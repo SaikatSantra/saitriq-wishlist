@@ -30,18 +30,13 @@ export default function WishlistOverview() {
               background="subdued"
             >
               <s-stack direction="inline" gap="base">
-                <img
+                <s-image
                   src={item.image}
                   alt={item.title}
-                  style={{
-                    width: 80,
-                    height: 80,
-                    objectFit: "cover",
-                    borderRadius: 12,
-                  }}
+                  aspectRatio="1/1"
                 />
                 <s-stack direction="block" gap="base">
-                  <strong>{item.title}</strong>
+                  <s-heading>{item.title}</s-heading>
                   <s-paragraph>{item.price}</s-paragraph>
                   <s-link href="/app">View in admin</s-link>
                 </s-stack>

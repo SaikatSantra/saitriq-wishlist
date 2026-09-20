@@ -27,6 +27,8 @@ const defaultSettings = {
   buttonLabel: "Remove",
   cardClass: "sai-wishlist-page__item",
   customCss: "",
+  buttonMode: "icon-text",
+  customSvg: "",
 };
 
 export const loader = async ({ request }) => {

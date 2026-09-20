@@ -92,7 +92,7 @@ export default function WishlistDashboard() {
       <s-section heading="Theme extension">
         <s-paragraph>
           The wishlist UI is delivered through the{" "}
-          <strong>{extensionName}</strong> theme app extension. This is why it
+          <s-heading>{extensionName}</s-heading> theme app extension. This is why it
           appears under your Shopify app: it is the installable storefront
           component that merchants add through Theme Editor.
         </s-paragraph>
@@ -126,7 +126,7 @@ export default function WishlistDashboard() {
               background="subdued"
             >
               <s-paragraph>
-                <strong>{block.title}</strong>
+                <s-heading>{block.title}</s-heading>
               </s-paragraph>
               <s-paragraph>{block.description}</s-paragraph>
             </s-box>

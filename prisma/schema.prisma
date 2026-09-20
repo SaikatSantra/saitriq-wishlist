@@ -60,5 +60,7 @@ model WishlistSettings {
   buttonLabel     String   @default("Remove")
   cardClass       String   @default("sai-wishlist-page__item")
   customCss       String   @default("")
+  buttonMode      String   @default("icon-text")
+  customSvg       String   @default("")
   updatedAt       DateTime @updatedAt
 }

@@ -11,6 +11,8 @@ const defaults = {
   buttonLabel: "Remove",
   cardClass: "sai-wishlist-page__item",
   customCss: "",
+  buttonMode: "icon-text",
+  customSvg: "",
 };
 
 export const loader = async ({ request }) => {
@@ -24,6 +26,21 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
+  const uploadedSvg = formData.get("customSvgFile");
+  let customSvg = String(formData.get("customSvg") || "").slice(0, 20000);
+  if (uploadedSvg instanceof File && uploadedSvg.size > 0) {
+    if (uploadedSvg.size > 20000 || uploadedSvg.type !== "image/svg+xml") {
+      return { error: "Upload an SVG file smaller than 20 KB." };
+    }
+    customSvg = (await uploadedSvg.text()).slice(0, 20000);
+  }
+  customSvg = customSvg
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(?:href|xlink:href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  if (customSvg && !/^<svg[\s>]/i.test(customSvg.trim())) {
+    return { error: "Custom icon must contain a valid SVG root element." };
+  }
   const settings = {
     heading: String(formData.get("heading") || defaults.heading).trim(),
     emptyMessage: String(
@@ -42,6 +59,12 @@ export const action = async ({ request }) => {
         .filter((value) => /^[a-zA-Z0-9_-]+$/.test(value))
         .join(" ") || defaults.cardClass,
     customCss: String(formData.get("customCss") || "").slice(0, 5000),
+    buttonMode: ["icon-only", "icon-text", "custom-svg"].includes(
+      formData.get("buttonMode"),
+    )
+      ? String(formData.get("buttonMode"))
+      : defaults.buttonMode,
+    customSvg,
   };
 
   await prisma.wishlistSettings.upsert({
@@ -65,18 +88,35 @@ export default function WishlistSettingsPage() {
           wishlist cards to inherit the same theme styling. The class is
           applied in addition to the Saitriq wishlist class.
         </s-paragraph>
-        <Form method="post">
+        <Form method="post" encType="multipart/form-data">
           <s-stack direction="block" gap="base">
-            <label>Heading<input name="heading" defaultValue={settings.heading} /></label>
-            <label>Empty message<input name="emptyMessage" defaultValue={settings.emptyMessage} /></label>
-            <label>Columns<input name="columns" type="number" min="2" max="6" defaultValue={settings.columns} /></label>
-            <label>Card CSS class<input name="cardClass" defaultValue={settings.cardClass} /></label>
-            <label>Remove label<input name="buttonLabel" defaultValue={settings.buttonLabel} /></label>
-            <label><input name="showPrices" type="checkbox" defaultChecked={settings.showPrices} /> Show prices</label>
-            <label><input name="showRemove" type="checkbox" defaultChecked={settings.showRemove} /> Show remove button</label>
-            <label>Custom CSS<textarea name="customCss" defaultValue={settings.customCss} rows="8" /></label>
-            <button type="submit">Save design settings</button>
+            <s-text-field label="Heading" name="heading" value={settings.heading} />
+            <s-text-field label="Empty message" name="emptyMessage" value={settings.emptyMessage} />
+            <s-text-field label="Columns (2-6)" name="columns" value={settings.columns} />
+            <s-text-field label="Card CSS class" name="cardClass" value={settings.cardClass} />
+            <s-text-field label="Remove label" name="buttonLabel" value={settings.buttonLabel} />
+            <s-checkbox label="Show prices" name="showPrices" checked={settings.showPrices} />
+            <s-checkbox label="Show remove button" name="showRemove" checked={settings.showRemove} />
+            <s-text-area label="Custom CSS" name="customCss" value={settings.customCss} rows={8} />
+            <s-select label="Wishlist button style" name="buttonMode" value={settings.buttonMode}>
+              <s-option value="icon-only">Icon only</s-option>
+              <s-option value="icon-text">Icon with text</s-option>
+              <s-option value="custom-svg">Custom SVG</s-option>
+            </s-select>
+            <s-paragraph>Upload an SVG icon (maximum 20 KB) or paste SVG markup below.</s-paragraph>
+            <label>
+              <s-button type="button">Choose SVG file</s-button>
+              <input
+                name="customSvgFile"
+                type="file"
+                accept=".svg,image/svg+xml"
+                style={{ display: "none" }}
+              />
+            </label>
+            <s-text-area label="Custom SVG markup" name="customSvg" value={settings.customSvg} rows={8} />
+            <s-button type="submit" variant="primary">Save design settings</s-button>
             {actionData?.saved && <s-paragraph>Settings saved.</s-paragraph>}
+            {actionData?.error && <s-paragraph>{actionData.error}</s-paragraph>}
           </s-stack>
         </Form>
       </s-section>

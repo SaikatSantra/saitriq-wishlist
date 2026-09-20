@@ -1,4 +1,36 @@
-# Shopify App Template - React Router
+# Saitriq Wishlist
+
+Production wishlist app for Shopify stores. It provides theme app blocks for
+product and collection pages, a customer wishlist page, header navigation,
+cross-device sync for logged-in customers, and merchant-controlled appearance
+settings.
+
+## Storefront setup
+
+1. Create a page with the handle `wishlist`.
+2. In Theme Editor, add the **Wishlist page** app block to that page.
+3. Add the **Wishlist button** app block to product and/or collection card
+   sections.
+4. Add the `wishlist-header-link` snippet to the header only if your theme
+   does not provide a suitable app block location.
+5. In the embedded app, open **Page design settings** to select icon-only,
+   icon-with-text, or custom SVG buttons and configure the wishlist grid.
+
+Logged-out shoppers use browser storage. Logged-in customers are synchronized
+through the app proxy and can access the same wishlist on another device.
+
+## Production deployment checklist
+
+- Deploy the app behind a stable HTTPS host and replace every
+  `REPLACE_WITH_YOUR_PRODUCTION_HOST` value in `shopify.app.toml`.
+- Run `npm exec prisma migrate deploy` against a persistent production database.
+- Use a shared production database for more than one app instance; the default
+  SQLite database is suitable only for a single persistent instance.
+- Configure the app proxy route `/apps/saitriq-wishlist` in the Shopify app.
+- Test guest add/remove, customer login sync, theme blocks, custom SVG
+  sanitization, and app-proxy requests on a development store before review.
+- Provide a privacy policy, support contact, and accurate App Store listing
+  before submitting the app.
 
 This is a template for building a [Shopify app](https://shopify.dev/docs/apps/getting-started) using [React Router](https://reactrouter.com/). It was forked from the [Shopify Remix app template](https://github.com/Shopify/shopify-app-template-remix) and converted to React Router.
 

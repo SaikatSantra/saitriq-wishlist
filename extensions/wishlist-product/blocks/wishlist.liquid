@@ -36,6 +36,24 @@
     const productTitle = button.dataset.productTitle;
     const productImage = button.dataset.productImage;
     const productPrice = button.dataset.productPrice;
+    let buttonSettings = { buttonMode: 'icon-text', customSvg: '' };
+    const renderIcon = (isSaved) => {
+      const icon = button.querySelector('.sai-wishlist__icon');
+      if (buttonSettings.buttonMode === 'custom-svg' && buttonSettings.customSvg) {
+        icon.innerHTML = buttonSettings.customSvg;
+      } else {
+        icon.textContent = isSaved ? '♥' : '♡';
+      }
+      button.querySelector('.sai-wishlist__label').hidden =
+        buttonSettings.buttonMode === 'icon-only';
+    };
+    const syncSettings = async () => {
+      const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
+      if (!response.ok) return;
+      const data = await response.json();
+      buttonSettings = data.settings || buttonSettings;
+      renderIcon(getWishlist().some((item) => String(item.id) === String(productId)));
+    };
 
     const getWishlist = () => {
       try {
@@ -105,11 +123,12 @@
       }
       saveWishlist(syncedItems);
       refresh();
+      syncSettings().catch(() => {});
     };
 
     const updateView = (isSaved) => {
       button.classList.toggle('is-active', isSaved);
-      button.querySelector('.sai-wishlist__icon').textContent = isSaved ? '♥' : '♡';
+      renderIcon(isSaved);
       button.querySelector('.sai-wishlist__label').textContent = isSaved ? 'Saved' : 'Add to wishlist';
       status.textContent = isSaved ? `${productTitle} saved to wishlist.` : '';
     };

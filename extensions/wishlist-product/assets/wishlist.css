@@ -28,6 +28,13 @@
   line-height: 1;
 }
 
+.sai-wishlist__icon svg {
+  display: block;
+  width: 1.2em;
+  height: 1.2em;
+  fill: currentColor;
+}
+
 .sai-wishlist__status {
   margin-top: 0.5rem;
   min-height: 1.2rem;
