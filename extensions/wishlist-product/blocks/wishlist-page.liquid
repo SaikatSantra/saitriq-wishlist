@@ -1,0 +1,251 @@
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+<section class="sai-wishlist-page" data-sai-wishlist-page>
+  <div class="sai-wishlist-page__header">
+    <h2>{{ block.settings.heading }}</h2>
+    <p data-sai-wishlist-empty hidden>{{ block.settings.empty_message }}</p>
+  </div>
+
+  <div class=" grid main-collection-grid spacing-style" style="
+    --grid--margin--mobile: 0 var(--margin-lg);
+    --grid-column--desktop: var(--centered);
+    --grid-column--mobile: var(--centered);
+    --padding-inline-start: 0px;
+    --padding-inline-end: 0px;
+  ">
+
+    <div style="
+      grid-column: var(--full-width);
+      --product-grid-gap-mobile: 12px 12px;
+      --product-grid-gap-desktop: 16px 16px;
+      container-type: inline-size;
+      container-name: product-grid;
+    ">
+      <ul class="sai-wishlist-page__items product-grid--grid product-grid " data-sai-wishlist-items></ul>
+    </div>
+
+  </div>
+</section>
+
+<script>
+  (() => {
+    const storageKey = 'saitriq_wishlist';
+    const syncEndpoint = '/apps/saitriq-wishlist';
+    let localRevision = 0;
+    let settings = {
+      heading: '{{ block.settings.heading | escape }}',
+      emptyMessage: '{{ block.settings.empty_message | escape }}',
+      columns: {{ block.settings.columns | default: 4 }},
+      showPrices: {{ block.settings.show_prices | default: true | json }},
+      showRemove: {{ block.settings.show_remove | default: true | json }},
+      buttonLabel: '{{ block.settings.button_label | escape }}',
+      cardClass: 'sai-wishlist-page__item',
+      customCss: ''
+    };
+    const script = document.currentScript;
+    const page = script && script.previousElementSibling;
+    if (!page) return;
+
+    const itemsContainer = page.querySelector('[data-sai-wishlist-items]');
+    const emptyMessage = page.querySelector('[data-sai-wishlist-empty]');
+    if (!itemsContainer || !emptyMessage) return;
+
+    const getItems = () => {
+      try {
+        const items = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        return Array.isArray(items) ? items : [];
+      } catch (error) {
+        return [];
+      }
+    };
+
+    const syncItems = async () => {
+      const revisionAtStart = localRevision;
+      const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.authenticated || !Array.isArray(data.items)) return;
+      if (data.settings) settings = { ...settings, ...data.settings };
+      let customStyle = document.querySelector('[data-sai-wishlist-custom-css]');
+      if (!customStyle) {
+        customStyle = document.createElement('style');
+        customStyle.dataset.saiWishlistCustomCss = '';
+        document.head.append(customStyle);
+      }
+      customStyle.textContent = settings.customCss || '';
+
+      let items = data.items.map((saved) => ({
+        id: saved.productId,
+        handle: saved.productHandle,
+        title: saved.productTitle,
+        image: saved.productImage || '',
+        price: saved.productPrice || '',
+        addedAt: saved.createdAt
+      }));
+
+      for (const item of getItems()) {
+        if (!items.some((saved) => String(saved.id) === String(item.id))) {
+          const addResponse = await fetch(syncEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              operation: 'add',
+              productId: item.id,
+              productHandle: item.handle,
+              productTitle: item.title,
+              productImage: item.image
+              ,productPrice: item.price
+            })
+          });
+          if (addResponse.ok) {
+            const added = await addResponse.json();
+            if (Array.isArray(added.items)) {
+              items = added.items.map((saved) => ({
+                id: saved.productId,
+                handle: saved.productHandle,
+                title: saved.productTitle,
+                image: saved.productImage || '',
+                price: saved.productPrice || '',
+                addedAt: saved.createdAt
+              }));
+            }
+          }
+        }
+      }
+      if (revisionAtStart !== localRevision) return;
+
+      localStorage.setItem(storageKey, JSON.stringify(items));
+      render();
+    };
+
+    const render = () => {
+      const items = getItems();
+      page.querySelector('h2').textContent = settings.heading;
+      emptyMessage.textContent = settings.emptyMessage;
+      itemsContainer.style.setProperty('--sai-wishlist-columns', settings.columns);
+      itemsContainer.replaceChildren();
+      emptyMessage.hidden = items.length > 0;
+
+      items.forEach((item) => {
+        const card = document.createElement('li');
+        card.className = `sai-wishlist-page__item product-grid__item ${settings.cardClass || ''}`.trim();
+        card.innerHTML = `
+          <a href="/products/${encodeURIComponent(item.handle)}">
+            <img src="${item.image || ''}" alt="${item.title || ''}" loading="lazy">
+          </a>
+          <div>
+            <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${item.title || 'Product'}</a>
+            ${settings.showPrices && item.price ? `<div class="sai-wishlist-page__price">${item.price}</div>` : ''}
+            ${settings.showRemove ? `<button type="button" class="sai-wishlist-page__remove">${settings.buttonLabel}</button>` : ''}
+          </div>
+        `;
+        const removeButton = card.querySelector('.sai-wishlist-page__remove');
+        if (!removeButton) {
+          itemsContainer.append(card);
+          return;
+        }
+        removeButton.addEventListener('click', () => {
+          localRevision += 1;
+          const updated = getItems().filter((saved) => String(saved.id) !== String(item.id));
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(updated));
+            window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+            fetch(syncEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                operation: 'remove',
+                productId: item.id,
+                productHandle: item.handle,
+                productTitle: item.title,
+                productImage: item.image
+                ,productPrice: item.price
+              })
+            })
+              .then((response) => {
+                if (!response.ok) throw new Error('Wishlist remove request failed');
+                return response.json();
+              })
+              .then((data) => {
+                if (data.authenticated && Array.isArray(data.items)) {
+                  const serverItems = data.items.map((saved) => ({
+                    id: saved.productId,
+                    handle: saved.productHandle,
+                    title: saved.productTitle,
+                    image: saved.productImage || '',
+                    addedAt: saved.createdAt
+                  }));
+                  localStorage.setItem(storageKey, JSON.stringify(serverItems));
+                  window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+                  render();
+                }
+              })
+              .catch(() => {});
+            render();
+          } catch (error) {
+            emptyMessage.hidden = false;
+            emptyMessage.textContent = 'Your browser could not update this wishlist.';
+          }
+        });
+        itemsContainer.append(card);
+      });
+    };
+
+    render();
+    syncItems().catch(() => {});
+    window.addEventListener('saitriq:wishlist-updated', render);
+    window.addEventListener('storage', (event) => {
+      if (event.key === storageKey) render();
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Wishlist page",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "My wishlist"
+    },
+    {
+      "type": "text",
+      "id": "empty_message",
+      "label": "Empty wishlist message",
+      "default": "You have not saved any products yet."
+    },
+    {
+      "type": "range",
+      "id": "columns",
+      "label": "Columns",
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "checkbox",
+      "id": "show_prices",
+      "label": "Show prices",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_remove",
+      "label": "Show remove button",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Remove button label",
+      "default": "Remove"
+    }
+  ]
+}
+{% endschema %}

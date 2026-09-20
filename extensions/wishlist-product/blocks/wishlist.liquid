@@ -1,0 +1,188 @@
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+{% assign product_for_wishlist = block.settings.product | default: product %}
+
+<div data-sai-wishlist>
+  <button
+    type="button"
+    class="sai-wishlist"
+    data-sai-wishlist-button
+    data-product-id="{{ product_for_wishlist.id }}"
+    data-product-handle="{{ product_for_wishlist.handle }}"
+    data-product-title="{{ product_for_wishlist.title | escape }}"
+    data-product-image="{{ product_for_wishlist.featured_image | image_url: width: 600 | escape }}"
+    data-product-price="{{ product_for_wishlist.price | money | escape }}"
+    data-block-id="{{ block.id }}"
+  >
+    <span class="sai-wishlist__icon" aria-hidden="true">♡</span>
+    <span class="sai-wishlist__label">Add to wishlist</span>
+  </button>
+  <p class="sai-wishlist__status" aria-live="polite"></p>
+</div>
+
+<script>
+  (() => {
+    const storageKey = 'saitriq_wishlist';
+    const syncEndpoint = '/apps/saitriq-wishlist';
+    const script = document.currentScript;
+    const block = script && script.previousElementSibling;
+    const button = block && block.querySelector('[data-sai-wishlist-button]');
+    const status = block && block.querySelector('.sai-wishlist__status');
+
+    if (!button || !status) return;
+
+    const productId = button.dataset.productId;
+    const productHandle = button.dataset.productHandle;
+    const productTitle = button.dataset.productTitle;
+    const productImage = button.dataset.productImage;
+    const productPrice = button.dataset.productPrice;
+
+    const getWishlist = () => {
+      try {
+        const value = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        return Array.isArray(value) ? value : [];
+      } catch (error) {
+        return [];
+      }
+    };
+
+    const saveWishlist = (items) => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(items));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+      } catch (error) {
+        status.textContent = 'Your browser could not save this wishlist item.';
+      }
+    };
+
+    const sync = async (operation, item) => {
+      const response = await fetch(syncEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ operation, ...item })
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (!data.authenticated || !Array.isArray(data.items)) return null;
+      const syncedItems = data.items.map((saved) => ({
+        id: saved.productId,
+        handle: saved.productHandle,
+        title: saved.productTitle,
+        image: saved.productImage || '',
+        price: saved.productPrice || '',
+        addedAt: saved.createdAt
+      }));
+      saveWishlist(syncedItems);
+      return syncedItems;
+    };
+
+    const syncExistingItems = async () => {
+      const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.authenticated || !Array.isArray(data.items)) return;
+
+      let syncedItems = data.items.map((saved) => ({
+        id: saved.productId,
+        handle: saved.productHandle,
+        title: saved.productTitle,
+        image: saved.productImage || '',
+        addedAt: saved.createdAt
+      }));
+
+      for (const item of getWishlist()) {
+        if (!syncedItems.some((saved) => String(saved.id) === String(item.id))) {
+          const merged = await sync('add', {
+            productId: item.id,
+            productHandle: item.handle,
+            productTitle: item.title,
+            productImage: item.image
+            ,productPrice: item.price
+          });
+          if (merged) syncedItems = merged;
+        }
+      }
+      saveWishlist(syncedItems);
+      refresh();
+    };
+
+    const updateView = (isSaved) => {
+      button.classList.toggle('is-active', isSaved);
+      button.querySelector('.sai-wishlist__icon').textContent = isSaved ? '♥' : '♡';
+      button.querySelector('.sai-wishlist__label').textContent = isSaved ? 'Saved' : 'Add to wishlist';
+      status.textContent = isSaved ? `${productTitle} saved to wishlist.` : '';
+    };
+
+    const refresh = () => {
+      const items = getWishlist();
+      updateView(items.some((item) => String(item.id) === String(productId)));
+    };
+
+    refresh();
+    syncExistingItems().catch(() => {
+      status.textContent = 'Wishlist sync is temporarily unavailable.';
+    });
+    window.addEventListener('saitriq:wishlist-updated', refresh);
+
+    button.addEventListener('click', () => {
+      const wishlistItems = getWishlist();
+      const existingIndex = wishlistItems.findIndex((item) => String(item.id) === String(productId));
+
+      if (existingIndex >= 0) {
+        wishlistItems.splice(existingIndex, 1);
+        saveWishlist(wishlistItems);
+        sync('remove', {
+          productId,
+          productHandle,
+          productTitle,
+          productImage
+        }).catch(() => {
+          status.textContent = 'The item was removed locally but could not sync.';
+        });
+        updateView(false);
+        return;
+      }
+
+      wishlistItems.push({
+        id: productId,
+        handle: productHandle,
+        title: productTitle,
+        image: productImage,
+        price: productPrice,
+        addedAt: new Date().toISOString()
+      });
+
+      saveWishlist(wishlistItems);
+      sync('add', {
+        productId,
+        productHandle,
+        productTitle,
+        productImage
+        ,productPrice
+      }).catch(() => {
+        status.textContent = 'The item was saved locally but could not sync.';
+      });
+      updateView(true);
+    });
+
+    window.addEventListener('storage', (event) => {
+      if (event.key === storageKey) refresh();
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Wishlist",
+  "target": "section",
+  "settings": [
+    {
+      "type": "product",
+      "id": "product",
+      "label": "Product",
+      "autofill": true
+    }
+  ]
+}
+{% endschema %}

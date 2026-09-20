@@ -1,0 +1,76 @@
+.sai-wishlist {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid #1a1a1a;
+  background: #ffffff;
+  color: #1a1a1a;
+  border-radius: 999px;
+  padding: 0.85rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sai-wishlist:hover {
+  background: #f5f5f5;
+}
+
+.sai-wishlist.is-active {
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+.sai-wishlist__icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.sai-wishlist__status {
+  margin-top: 0.5rem;
+  min-height: 1.2rem;
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.sai-wishlist-page__items {
+  display: grid;
+  grid-template-columns: repeat(var(--sai-wishlist-columns, 4), minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.sai-wishlist-page__item {
+  min-width: 0;
+}
+
+.sai-wishlist-page__item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.sai-wishlist-page__price {
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.sai-wishlist-page__title {
+  display: block;
+  margin-top: 0.75rem;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sai-wishlist-page__remove {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}

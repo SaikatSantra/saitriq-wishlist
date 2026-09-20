@@ -1,0 +1,22 @@
+{% if customer %}
+  <a href="/pages/wishlist" class="header-wishlist-link" aria-label="View wishlist" title="Wishlist">
+    <span aria-hidden="true">♥</span>
+    <span>Wishlist</span>
+  </a>
+{% else %}
+  <a href="{{ routes.account_login_url }}" class="header-wishlist-link" aria-label="Log in to use wishlist" title="Log in to use wishlist">
+    <span aria-hidden="true">♥</span>
+    <span>Log in for wishlist</span>
+  </a>
+{% endif %}
+
+<style>
+  .header-wishlist-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #1a1a1a;
+    text-decoration: none;
+    font-weight: 600;
+  }
+</style>
