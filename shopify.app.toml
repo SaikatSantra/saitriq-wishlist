@@ -8,11 +8,11 @@ embedded = true
 api_version = "2026-10"
 
   [[webhooks.subscriptions]]
-  uri = "https://saitriq-wishlist.vercel.app/webhooks/app/uninstalled"
+  uri = "/webhooks/app/uninstalled"
   topics = [ "app/uninstalled" ]
 
   [[webhooks.subscriptions]]
-  uri = "https://saitriq-wishlist.vercel.app/webhooks/app/scopes_update"
+  uri = "/webhooks/app/scopes_update"
   topics = [ "app/scopes_update" ]
 
 [auth]
