@@ -1,0 +1,130 @@
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+<div data-sai-wishlist-collection></div>
+
+<script>
+  (() => {
+    const storageKey = 'saitriq_wishlist';
+    const endpoint = '/apps/saitriq-wishlist';
+    const root = document.currentScript && document.currentScript.previousElementSibling;
+    if (!root || window.saitriqWishlistCollectionLoaded) return;
+    window.saitriqWishlistCollectionLoaded = true;
+
+    const readItems = () => {
+      try {
+        const value = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        return Array.isArray(value) ? value : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const saveItems = (items) => {
+      localStorage.setItem(storageKey, JSON.stringify(items));
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+    };
+
+    const productHandleFromLink = (link) => {
+      const match = new URL(link.href, window.location.origin).pathname.match(/^\/products\/([^/]+)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    };
+
+    const productLinks = () => [...document.querySelectorAll('a[href*="/products/"]')]
+      .filter((link) => productHandleFromLink(link))
+      .filter((link, index, links) => links.findIndex((candidate) =>
+        productHandleFromLink(candidate) === productHandleFromLink(link)
+      ) === index);
+
+    const productData = async (handle) => {
+      const response = await fetch(`/products/${encodeURIComponent(handle)}.js`);
+      if (!response.ok) throw new Error(`Product lookup failed: ${response.status}`);
+      const product = await response.json();
+      return {
+        id: String(product.id),
+        handle: product.handle,
+        title: product.title,
+        image: product.featured_image || product.images?.[0] || '',
+        price: product.price ? (product.price / 100).toFixed(2) : ''
+      };
+    };
+
+    const sync = async (operation, item) => {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ operation, ...item })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.authenticated || !Array.isArray(data.items)) {
+        throw new Error(data.error || `Wishlist ${operation} failed`);
+      }
+      const items = data.items.map((saved) => ({
+        id: saved.productId,
+        handle: saved.productHandle,
+        title: saved.productTitle,
+        image: saved.productImage || '',
+        price: saved.productPrice || '',
+        addedAt: saved.createdAt
+      }));
+      saveItems(items);
+      return items;
+    };
+
+    const render = (button, item) => {
+      const saved = readItems().some((entry) => String(entry.id) === String(item.id));
+      button.textContent = saved ? '♥' : '♡';
+      button.classList.toggle('is-active', saved);
+      button.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
+      button.title = saved ? 'Remove from wishlist' : 'Add to wishlist';
+    };
+
+    const attach = async (link) => {
+      const handle = productHandleFromLink(link);
+      const card = link.closest('li, article, .card, .product-card, [class*="product-card"]');
+      if (!handle || !card || card.querySelector('[data-sai-collection-wishlist]')) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'sai-wishlist sai-wishlist--collection';
+      button.dataset.saiCollectionWishlist = '';
+      button.textContent = '♡';
+      button.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.disabled) return;
+        button.disabled = true;
+        try {
+          const item = await productData(handle);
+          const saved = readItems().some((entry) => String(entry.id) === String(item.id));
+          await sync(saved ? 'remove' : 'add', item);
+          render(button, item);
+        } catch (error) {
+          console.error('Collection wishlist request failed', error);
+        } finally {
+          button.disabled = false;
+        }
+      });
+      card.append(button);
+      try {
+        const item = await productData(handle);
+        render(button, item);
+      } catch (error) {
+        button.remove();
+        console.error('Collection wishlist product lookup failed', error);
+      }
+    };
+
+    const scan = () => productLinks().forEach((link) => attach(link));
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('saitriq:wishlist-updated', scan);
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Collection wishlist icons",
+  "target": "section",
+  "settings": []
+}
+{% endschema %}

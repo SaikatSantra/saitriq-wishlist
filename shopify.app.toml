@@ -95,7 +95,7 @@ api_version = "2026-10"
 redirect_urls = [ "https://saitriq-wishlist.vercel.app/auth/callback" ]
 
 [app_proxy]
-url = "/apps/saitriq-wishlist"
+url = "https://saitriq-wishlist.vercel.app"
 subpath = "saitriq-wishlist"
 prefix = "apps"
 
