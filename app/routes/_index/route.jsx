@@ -1,4 +1,4 @@
-import { redirect, useLoaderData } from "react-router";
+import { Form, redirect, useLoaderData } from "react-router";
 import { login } from "../../shopify.server";
 import styles from "./styles.module.css";
 
@@ -23,9 +23,21 @@ export default function App() {
           Give customers a persistent wishlist that works across devices.
         </p>
         {showForm && (
-          <p className={styles.text}>
-            Install or open Saitriq Wishlist from Shopify Admin to begin setup.
-          </p>
+          <>
+            <Form className={styles.form} method="post" action="/auth/login">
+              <label className={styles.label}>
+                <span>Shop domain</span>
+                <input className={styles.input} type="text" name="shop" />
+                <span>e.g: my-shop-domain.myshopify.com</span>
+              </label>
+              <button className={styles.button} type="submit">
+                Log in
+              </button>
+            </Form>
+            <p className={styles.text}>
+              Install or open Saitriq Wishlist from Shopify Admin to begin setup.
+            </p>
+          </>
         )}
         <ul className={styles.list}>
           <li>
