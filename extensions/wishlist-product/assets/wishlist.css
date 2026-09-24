@@ -52,6 +52,22 @@
   min-width: 0;
 }
 
+.sai-wishlist-page__clear {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid currentColor;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sai-wishlist-page__clear:disabled,
+.sai-wishlist-page__remove:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .sai-wishlist-page__item img {
   display: block;
   width: 100%;

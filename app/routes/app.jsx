@@ -19,7 +19,8 @@ export default function App() {
         <s-link href="/app">Dashboard</s-link>
         <s-link href="/app/wishlist">Wishlist activity</s-link>
         <s-link href="/app/settings">Page design settings</s-link>
-        <s-link href="/app/additional">Installation guide</s-link>
+        <s-link href="/app/pricing">Pricing</s-link>
+        <s-link href="/app/how-to-use">How to use</s-link>
       </s-app-nav>
       <Outlet />
     </AppProvider>

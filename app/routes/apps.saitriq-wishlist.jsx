@@ -1,5 +1,14 @@
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import {
+  getAnalytics,
+  listCustomerWishlists,
+  monthlyLimit,
+  recordAnalytics,
+  upsertWishlist,
+  deleteWishlist,
+  deleteCustomerWishlists,
+} from "../metaobjects.server";
 
 const json = (data, init = {}) =>
   new Response(JSON.stringify(data), {
@@ -7,16 +16,35 @@ const json = (data, init = {}) =>
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
+      "X-Saitriq-Wishlist-Version": "proxy-v7",
       ...(init.headers || {}),
     },
   });
 
-const getCustomerId = (request) => {
-  const customerId = new URL(request.url).searchParams.get(
-    "logged_in_customer_id",
-  );
-  return customerId && /^\d+$/.test(customerId) ? customerId : null;
+const readPayload = async (request) => {
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return request.json().catch(() => null);
+  }
+
+  const form = await request.formData().catch(() => null);
+  return form ? Object.fromEntries(form.entries()) : null;
 };
+
+const getCustomerId = (request) => {
+  const id = new URL(request.url).searchParams.get("logged_in_customer_id");
+  if (id && /^\d+$/.test(id)) return id;
+  const gidMatch = id?.match(/^gid:\/\/shopify\/Customer\/(\d+)$/);
+  return gidMatch ? gidMatch[1] : null;
+};
+
+const monthKey = () => new Date().toISOString().slice(0, 7);
+
+const usageFor = (used, limit) => ({
+  used,
+  limit,
+  remaining: Number.isFinite(limit) ? Math.max(0, limit - used) : Infinity,
+});
 
 const defaultSettings = {
   heading: "My wishlist",
@@ -25,86 +53,115 @@ const defaultSettings = {
   showPrices: true,
   showRemove: true,
   buttonLabel: "Remove",
-  cardClass: "sai-wishlist-page__item",
-  customCss: "",
-  buttonMode: "icon-text",
-  customSvg: "",
 };
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.public.appProxy(request);
+  const { session, admin } = await authenticate.public.appProxy(request);
   const customerId = getCustomerId(request);
-  const settings = session
-    ? await prisma.wishlistSettings.findUnique({ where: { shop: session.shop } })
-    : null;
-
-  if (!session || !customerId) {
-    return json({ authenticated: false, items: [], settings: settings || defaultSettings });
+  if (!session || !admin || !customerId) {
+    return json({ authenticated: false, items: [] });
   }
 
-  const items = await prisma.wishlistItem.findMany({
-    where: { shop: session.shop, customerId },
-    orderBy: { createdAt: "desc" },
+  const analytics = await getAnalytics(admin, monthKey());
+  const items = await listCustomerWishlists(admin, customerId);
+  const settings = await prisma.wishlistSettings.findUnique({
+    where: { shop: session.shop },
   });
-
-  return json({ authenticated: true, items, settings: settings || defaultSettings });
+  return json({
+    authenticated: true,
+    items,
+    settings: settings || defaultSettings,
+    usage: usageFor(analytics.adds, monthlyLimit("free")),
+  });
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.public.appProxy(request);
-  const customerId = getCustomerId(request);
+  try {
+    const { session, admin } = await authenticate.public.appProxy(request);
+    const customerId = getCustomerId(request);
+    if (!session || !admin || !customerId) {
+      return json(
+        { authenticated: false, error: "Log in to save a synced wishlist." },
+        { status: 401 },
+      );
+    }
 
-  if (!session || !customerId) {
-    return json(
-      { authenticated: false, error: "Log in to save a synced wishlist." },
-      { status: 401 },
-    );
-  }
+    const payload = await readPayload(request);
+    const operation = payload?.operation;
+    const month = monthKey();
+    const limit = monthlyLimit("free");
 
-  const payload = await request.json().catch(() => null);
-  if (!payload || typeof payload !== "object") {
-    return json({ error: "Invalid wishlist request." }, { status: 400 });
-  }
+    if (operation === "clear") {
+      const removedCount = await deleteCustomerWishlists(admin, customerId);
+      if (removedCount > 0) {
+        await recordAnalytics(admin, month, { removes: removedCount });
+      }
+      const analytics = await getAnalytics(admin, month);
+      return json({
+        authenticated: true,
+        items: [],
+        usage: usageFor(analytics.adds, limit),
+      });
+    }
 
-  const productId = String(payload.productId || "");
-  const productHandle = String(payload.productHandle || "");
-  const productTitle = String(payload.productTitle || "");
-  const productImage = payload.productImage ? String(payload.productImage) : null;
-  const productPrice = payload.productPrice ? String(payload.productPrice) : null;
-  const operation = payload.operation;
+    const productId = String(payload?.productId || "");
+    const productHandle = String(payload?.productHandle || "");
+    const productTitle = String(payload?.productTitle || "");
+    if (
+      !productId ||
+      !productHandle ||
+      !productTitle ||
+      !["add", "remove"].includes(operation)
+    ) {
+      return json(
+        { error: "A valid wishlist operation and product details are required." },
+        { status: 400 },
+      );
+    }
 
-  if (!productId || !productHandle || !productTitle) {
-    return json({ error: "Product details are required." }, { status: 400 });
-  }
+    const analytics = await getAnalytics(admin, month);
+    if (operation === "add" && analytics.adds >= limit) {
+      return json(
+        {
+          error: "This store has reached its monthly wishlist limit.",
+          usage: { used: analytics.adds, limit, remaining: 0 },
+        },
+        { status: 429 },
+      );
+    }
 
-  if (operation === "remove") {
-    await prisma.wishlistItem.deleteMany({
-      where: { shop: session.shop, customerId, productId },
-    });
-  } else if (operation === "add") {
-    await prisma.wishlistItem.upsert({
-      where: {
-        shop_customerId_productId: { shop: session.shop, customerId, productId },
-      },
-      create: {
-        shop: session.shop,
+    if (operation === "add") {
+      const result = await upsertWishlist(admin, {
         customerId,
         productId,
         productHandle,
         productTitle,
-        productImage,
-        productPrice,
-      },
-      update: { productHandle, productTitle, productImage, productPrice },
+        productImage: payload.productImage,
+        productPrice: payload.productPrice,
+        addedAt: new Date().toISOString(),
+      });
+      if (result.created) {
+        await recordAnalytics(admin, month, { adds: 1, uniqueCustomers: 1 });
+      }
+    } else {
+      await deleteWishlist(admin, customerId, productId);
+      await recordAnalytics(admin, month, { removes: 1 });
+    }
+
+    const updated = await getAnalytics(admin, month);
+    return json({
+      authenticated: true,
+      items: await listCustomerWishlists(admin, customerId),
+      usage: usageFor(updated.adds, limit),
     });
-  } else {
-    return json({ error: "Unsupported wishlist operation." }, { status: 400 });
+  } catch (error) {
+    console.error("Wishlist proxy operation failed", error);
+    return json(
+      {
+        authenticated: true,
+        error: "The wishlist could not be synchronized.",
+      },
+      { status: 502 },
+    );
   }
-
-  const items = await prisma.wishlistItem.findMany({
-    where: { shop: session.shop, customerId },
-    orderBy: { createdAt: "desc" },
-  });
-
-  return json({ authenticated: true, items });
 };

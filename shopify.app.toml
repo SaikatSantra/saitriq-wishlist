@@ -4,6 +4,82 @@ name = "Saitriq : Wishlist"
 application_url = "https://saitriq-wishlist.vercel.app"
 embedded = true
 
+[access_scopes]
+scopes = "read_metaobjects,write_metaobjects"
+
+[metaobjects.app.wishlist]
+name = "Wishlist item"
+display_name_field = "product_title"
+access.admin = "merchant_read_write"
+access.storefront = "public_read"
+
+[metaobjects.app.wishlist.fields.customer_id]
+name = "Customer ID"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.wishlist.fields.product_id]
+name = "Product ID"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.wishlist.fields.product_handle]
+name = "Product handle"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.wishlist.fields.product_title]
+name = "Product title"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.wishlist.fields.product_image]
+name = "Product image"
+type = "url"
+
+[metaobjects.app.wishlist.fields.product_price]
+name = "Product price"
+type = "single_line_text_field"
+
+[metaobjects.app.wishlist.fields.added_at]
+name = "Added at"
+type = "date_time"
+
+[metaobjects.app.wishlist_analytics]
+name = "Wishlist analytics"
+display_name_field = "month"
+access.admin = "merchant_read_write"
+
+[metaobjects.app.wishlist_analytics.fields.month]
+name = "Month"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.wishlist_analytics.fields.day]
+name = "Day"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.wishlist_analytics.fields.adds]
+name = "Wishlist adds"
+type = "number_integer"
+required = true
+
+[metaobjects.app.wishlist_analytics.fields.removes]
+name = "Wishlist removes"
+type = "number_integer"
+required = true
+
+[metaobjects.app.wishlist_analytics.fields.unique_customers]
+name = "Unique customers"
+type = "number_integer"
+required = true
+
+[metaobjects.app.wishlist_analytics.fields.updated_at]
+name = "Updated at"
+type = "date_time"
+required = true
+
 [webhooks]
 api_version = "2026-10"
 

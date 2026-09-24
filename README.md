@@ -111,8 +111,41 @@ For more information on the Shopify Dev MCP please read [the documentation](http
 
 ### Application Storage
 
-This template uses [Prisma](https://www.prisma.io/) to store session data, by default using an [SQLite](https://www.sqlite.org/index.html) database.
+This app uses [Prisma](https://www.prisma.io/) with PostgreSQL to store Shopify
+session data and merchant settings. Wishlist entries and wishlist analytics are
+stored in Shopify app-owned metaobjects.
 The database is defined as a Prisma schema in `prisma/schema.prisma`.
+
+Before running `shopify app dev`, create a local `.env` file from
+[.env.example](./.env.example) and set `DATABASE_URL` to a reachable PostgreSQL
+database. The file is gitignored and must never be committed:
+
+```powershell
+Copy-Item .env.example .env
+# Edit .env and replace the DATABASE_URL placeholder.
+npm exec prisma migrate deploy
+shopify app dev
+```
+
+If `shopify app dev` reports `Environment variable not found: DATABASE_URL`,
+the `.env` file is missing, is in a different directory, or still has not been
+created. Shopify CLI cannot create a PostgreSQL database or infer its
+credentials.
+
+If Prisma reports `P3009` and says the initial migration failed because a
+`Session` relation already exists, do not drop the database. This means the
+schema was already created but Prisma's migration history was not recorded.
+After verifying that the existing schema belongs to this app, mark that
+specific migration as applied and deploy again:
+
+```powershell
+npx prisma migrate resolve --applied 20260920153143_init
+npm exec prisma migrate deploy
+```
+
+Only use `--applied` when the existing tables match the migration. For a
+different or incomplete schema, stop and inspect the database before changing
+migration history.
 
 This use of SQLite works in production if your app runs as a single instance.
 The database that works best for you depends on the data your app needs and how it is queried.

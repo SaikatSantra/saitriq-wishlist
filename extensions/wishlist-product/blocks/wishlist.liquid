@@ -17,7 +17,6 @@
     <span class="sai-wishlist__icon" aria-hidden="true">♡</span>
     <span class="sai-wishlist__label">Add to wishlist</span>
   </button>
-  <p class="sai-wishlist__status" aria-live="polite"></p>
 </div>
 
 <script>
@@ -27,9 +26,8 @@
     const script = document.currentScript;
     const block = script && script.previousElementSibling;
     const button = block && block.querySelector('[data-sai-wishlist-button]');
-    const status = block && block.querySelector('.sai-wishlist__status');
 
-    if (!button || !status) return;
+    if (!button) return;
 
     const productId = button.dataset.productId;
     const productHandle = button.dataset.productHandle;
@@ -37,6 +35,7 @@
     const productImage = button.dataset.productImage;
     const productPrice = button.dataset.productPrice;
     let buttonSettings = { buttonMode: 'icon-text', customSvg: '' };
+    let requestInFlight = false;
     const renderIcon = (isSaved) => {
       const icon = button.querySelector('.sai-wishlist__icon');
       if (buttonSettings.buttonMode === 'custom-svg' && buttonSettings.customSvg) {
@@ -60,6 +59,7 @@
         const value = JSON.parse(localStorage.getItem(storageKey) || '[]');
         return Array.isArray(value) ? value : [];
       } catch (error) {
+        console.error('Wishlist storage is unavailable', error);
         return [];
       }
     };
@@ -69,7 +69,6 @@
         localStorage.setItem(storageKey, JSON.stringify(items));
         window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
       } catch (error) {
-        status.textContent = 'Your browser could not save this wishlist item.';
       }
     };
 
@@ -80,7 +79,15 @@
         credentials: 'same-origin',
         body: JSON.stringify({ operation, ...item })
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        console.error('Wishlist proxy request failed', {
+          status: response.status,
+          body: errorBody,
+          version: response.headers.get('X-Saitriq-Wishlist-Version')
+        });
+        return null;
+      }
       const data = await response.json();
       if (!data.authenticated || !Array.isArray(data.items)) return null;
       const syncedItems = data.items.map((saved) => ({
@@ -96,6 +103,11 @@
     };
 
     const syncExistingItems = async () => {
+      if (window.saitriqWishlistSyncPromise) {
+        return window.saitriqWishlistSyncPromise;
+      }
+
+      const syncRun = (async () => {
       const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
       if (!response.ok) return;
       const data = await response.json();
@@ -124,13 +136,18 @@
       saveWishlist(syncedItems);
       refresh();
       syncSettings().catch(() => {});
+      })();
+
+      window.saitriqWishlistSyncPromise = syncRun.finally(() => {
+        window.saitriqWishlistSyncPromise = null;
+      });
+      return window.saitriqWishlistSyncPromise;
     };
 
     const updateView = (isSaved) => {
       button.classList.toggle('is-active', isSaved);
       renderIcon(isSaved);
       button.querySelector('.sai-wishlist__label').textContent = isSaved ? 'Saved' : 'Add to wishlist';
-      status.textContent = isSaved ? `${productTitle} saved to wishlist.` : '';
     };
 
     const refresh = () => {
@@ -139,50 +156,44 @@
     };
 
     refresh();
-    syncExistingItems().catch(() => {
-      status.textContent = 'Wishlist sync is temporarily unavailable.';
+    const initialSync = syncExistingItems().catch(() => {
+      console.error('Wishlist sync is temporarily unavailable');
     });
     window.addEventListener('saitriq:wishlist-updated', refresh);
 
-    button.addEventListener('click', () => {
-      const wishlistItems = getWishlist();
-      const existingIndex = wishlistItems.findIndex((item) => String(item.id) === String(productId));
+    button.addEventListener('click', async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      button.disabled = true;
+      try {
+        await initialSync;
+        const wishlistItems = getWishlist();
+        const existingIndex = wishlistItems.findIndex((item) => String(item.id) === String(productId));
 
-      if (existingIndex >= 0) {
-        wishlistItems.splice(existingIndex, 1);
-        saveWishlist(wishlistItems);
-        sync('remove', {
-          productId,
-          productHandle,
-          productTitle,
-          productImage
-        }).catch(() => {
-          status.textContent = 'The item was removed locally but could not sync.';
-        });
-        updateView(false);
-        return;
+        if (existingIndex >= 0) {
+          const syncedItems = await sync('remove', {
+            productId,
+            productHandle,
+            productTitle,
+            productImage
+          });
+          if (syncedItems) updateView(false);
+        } else {
+          const syncedItems = await sync('add', {
+            productId,
+            productHandle,
+            productTitle,
+            productImage,
+            productPrice
+          });
+          if (syncedItems) updateView(true);
+        }
+      } catch (error) {
+        console.error('Wishlist request failed', error);
+      } finally {
+        button.disabled = false;
+        requestInFlight = false;
       }
-
-      wishlistItems.push({
-        id: productId,
-        handle: productHandle,
-        title: productTitle,
-        image: productImage,
-        price: productPrice,
-        addedAt: new Date().toISOString()
-      });
-
-      saveWishlist(wishlistItems);
-      sync('add', {
-        productId,
-        productHandle,
-        productTitle,
-        productImage
-        ,productPrice
-      }).catch(() => {
-        status.textContent = 'The item was saved locally but could not sync.';
-      });
-      updateView(true);
     });
 
     window.addEventListener('storage', (event) => {

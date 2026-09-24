@@ -1,17 +1,12 @@
-import { useLoaderData } from "react-router";
+import { useEffect } from "react";
+import { useLoaderData, useRevalidator } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { getAnalytics, monthlyLimit } from "../metaobjects.server";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const [savedItems, customers] = await Promise.all([
-    prisma.wishlistItem.count({ where: { shop: session.shop } }),
-    prisma.wishlistItem.findMany({
-      where: { shop: session.shop },
-      distinct: ["customerId"],
-      select: { customerId: true },
-    }),
-  ]);
+  const { session, admin } = await authenticate.admin(request);
+  const analytics = await getAnalytics(admin, new Date().toISOString().slice(0, 7));
   const settings =
     (await prisma.wishlistSettings.findUnique({ where: { shop: session.shop } })) ||
     {
@@ -24,7 +19,7 @@ export const loader = async ({ request }) => {
     };
 
   return {
-    stats: { savedItems, customers: customers.length },
+    stats: { used: analytics.adds, remaining: Math.max(0, monthlyLimit("free") - analytics.adds), limit: monthlyLimit("free") },
     settings,
     extensionName: "wishlist-product",
     blocks: [
@@ -85,7 +80,16 @@ export const action = async ({ request }) => {
 };
 
 export default function WishlistDashboard() {
-  const { extensionName, blocks, stats, settings } = useLoaderData();
+  const { extensionName, blocks, stats } = useLoaderData();
+  const revalidator = useRevalidator();
+
+  useEffect(() => {
+    const refreshTimer = window.setInterval(() => {
+      revalidator.revalidate();
+    }, 10000);
+
+    return () => window.clearInterval(refreshTimer);
+  }, [revalidator]);
 
   return (
     <s-page heading="Saitriq Wishlist">
@@ -105,12 +109,12 @@ export default function WishlistDashboard() {
       <s-section heading="Wishlist activity">
         <s-stack direction="inline" gap="base">
           <s-box background="subdued" borderRadius="base" padding="base">
-            <s-paragraph>Synced wishlist items</s-paragraph>
-            <s-paragraph>{stats.savedItems}</s-paragraph>
+            <s-paragraph>Wishlist saves used this month</s-paragraph>
+            <s-paragraph>{stats.used}</s-paragraph>
           </s-box>
           <s-box background="subdued" borderRadius="base" padding="base">
-            <s-paragraph>Customers with wishlists</s-paragraph>
-            <s-paragraph>{stats.customers}</s-paragraph>
+            <s-paragraph>Wishlist saves remaining</s-paragraph>
+            <s-paragraph>{stats.remaining === Infinity ? "Unlimited" : stats.remaining}</s-paragraph>
           </s-box>
         </s-stack>
       </s-section>
@@ -144,11 +148,9 @@ export default function WishlistDashboard() {
 
       <s-section heading="Current data mode">
         <s-paragraph>
-          The storefront currently keeps wishlist items in the shopper&apos;s
-          browser so the product buttons, collection buttons, header link, and
-          wishlist page update immediately without fake dashboard numbers.
-          Cross-device customer syncing requires a customer-authenticated
-          backend API and is the next production data layer.
+          Wishlist saves are stored in Shopify metaobjects through the app
+          proxy. The storefront keeps a local copy for immediate UI updates,
+          while the dashboard reads the server-side analytics record.
         </s-paragraph>
       </s-section>
     </s-page>

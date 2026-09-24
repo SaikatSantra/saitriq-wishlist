@@ -3,6 +3,9 @@
 <section class="sai-wishlist-page" data-sai-wishlist-page>
   <div class="sai-wishlist-page__header">
     <h2>{{ block.settings.heading }}</h2>
+    <button type="button" class="sai-wishlist-page__clear" data-sai-wishlist-clear hidden>
+      Clear all
+    </button>
     <p data-sai-wishlist-empty hidden>{{ block.settings.empty_message }}</p>
   </div>
 
@@ -47,7 +50,8 @@
 
     const itemsContainer = page.querySelector('[data-sai-wishlist-items]');
     const emptyMessage = page.querySelector('[data-sai-wishlist-empty]');
-    if (!itemsContainer || !emptyMessage) return;
+    const clearButton = page.querySelector('[data-sai-wishlist-clear]');
+    if (!itemsContainer || !emptyMessage || !clearButton) return;
 
     const getItems = () => {
       try {
@@ -59,7 +63,11 @@
     };
 
     const syncItems = async () => {
-      const revisionAtStart = localRevision;
+      if (window.saitriqWishlistSyncPromise) {
+        return window.saitriqWishlistSyncPromise;
+      }
+
+      const syncRun = (async () => {
       const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
       if (!response.ok) return;
       const data = await response.json();
@@ -82,40 +90,14 @@
         addedAt: saved.createdAt
       }));
 
-      for (const item of getItems()) {
-        if (!items.some((saved) => String(saved.id) === String(item.id))) {
-          const addResponse = await fetch(syncEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-              operation: 'add',
-              productId: item.id,
-              productHandle: item.handle,
-              productTitle: item.title,
-              productImage: item.image
-              ,productPrice: item.price
-            })
-          });
-          if (addResponse.ok) {
-            const added = await addResponse.json();
-            if (Array.isArray(added.items)) {
-              items = added.items.map((saved) => ({
-                id: saved.productId,
-                handle: saved.productHandle,
-                title: saved.productTitle,
-                image: saved.productImage || '',
-                price: saved.productPrice || '',
-                addedAt: saved.createdAt
-              }));
-            }
-          }
-        }
-      }
-      if (revisionAtStart !== localRevision) return;
-
       localStorage.setItem(storageKey, JSON.stringify(items));
       render();
+      })();
+
+      window.saitriqWishlistSyncPromise = syncRun.finally(() => {
+        window.saitriqWishlistSyncPromise = null;
+      });
+      return window.saitriqWishlistSyncPromise;
     };
 
     const render = () => {
@@ -125,13 +107,14 @@
       itemsContainer.style.setProperty('--sai-wishlist-columns', settings.columns);
       itemsContainer.replaceChildren();
       emptyMessage.hidden = items.length > 0;
+      clearButton.hidden = items.length === 0;
 
       items.forEach((item) => {
         const card = document.createElement('li');
         card.className = `sai-wishlist-page__item product-grid__item ${settings.cardClass || ''}`.trim();
         card.innerHTML = `
           <a href="/products/${encodeURIComponent(item.handle)}">
-            <img src="${item.image || ''}" alt="${item.title || ''}" loading="lazy">
+            <img data-sai-wishlist-image alt="" loading="lazy">
           </a>
           <div>
             <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${item.title || 'Product'}</a>
@@ -139,18 +122,32 @@
             ${settings.showRemove ? `<button type="button" class="sai-wishlist-page__remove">${settings.buttonLabel}</button>` : ''}
           </div>
         `;
+        const image = card.querySelector('[data-sai-wishlist-image]');
+        image.alt = item.title || 'Product';
+        image.src = item.image || `/products/${encodeURIComponent(item.handle)}.js`;
+        image.addEventListener('error', async () => {
+          if (image.dataset.fallbackAttempted) return;
+          image.dataset.fallbackAttempted = 'true';
+          try {
+            const response = await fetch(`/products/${encodeURIComponent(item.handle)}.js`);
+            if (!response.ok) return;
+            const product = await response.json();
+            const fallback = product.featured_image || product.images?.[0];
+            if (fallback) image.src = fallback;
+          } catch (error) {
+            console.error('Wishlist image fallback failed', error);
+          }
+        }, { once: true });
         const removeButton = card.querySelector('.sai-wishlist-page__remove');
         if (!removeButton) {
           itemsContainer.append(card);
           return;
         }
-        removeButton.addEventListener('click', () => {
+        removeButton.addEventListener('click', async () => {
+          removeButton.disabled = true;
           localRevision += 1;
-          const updated = getItems().filter((saved) => String(saved.id) !== String(item.id));
           try {
-            localStorage.setItem(storageKey, JSON.stringify(updated));
-            window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-            fetch(syncEndpoint, {
+            const response = await fetch(syncEndpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'same-origin',
@@ -160,37 +157,72 @@
                 productHandle: item.handle,
                 productTitle: item.title,
                 productImage: item.image
-                ,productPrice: item.price
               })
             })
-              .then((response) => {
-                if (!response.ok) throw new Error('Wishlist remove request failed');
-                return response.json();
-              })
-              .then((data) => {
-                if (data.authenticated && Array.isArray(data.items)) {
-                  const serverItems = data.items.map((saved) => ({
-                    id: saved.productId,
-                    handle: saved.productHandle,
-                    title: saved.productTitle,
-                    image: saved.productImage || '',
-                    addedAt: saved.createdAt
-                  }));
-                  localStorage.setItem(storageKey, JSON.stringify(serverItems));
-                  window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-                  render();
-                }
-              })
-              .catch(() => {});
+            if (!response.ok) {
+              const errorBody = await response.text().catch(() => '');
+              console.error('Wishlist remove proxy request failed', {
+                status: response.status,
+                body: errorBody,
+                version: response.headers.get('X-Saitriq-Wishlist-Version')
+              });
+              throw new Error('Wishlist remove request failed');
+            }
+            const data = await response.json();
+            if (!data.authenticated || !Array.isArray(data.items)) {
+              throw new Error('Wishlist remove response was invalid');
+            }
+            const serverItems = data.items.map((saved) => ({
+              id: saved.productId,
+              handle: saved.productHandle,
+              title: saved.productTitle,
+              image: saved.productImage || '',
+              price: saved.productPrice || '',
+              addedAt: saved.createdAt
+            }));
+            localStorage.setItem(storageKey, JSON.stringify(serverItems));
+            window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
             render();
           } catch (error) {
+            emptyMessage.textContent = error.message;
             emptyMessage.hidden = false;
-            emptyMessage.textContent = 'Your browser could not update this wishlist.';
+          } finally {
+            removeButton.disabled = false;
           }
         });
         itemsContainer.append(card);
       });
     };
+
+    clearButton.addEventListener('click', async () => {
+      if (clearButton.disabled || getItems().length === 0) return;
+      clearButton.disabled = true;
+      localRevision += 1;
+      try {
+        const response = await fetch(syncEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ operation: 'clear' })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.authenticated || !Array.isArray(data.items)) {
+          console.error('Wishlist clear proxy request failed', {
+            status: response.status,
+            body: data
+          });
+          throw new Error(data.error || 'Wishlist clear request failed');
+        }
+        localStorage.setItem(storageKey, JSON.stringify(data.items));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+        render();
+      } catch (error) {
+        emptyMessage.textContent = error.message;
+        emptyMessage.hidden = false;
+      } finally {
+        clearButton.disabled = false;
+      }
+    });
 
     render();
     syncItems().catch(() => {});
