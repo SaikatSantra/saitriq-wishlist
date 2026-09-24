@@ -26,6 +26,18 @@
       window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
     };
 
+    const persistLocalFallback = (operation, item) => {
+      const items = readItems();
+      const index = items.findIndex((saved) => String(saved.id) === String(item.id));
+      if (operation === 'add' && index < 0) items.push({ ...item, addedAt: new Date().toISOString() });
+      if (operation === 'remove' && index >= 0) items.splice(index, 1);
+      saveItems(items);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+        detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
+      }));
+      return items;
+    };
+
     const getVisitorId = () => {
       let visitorId = localStorage.getItem(visitorStorageKey);
       if (!visitorId) {
@@ -78,15 +90,7 @@
     const sync = async (operation, item) => {
       if (!customerAuthenticated) {
         await trackGuest(operation, item);
-        const items = readItems();
-        const index = items.findIndex((saved) => String(saved.id) === String(item.id));
-        if (operation === 'add' && index < 0) items.push({ ...item, addedAt: new Date().toISOString() });
-        if (operation === 'remove' && index >= 0) items.splice(index, 1);
-        saveItems(items);
-        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-          detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
-        }));
-        return items;
+        return persistLocalFallback(operation, item);
       }
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -96,8 +100,9 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !Array.isArray(data.items)) {
+        console.warn('Wishlist proxy unavailable; using local fallback:', response.status, data.error || '(empty response)');
         customerAuthenticated = false;
-        return sync(operation, item);
+        return persistLocalFallback(operation, item);
       }
       const items = data.items.map((saved) => ({
         id: saved.productId,

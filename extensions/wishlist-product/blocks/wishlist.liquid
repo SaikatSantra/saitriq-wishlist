@@ -95,6 +95,25 @@
       }
     };
 
+    const persistLocalFallback = (operation, item) => {
+      const items = getWishlist();
+      const index = items.findIndex((saved) => String(saved.id) === String(item.productId));
+      if (operation === 'add' && index < 0) items.push({
+        id: item.productId,
+        handle: item.productHandle,
+        title: item.productTitle,
+        image: item.productImage || '',
+        price: item.productPrice || '',
+        addedAt: new Date().toISOString()
+      });
+      if (operation === 'remove' && index >= 0) items.splice(index, 1);
+      saveWishlist(items);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+        detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
+      }));
+      return items;
+    };
+
     const getVisitorId = () => {
       let visitorId = localStorage.getItem(visitorStorageKey);
       if (!visitorId) {
@@ -124,22 +143,7 @@
     const sync = async (operation, item) => {
       if (!customerAuthenticated) {
         await trackGuest(operation, item);
-        const items = getWishlist();
-        const index = items.findIndex((saved) => String(saved.id) === String(item.productId));
-        if (operation === 'add' && index < 0) items.push({
-          id: item.productId,
-          handle: item.productHandle,
-          title: item.productTitle,
-          image: item.productImage || '',
-          price: item.productPrice || '',
-          addedAt: new Date().toISOString()
-        });
-        if (operation === 'remove' && index >= 0) items.splice(index, 1);
-        saveWishlist(items);
-        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-          detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
-        }));
-        return items;
+        return persistLocalFallback(operation, item);
       }
       const response = await fetch(syncEndpoint, {
         method: 'POST',
@@ -149,14 +153,14 @@
       });
       if (!response.ok) {
         const errorBody = await response.text().catch(() => '');
-        console.error(
-          'Wishlist proxy request failed:',
+        console.warn(
+          'Wishlist proxy unavailable; using local fallback:',
           response.status,
           errorBody || '(empty response)',
           response.headers.get('X-Saitriq-Wishlist-Version') || '(no version header)'
         );
         customerAuthenticated = false;
-        return sync(operation, item);
+        return persistLocalFallback(operation, item);
       }
       const data = await response.json();
       if (!Array.isArray(data.items)) {

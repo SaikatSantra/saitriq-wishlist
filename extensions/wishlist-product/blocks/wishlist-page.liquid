@@ -73,6 +73,24 @@
       return visitorId;
     };
 
+    const persistLocalFallback = (operation, item = {}) => {
+      const items = getItems();
+      const itemId = String(item.productId || item.id || '');
+      const index = items.findIndex((saved) => String(saved.id) === itemId);
+      if (operation === 'add' && itemId && index < 0) items.push({
+        id: itemId,
+        handle: item.productHandle || item.handle || '',
+        title: item.productTitle || item.title || 'Product',
+        image: item.productImage || item.image || '',
+        price: item.productPrice || item.price || '',
+        addedAt: new Date().toISOString()
+      });
+      if (operation === 'remove' && index >= 0) items.splice(index, 1);
+      localStorage.setItem(storageKey, JSON.stringify(items));
+      render();
+      return items;
+    };
+
     const trackGuest = async (operation, item = {}) => {
       try {
         const response = await fetch(syncEndpoint, {
@@ -96,7 +114,11 @@
 
       const syncRun = (async () => {
       const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
-      if (!response.ok) return;
+      if (!response.ok) {
+        console.warn('Wishlist proxy unavailable during sync; using local storage fallback.', response.status);
+        render();
+        return;
+      }
       const data = await response.json();
       customerAuthenticated = data.authenticated === true;
       if (!data.authenticated || !Array.isArray(data.items)) {
