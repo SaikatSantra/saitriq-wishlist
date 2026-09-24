@@ -1,14 +1,29 @@
-{% if customer %}
-  <a href="/pages/wishlist" class="header-wishlist-link" aria-label="View wishlist" title="Wishlist">
-    <span aria-hidden="true">♥</span>
-    <span>Wishlist</span>
-  </a>
-{% else %}
-  <a href="{{ routes.account_login_url }}" class="header-wishlist-link" aria-label="Log in to use wishlist" title="Log in to use wishlist">
-    <span aria-hidden="true">♥</span>
-    <span>Log in for wishlist</span>
-  </a>
-{% endif %}
+<a href="/pages/wishlist" class="header-wishlist-link" aria-label="View wishlist" title="Wishlist">
+  <span class="header-wishlist-link__icon" aria-hidden="true">♥</span>
+  <span>Wishlist</span>
+  <span class="header-wishlist-link__count" data-sai-wishlist-count>0</span>
+</a>
+
+<script>
+  (() => {
+    const key = 'saitriq_wishlist';
+    const count = document.querySelector('[data-sai-wishlist-count]');
+    if (!count) return;
+    const update = () => {
+      try {
+        const items = JSON.parse(localStorage.getItem(key) || '[]');
+        count.textContent = Array.isArray(items) ? items.length : '0';
+      } catch {
+        count.textContent = '0';
+      }
+    };
+    update();
+    window.addEventListener('storage', (event) => {
+      if (event.key === key) update();
+    });
+    window.addEventListener('saitriq:wishlist-updated', update);
+  })();
+</script>
 
 <style>
   .header-wishlist-link {
@@ -18,5 +33,19 @@
     color: #1a1a1a;
     text-decoration: none;
     font-weight: 600;
+  }
+
+  .header-wishlist-link__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 0.25rem;
+    border-radius: 999px;
+    background: #1a1a1a;
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1;
   }
 </style>

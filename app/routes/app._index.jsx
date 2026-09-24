@@ -2,11 +2,18 @@ import { useEffect } from "react";
 import { useLoaderData, useRevalidator } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { getAnalytics, monthlyLimit } from "../metaobjects.server";
+import {
+  countWishlistSavesForMonth,
+  getAnalytics,
+  monthlyLimit,
+} from "../metaobjects.server";
 
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
-  const analytics = await getAnalytics(admin, new Date().toISOString().slice(0, 7));
+  const month = new Date().toISOString().slice(0, 7);
+  const analytics = await getAnalytics(admin, month);
+  const savedRecords = await countWishlistSavesForMonth(admin, month);
+  const used = Math.max(analytics.adds, savedRecords);
   const settings =
     (await prisma.wishlistSettings.findUnique({ where: { shop: session.shop } })) ||
     {
@@ -19,7 +26,7 @@ export const loader = async ({ request }) => {
     };
 
   return {
-    stats: { used: analytics.adds, remaining: Math.max(0, monthlyLimit("free") - analytics.adds), limit: monthlyLimit("free") },
+    stats: { used, remaining: Math.max(0, monthlyLimit("free") - used), limit: monthlyLimit("free") },
     settings,
     extensionName: "wishlist-product",
     blocks: [
@@ -45,6 +52,10 @@ export const loader = async ({ request }) => {
     ],
   };
 };
+
+export const headers = () => ({
+  "Cache-Control": "no-store, max-age=0",
+});
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);

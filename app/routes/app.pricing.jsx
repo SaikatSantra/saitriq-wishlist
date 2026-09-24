@@ -1,16 +1,29 @@
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { PLANS } from "../plans";
-import { getAnalytics, monthlyLimit } from "../metaobjects.server";
+import {
+  countWishlistSavesForMonth,
+  getAnalytics,
+  monthlyLimit,
+} from "../metaobjects.server";
 
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
-  const analytics = await getAnalytics(admin, new Date().toISOString().slice(0, 7));
+  const month = new Date().toISOString().slice(0, 7);
+  const analytics = await getAnalytics(admin, month);
+  const savedRecords = await countWishlistSavesForMonth(admin, month);
   return {
     plans: PLANS,
-    usage: { used: analytics.adds, limit: monthlyLimit("free") },
+    usage: {
+      used: Math.max(analytics.adds, savedRecords),
+      limit: monthlyLimit("free"),
+    },
   };
 };
+
+export const headers = () => ({
+  "Cache-Control": "no-store, max-age=0",
+});
 
 export default function PricingPage() {
   const { plans, usage } = useLoaderData();

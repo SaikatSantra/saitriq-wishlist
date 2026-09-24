@@ -5,7 +5,9 @@
 <script>
   (() => {
     const storageKey = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
     const endpoint = '/apps/saitriq-wishlist';
+    let customerAuthenticated = false;
     const root = document.currentScript && document.currentScript.previousElementSibling;
     if (!root || window.saitriqWishlistCollectionLoaded) return;
     window.saitriqWishlistCollectionLoaded = true;
@@ -22,6 +24,31 @@
     const saveItems = (items) => {
       localStorage.setItem(storageKey, JSON.stringify(items));
       window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+    };
+
+    const getVisitorId = () => {
+      let visitorId = localStorage.getItem(visitorStorageKey);
+      if (!visitorId) {
+        visitorId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+        localStorage.setItem(visitorStorageKey, visitorId);
+      }
+      return visitorId;
+    };
+
+    const trackGuest = async (operation, item) => {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.tracked === true) return;
+        console.warn('Wishlist analytics tracking unavailable', response.status, data.error || '');
+      } catch (error) {
+        console.warn('Wishlist analytics tracking unavailable', error);
+      }
     };
 
     const productHandleFromLink = (link) => {
@@ -49,15 +76,28 @@
     };
 
     const sync = async (operation, item) => {
+      if (!customerAuthenticated) {
+        await trackGuest(operation, item);
+        const items = readItems();
+        const index = items.findIndex((saved) => String(saved.id) === String(item.id));
+        if (operation === 'add' && index < 0) items.push({ ...item, addedAt: new Date().toISOString() });
+        if (operation === 'remove' && index >= 0) items.splice(index, 1);
+        saveItems(items);
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+          detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
+        }));
+        return items;
+      }
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ operation, ...item })
+        body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.authenticated || !Array.isArray(data.items)) {
-        throw new Error(data.error || `Wishlist ${operation} failed`);
+      if (!response.ok || !Array.isArray(data.items)) {
+        customerAuthenticated = false;
+        return sync(operation, item);
       }
       const items = data.items.map((saved) => ({
         id: saved.productId,
@@ -68,6 +108,9 @@
         addedAt: saved.createdAt
       }));
       saveItems(items);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+        detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
+      }));
       return items;
     };
 
@@ -77,6 +120,12 @@
       button.classList.toggle('is-active', saved);
       button.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
       button.title = saved ? 'Remove from wishlist' : 'Add to wishlist';
+    };
+
+    const detectAuthentication = async () => {
+      const response = await fetch(endpoint, { credentials: 'same-origin' });
+      const data = await response.json().catch(() => ({}));
+      customerAuthenticated = data.authenticated === true;
     };
 
     const attach = async (link) => {
@@ -115,7 +164,7 @@
     };
 
     const scan = () => productLinks().forEach((link) => attach(link));
-    scan();
+    detectAuthentication().finally(scan);
     new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
     window.addEventListener('saitriq:wishlist-updated', scan);
   })();

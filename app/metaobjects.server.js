@@ -109,11 +109,19 @@ export const wishlistHandle = (customerId, productId) =>
     .replace(/[^a-zA-Z0-9-]/g, "-")
     .slice(0, 255);
 
+export const guestWishlistHandle = (visitorId, productId) =>
+  `guest-${visitorId}-product-${productId}`
+    .replace(/[^a-zA-Z0-9-]/g, "-")
+    .slice(0, 255);
+
 export const analyticsHandle = (month) => `month-${month}`;
 export const dailyAnalyticsHandle = (day) => `day-${day}`;
 
 export const upsertWishlist = async (admin, item) => {
-  const handle = wishlistHandle(item.customerId, item.productId);
+  const handle = (item.handleFactory || wishlistHandle)(
+    item.customerId,
+    item.productId,
+  );
   const existing = await readByHandle(admin, WISHLIST_TYPE, handle);
   const metaobjectValues = values({
     customer_id: item.customerId,
@@ -171,24 +179,34 @@ export const upsertWishlist = async (admin, item) => {
   };
 };
 
-export const deleteWishlist = async (admin, customerId, productId) => {
+export const deleteWishlist = async (
+  admin,
+  customerId,
+  productId,
+  handleFactory = wishlistHandle,
+) => {
   const existing = await readByHandle(
     admin,
     WISHLIST_TYPE,
-    wishlistHandle(customerId, productId),
+    handleFactory(customerId, productId),
   );
-  if (!existing) return;
+  if (!existing) return false;
   const response = await admin.graphql(METAOBJECT_DELETE, {
     variables: { id: existing.id },
   });
   const payload = await readPayload(response, "Wishlist delete");
   assertNoErrors(payload.data?.metaobjectDelete, "Wishlist delete");
+  return true;
 };
 
-export const deleteCustomerWishlists = async (admin, customerId) => {
+export const deleteCustomerWishlists = async (
+  admin,
+  customerId,
+  handleFactory = wishlistHandle,
+) => {
   const items = await listCustomerWishlists(admin, customerId);
   for (const item of items) {
-    await deleteWishlist(admin, customerId, item.productId);
+    await deleteWishlist(admin, customerId, item.productId, handleFactory);
   }
   return items.length;
 };
@@ -212,6 +230,11 @@ export const listWishlists = async (admin) => {
       ),
     }))
     .map(toWishlistItem);
+};
+
+export const countWishlistSavesForMonth = async (admin, month) => {
+  const items = await listWishlists(admin);
+  return items.filter((item) => item.createdAt?.slice(0, 7) === month).length;
 };
 
 const toWishlistItem = (item) => ({

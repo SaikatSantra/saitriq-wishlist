@@ -32,8 +32,10 @@
 <script>
   (() => {
     const storageKey = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
     const syncEndpoint = '/apps/saitriq-wishlist';
     let localRevision = 0;
+    let customerAuthenticated = false;
     let settings = {
       heading: '{{ block.settings.heading | escape }}',
       emptyMessage: '{{ block.settings.empty_message | escape }}',
@@ -62,6 +64,31 @@
       }
     };
 
+    const getVisitorId = () => {
+      let visitorId = localStorage.getItem(visitorStorageKey);
+      if (!visitorId) {
+        visitorId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+        localStorage.setItem(visitorStorageKey, visitorId);
+      }
+      return visitorId;
+    };
+
+    const trackGuest = async (operation, item = {}) => {
+      try {
+        const response = await fetch(syncEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.tracked === true) return;
+        console.warn('Wishlist analytics tracking unavailable', response.status, data.error || '');
+      } catch (error) {
+        console.warn('Wishlist analytics tracking unavailable', error);
+      }
+    };
+
     const syncItems = async () => {
       if (window.saitriqWishlistSyncPromise) {
         return window.saitriqWishlistSyncPromise;
@@ -71,7 +98,11 @@
       const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
       if (!response.ok) return;
       const data = await response.json();
-      if (!data.authenticated || !Array.isArray(data.items)) return;
+      customerAuthenticated = data.authenticated === true;
+      if (!data.authenticated || !Array.isArray(data.items)) {
+        render();
+        return;
+      }
       if (data.settings) settings = { ...settings, ...data.settings };
       let customStyle = document.querySelector('[data-sai-wishlist-custom-css]');
       if (!customStyle) {
@@ -147,12 +178,31 @@
           removeButton.disabled = true;
           localRevision += 1;
           try {
+            if (!customerAuthenticated) {
+              await trackGuest('remove', {
+                productId: item.id,
+                productHandle: item.handle,
+                productTitle: item.title,
+                productImage: item.image
+              });
+              localStorage.setItem(
+                storageKey,
+                JSON.stringify(getItems().filter((saved) => String(saved.id) !== String(item.id)))
+              );
+              window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+              window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+                detail: { message: 'Removed from wishlist' }
+              }));
+              render();
+              return;
+            }
             const response = await fetch(syncEndpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'same-origin',
               body: JSON.stringify({
                 operation: 'remove',
+                visitorId: getVisitorId(),
                 productId: item.id,
                 productHandle: item.handle,
                 productTitle: item.title,
@@ -161,15 +211,16 @@
             })
             if (!response.ok) {
               const errorBody = await response.text().catch(() => '');
-              console.error('Wishlist remove proxy request failed', {
-                status: response.status,
-                body: errorBody,
-                version: response.headers.get('X-Saitriq-Wishlist-Version')
-              });
+              console.error(
+                'Wishlist remove proxy request failed:',
+                response.status,
+                errorBody || '(empty response)',
+                response.headers.get('X-Saitriq-Wishlist-Version') || '(no version header)'
+              );
               throw new Error('Wishlist remove request failed');
             }
             const data = await response.json();
-            if (!data.authenticated || !Array.isArray(data.items)) {
+            if (!Array.isArray(data.items)) {
               throw new Error('Wishlist remove response was invalid');
             }
             const serverItems = data.items.map((saved) => ({
@@ -182,6 +233,9 @@
             }));
             localStorage.setItem(storageKey, JSON.stringify(serverItems));
             window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+            window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+              detail: { message: 'Removed from wishlist' }
+            }));
             render();
           } catch (error) {
             emptyMessage.textContent = error.message;
@@ -199,11 +253,21 @@
       clearButton.disabled = true;
       localRevision += 1;
       try {
+        if (!customerAuthenticated) {
+          await trackGuest('clear');
+          localStorage.setItem(storageKey, '[]');
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+            detail: { message: 'Wishlist cleared' }
+          }));
+          render();
+          return;
+        }
         const response = await fetch(syncEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ operation: 'clear' })
+          body: JSON.stringify({ operation: 'clear', visitorId: getVisitorId() })
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.authenticated || !Array.isArray(data.items)) {

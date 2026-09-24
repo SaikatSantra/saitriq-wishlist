@@ -16,8 +16,11 @@ settings.
 5. In the embedded app, open **Page design settings** to select icon-only,
    icon-with-text, or custom SVG buttons and configure the wishlist grid.
 
-Logged-out shoppers use browser storage. Logged-in customers are synchronized
-through the app proxy and can access the same wishlist on another device.
+Logged-out shoppers use browser storage and receive an anonymous visitor ID for
+idempotent usage tracking. Logged-in customers are synchronized through the app
+proxy and can access the same wishlist on another device. Every successful new
+save, whether made by a guest or logged-in customer, counts toward the store's
+monthly usage limit.
 
 ## Production deployment checklist
 

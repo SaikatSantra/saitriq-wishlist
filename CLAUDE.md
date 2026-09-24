@@ -4,7 +4,7 @@
 ## Project purpose
 
 Saitriq Wishlist is an embedded Shopify app with a theme app extension. It lets
-logged-in shoppers save products, view a wishlist page, and gives merchants
+guest and logged-in shoppers save products, view a wishlist page, and gives merchants
 monthly usage visibility and plan information.
 
 ## Technology and conventions
@@ -24,8 +24,10 @@ monthly usage visibility and plan information.
 `$app:wishlist` stores one entry per `customer_id + product_id`. Its
 deterministic handle makes add/upsert, remove, and retry operations idempotent.
 It stores customer ID, product ID, product handle, title, image URL, price text,
-and ISO timestamp. The app proxy reads entries for the logged-in customer and
-writes them with `metaobjectCreate`, `metaobjectUpsert`, and `metaobjectDelete`.
+and ISO timestamp. The app proxy reads entries for the logged-in customer and writes them with
+`metaobjectCreate`, `metaobjectUpsert`, and `metaobjectDelete`. Guest items are
+kept in browser storage, while an anonymous visitor ID creates an idempotent
+server record so guest saves are included in monthly usage analytics.
 
 ### Analytics
 
@@ -71,7 +73,8 @@ its limit to the proxy instead of hard-coding `free`.
 
 ## Operational safeguards
 
-- The proxy returns `401` without a logged-in customer.
+- The proxy accepts a signed app-proxy request from either a logged-in customer
+  or a guest visitor with a valid anonymous visitor ID.
 - Product fields are required and operations are allowlisted.
 - GraphQL `userErrors` are surfaced rather than treated as success.
 - Handles are sanitized and bounded.
@@ -101,6 +104,16 @@ its limit to the proxy instead of hard-coding `free`.
   metaobjects and records the removals in analytics.
 - [x] Added a Clear all control to the wishlist page with failure-safe state
   handling.
+- [x] Counted guest and logged-in wishlist saves in the same monthly usage
+  analytics and enforced the monthly limit for both audiences.
+- [x] Added local-first storefront fallback, wishlist header count, and
+  add/remove confirmation toast so a stale proxy deployment cannot break the
+  shopper interaction.
+- [x] Added dashboard and pricing reconciliation from current-month wishlist
+  metaobjects so usage does not remain zero when analytics history is stale.
+- [x] Made every storefront mutation send the visitor ID, including logged-in
+  requests, and made monthly usage enforcement use the higher of analytics
+  events or current-month saved records.
 
 ## Local development troubleshooting
 

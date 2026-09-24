@@ -2,12 +2,15 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import {
   getAnalytics,
+  countWishlistSavesForMonth,
   listCustomerWishlists,
   monthlyLimit,
   recordAnalytics,
   upsertWishlist,
   deleteWishlist,
   deleteCustomerWishlists,
+  guestWishlistHandle,
+  wishlistHandle,
 } from "../metaobjects.server";
 
 const json = (data, init = {}) =>
@@ -16,7 +19,7 @@ const json = (data, init = {}) =>
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
-      "X-Saitriq-Wishlist-Version": "proxy-v7",
+      "X-Saitriq-Wishlist-Version": "proxy-v9",
       ...(init.headers || {}),
     },
   });
@@ -55,6 +58,17 @@ const defaultSettings = {
   buttonLabel: "Remove",
 };
 
+const currentUsage = async (admin, month) => {
+  const [analytics, savedRecords] = await Promise.all([
+    getAnalytics(admin, month),
+    countWishlistSavesForMonth(admin, month),
+  ]);
+  return {
+    analytics,
+    used: Math.max(analytics.adds, savedRecords),
+  };
+};
+
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.public.appProxy(request);
   const customerId = getCustomerId(request);
@@ -62,7 +76,7 @@ export const loader = async ({ request }) => {
     return json({ authenticated: false, items: [] });
   }
 
-  const analytics = await getAnalytics(admin, monthKey());
+  const { used } = await currentUsage(admin, monthKey());
   const items = await listCustomerWishlists(admin, customerId);
   const settings = await prisma.wishlistSettings.findUnique({
     where: { shop: session.shop },
@@ -71,7 +85,7 @@ export const loader = async ({ request }) => {
     authenticated: true,
     items,
     settings: settings || defaultSettings,
-    usage: usageFor(analytics.adds, monthlyLimit("free")),
+    usage: usageFor(used, monthlyLimit("free")),
   });
 };
 
@@ -79,28 +93,50 @@ export const action = async ({ request }) => {
   try {
     const { session, admin } = await authenticate.public.appProxy(request);
     const customerId = getCustomerId(request);
-    if (!session || !admin || !customerId) {
+    if (!session || !admin) {
       return json(
-        { authenticated: false, error: "Log in to save a synced wishlist." },
-        { status: 401 },
+        { authenticated: false, error: "Wishlist service is unavailable." },
+        { status: 502 },
       );
     }
 
     const payload = await readPayload(request);
     const operation = payload?.operation;
+    const visitorId = String(payload?.visitorId || "").match(
+      /^[a-zA-Z0-9_-]{16,80}$/,
+    )?.[0];
+    const actorId = customerId || visitorId || null;
+    if (!actorId) {
+      return json(
+        { authenticated: false, error: "A valid wishlist visitor is required." },
+        { status: 400 },
+      );
+    }
+    const handleFactory = customerId ? wishlistHandle : guestWishlistHandle;
     const month = monthKey();
     const limit = monthlyLimit("free");
 
     if (operation === "clear") {
-      const removedCount = await deleteCustomerWishlists(admin, customerId);
+      const removedCount = await deleteCustomerWishlists(
+        admin,
+        actorId,
+        handleFactory,
+      );
       if (removedCount > 0) {
-        await recordAnalytics(admin, month, { removes: removedCount });
+        try {
+          await recordAnalytics(admin, month, { removes: removedCount });
+        } catch (error) {
+          console.error("Wishlist clear analytics update failed", error);
+        }
       }
-      const analytics = await getAnalytics(admin, month);
+      const { used: clearedUsage } = await currentUsage(admin, month);
       return json({
-        authenticated: true,
-        items: [],
-        usage: usageFor(analytics.adds, limit),
+        authenticated: Boolean(customerId),
+        tracked: true,
+        items: customerId
+          ? await listCustomerWishlists(admin, actorId)
+          : [],
+        usage: usageFor(clearedUsage, limit),
       });
     }
 
@@ -119,12 +155,12 @@ export const action = async ({ request }) => {
       );
     }
 
-    const analytics = await getAnalytics(admin, month);
-    if (operation === "add" && analytics.adds >= limit) {
+    const { used } = await currentUsage(admin, month);
+    if (operation === "add" && used >= limit) {
       return json(
         {
           error: "This store has reached its monthly wishlist limit.",
-          usage: { used: analytics.adds, limit, remaining: 0 },
+          usage: { used, limit, remaining: 0 },
         },
         { status: 429 },
       );
@@ -132,7 +168,8 @@ export const action = async ({ request }) => {
 
     if (operation === "add") {
       const result = await upsertWishlist(admin, {
-        customerId,
+        customerId: actorId,
+        handleFactory,
         productId,
         productHandle,
         productTitle,
@@ -141,18 +178,36 @@ export const action = async ({ request }) => {
         addedAt: new Date().toISOString(),
       });
       if (result.created) {
-        await recordAnalytics(admin, month, { adds: 1, uniqueCustomers: 1 });
+        try {
+          await recordAnalytics(admin, month, { adds: 1, uniqueCustomers: 1 });
+        } catch (error) {
+          console.error("Wishlist add analytics update failed", error);
+        }
       }
     } else {
-      await deleteWishlist(admin, customerId, productId);
-      await recordAnalytics(admin, month, { removes: 1 });
+      const removed = await deleteWishlist(
+        admin,
+        actorId,
+        productId,
+        handleFactory,
+      );
+      if (removed) {
+        try {
+          await recordAnalytics(admin, month, { removes: 1 });
+        } catch (error) {
+          console.error("Wishlist remove analytics update failed", error);
+        }
+      }
     }
 
-    const updated = await getAnalytics(admin, month);
+    const { used: finalUsage } = await currentUsage(admin, month);
     return json({
-      authenticated: true,
-      items: await listCustomerWishlists(admin, customerId),
-      usage: usageFor(updated.adds, limit),
+      authenticated: Boolean(customerId),
+      tracked: true,
+      items: customerId
+        ? await listCustomerWishlists(admin, actorId)
+        : [],
+      usage: usageFor(finalUsage, limit),
     });
   } catch (error) {
     console.error("Wishlist proxy operation failed", error);

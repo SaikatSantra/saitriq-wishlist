@@ -22,12 +22,33 @@
 <script>
   (() => {
     const storageKey = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
     const syncEndpoint = '/apps/saitriq-wishlist';
     const script = document.currentScript;
     const block = script && script.previousElementSibling;
     const button = block && block.querySelector('[data-sai-wishlist-button]');
 
     if (!button) return;
+
+    const announce = (message) => {
+      let toast = document.querySelector('[data-sai-wishlist-toast]');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.dataset.saiWishlistToast = '';
+        toast.className = 'sai-wishlist__toast';
+        toast.setAttribute('role', 'status');
+        document.body.append(toast);
+      }
+      toast.textContent = message;
+      toast.classList.add('is-visible');
+      clearTimeout(window.saitriqWishlistToastTimer);
+      window.saitriqWishlistToastTimer = setTimeout(() => {
+        toast.classList.remove('is-visible');
+      }, 2200);
+    };
+    window.addEventListener('saitriq:wishlist-toast', (event) => {
+      if (event.detail?.message) announce(event.detail.message);
+    });
 
     const productId = button.dataset.productId;
     const productHandle = button.dataset.productHandle;
@@ -36,6 +57,7 @@
     const productPrice = button.dataset.productPrice;
     let buttonSettings = { buttonMode: 'icon-text', customSvg: '' };
     let requestInFlight = false;
+    let customerAuthenticated = false;
     const renderIcon = (isSaved) => {
       const icon = button.querySelector('.sai-wishlist__icon');
       if (buttonSettings.buttonMode === 'custom-svg' && buttonSettings.customSvg) {
@@ -50,6 +72,7 @@
       const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
       if (!response.ok) return;
       const data = await response.json();
+      customerAuthenticated = data.authenticated === true;
       buttonSettings = data.settings || buttonSettings;
       renderIcon(getWishlist().some((item) => String(item.id) === String(productId)));
     };
@@ -72,24 +95,74 @@
       }
     };
 
+    const getVisitorId = () => {
+      let visitorId = localStorage.getItem(visitorStorageKey);
+      if (!visitorId) {
+        visitorId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+        localStorage.setItem(visitorStorageKey, visitorId);
+      }
+      return visitorId;
+    };
+
+    const trackGuest = async (operation, item) => {
+      try {
+        const response = await fetch(syncEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.tracked === true) return data;
+        console.warn('Wishlist analytics tracking unavailable', response.status, data.error || '');
+      } catch (error) {
+        console.warn('Wishlist analytics tracking unavailable', error);
+      }
+      return null;
+    };
+
     const sync = async (operation, item) => {
+      if (!customerAuthenticated) {
+        await trackGuest(operation, item);
+        const items = getWishlist();
+        const index = items.findIndex((saved) => String(saved.id) === String(item.productId));
+        if (operation === 'add' && index < 0) items.push({
+          id: item.productId,
+          handle: item.productHandle,
+          title: item.productTitle,
+          image: item.productImage || '',
+          price: item.productPrice || '',
+          addedAt: new Date().toISOString()
+        });
+        if (operation === 'remove' && index >= 0) items.splice(index, 1);
+        saveWishlist(items);
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+          detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
+        }));
+        return items;
+      }
       const response = await fetch(syncEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ operation, ...item })
+        body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
       });
       if (!response.ok) {
         const errorBody = await response.text().catch(() => '');
-        console.error('Wishlist proxy request failed', {
-          status: response.status,
-          body: errorBody,
-          version: response.headers.get('X-Saitriq-Wishlist-Version')
-        });
-        return null;
+        console.error(
+          'Wishlist proxy request failed:',
+          response.status,
+          errorBody || '(empty response)',
+          response.headers.get('X-Saitriq-Wishlist-Version') || '(no version header)'
+        );
+        customerAuthenticated = false;
+        return sync(operation, item);
       }
       const data = await response.json();
-      if (!data.authenticated || !Array.isArray(data.items)) return null;
+      if (!Array.isArray(data.items)) {
+        customerAuthenticated = false;
+        return sync(operation, item);
+      }
       const syncedItems = data.items.map((saved) => ({
         id: saved.productId,
         handle: saved.productHandle,
@@ -99,6 +172,9 @@
         addedAt: saved.createdAt
       }));
       saveWishlist(syncedItems);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+        detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
+      }));
       return syncedItems;
     };
 
@@ -111,6 +187,7 @@
       const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
       if (!response.ok) return;
       const data = await response.json();
+      customerAuthenticated = data.authenticated === true;
       if (!data.authenticated || !Array.isArray(data.items)) return;
 
       let syncedItems = data.items.map((saved) => ({
@@ -190,6 +267,7 @@
         }
       } catch (error) {
         console.error('Wishlist request failed', error);
+        announce('Wishlist is temporarily unavailable. Please try again.');
       } finally {
         button.disabled = false;
         requestInFlight = false;
