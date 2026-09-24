@@ -117,6 +117,11 @@ its limit to the proxy instead of hard-coding `free`.
 - [x] Made proxy body parsing resilient to Shopify proxy content-type changes
   and normalized missing storefront fields so valid wishlist saves are not
   rejected before analytics tracking.
+- [x] Hardened current-month save timestamp matching and forced dashboard usage
+  revalidation on load, focus, and a ten-second interval.
+- [x] Added a no-cache `/app/usage` resource route and direct five-second
+  dashboard polling so the usage card receives fresh server data independently
+  of the embedded document loader.
 
 ## Local development troubleshooting
 

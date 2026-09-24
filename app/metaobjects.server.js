@@ -234,7 +234,14 @@ export const listWishlists = async (admin) => {
 
 export const countWishlistSavesForMonth = async (admin, month) => {
   const items = await listWishlists(admin);
-  return items.filter((item) => item.createdAt?.slice(0, 7) === month).length;
+  return items.filter((item) => {
+    const timestamp = String(item.createdAt || "").trim();
+    if (!timestamp) return false;
+    if (timestamp.startsWith(month)) return true;
+    const parsed = new Date(timestamp);
+    return !Number.isNaN(parsed.valueOf()) &&
+      parsed.toISOString().slice(0, 7) === month;
+  }).length;
 };
 
 const toWishlistItem = (item) => ({

@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useLoaderData, useRevalidator } from "react-router";
+import { useEffect, useState } from "react";
+import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import {
@@ -57,6 +57,8 @@ export const headers = () => ({
   "Cache-Control": "no-store, max-age=0",
 });
 
+export const shouldRevalidate = () => true;
+
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
@@ -92,15 +94,36 @@ export const action = async ({ request }) => {
 
 export default function WishlistDashboard() {
   const { extensionName, blocks, stats } = useLoaderData();
-  const revalidator = useRevalidator();
+  const [liveStats, setLiveStats] = useState(stats);
 
   useEffect(() => {
-    const refreshTimer = window.setInterval(() => {
-      revalidator.revalidate();
-    }, 10000);
+    let cancelled = false;
+    const refreshUsage = async () => {
+      try {
+        const response = await fetch(`/app/usage?ts=${Date.now()}`, {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        if (!response.ok) return;
+        const nextStats = await response.json();
+        if (!cancelled && Number.isFinite(nextStats.used)) {
+          setLiveStats(nextStats);
+        }
+      } catch (error) {
+        console.error("Wishlist usage refresh failed", error);
+      }
+    };
 
-    return () => window.clearInterval(refreshTimer);
-  }, [revalidator]);
+    refreshUsage();
+    const refreshTimer = window.setInterval(refreshUsage, 5000);
+    const refreshOnFocus = refreshUsage;
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshTimer);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, []);
 
   return (
     <s-page heading="Saitriq Wishlist">
@@ -121,11 +144,11 @@ export default function WishlistDashboard() {
         <s-stack direction="inline" gap="base">
           <s-box background="subdued" borderRadius="base" padding="base">
             <s-paragraph>Wishlist saves used this month</s-paragraph>
-            <s-paragraph>{stats.used}</s-paragraph>
+            <s-paragraph>{liveStats.used}</s-paragraph>
           </s-box>
           <s-box background="subdued" borderRadius="base" padding="base">
             <s-paragraph>Wishlist saves remaining</s-paragraph>
-            <s-paragraph>{stats.remaining === Infinity ? "Unlimited" : stats.remaining}</s-paragraph>
+            <s-paragraph>{liveStats.remaining === null ? "Unlimited" : liveStats.remaining}</s-paragraph>
           </s-box>
         </s-stack>
       </s-section>
