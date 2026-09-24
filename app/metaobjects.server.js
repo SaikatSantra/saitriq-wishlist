@@ -118,6 +118,7 @@ export const analyticsHandle = (month) => `month-${month}`;
 export const dailyAnalyticsHandle = (day) => `day-${day}`;
 
 export const upsertWishlist = async (admin, item) => {
+  console.log("Upserting wishlist item", item);
   const handle = (item.handleFactory || wishlistHandle)(
     item.customerId,
     item.productId,
