@@ -114,6 +114,9 @@ its limit to the proxy instead of hard-coding `free`.
 - [x] Made every storefront mutation send the visitor ID, including logged-in
   requests, and made monthly usage enforcement use the higher of analytics
   events or current-month saved records.
+- [x] Made proxy body parsing resilient to Shopify proxy content-type changes
+  and normalized missing storefront fields so valid wishlist saves are not
+  rejected before analytics tracking.
 
 ## Local development troubleshooting
 

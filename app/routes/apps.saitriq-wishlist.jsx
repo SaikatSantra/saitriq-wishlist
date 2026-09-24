@@ -19,17 +19,26 @@ const json = (data, init = {}) =>
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
-      "X-Saitriq-Wishlist-Version": "proxy-v9",
+      "X-Saitriq-Wishlist-Version": "proxy-v10",
       ...(init.headers || {}),
     },
   });
 
 const readPayload = async (request) => {
   const contentType = request.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    return request.json().catch(() => null);
+  const rawBody = await request
+    .clone()
+    .text()
+    .catch(() => "");
+  if (rawBody.trim().startsWith("{")) {
+    try {
+      return JSON.parse(rawBody);
+    } catch {
+      return null;
+    }
   }
 
+  if (contentType.includes("application/json")) return null;
   const form = await request.formData().catch(() => null);
   return form ? Object.fromEntries(form.entries()) : null;
 };
@@ -102,9 +111,10 @@ export const action = async ({ request }) => {
 
     const payload = await readPayload(request);
     const operation = payload?.operation;
-    const visitorId = String(payload?.visitorId || "").match(
-      /^[a-zA-Z0-9_-]{16,80}$/,
-    )?.[0];
+    const visitorId = String(payload?.visitorId || "")
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, "-")
+      .slice(0, 80);
     const actorId = customerId || visitorId || null;
     if (!actorId) {
       return json(
@@ -140,9 +150,11 @@ export const action = async ({ request }) => {
       });
     }
 
-    const productId = String(payload?.productId || "");
-    const productHandle = String(payload?.productHandle || "");
-    const productTitle = String(payload?.productTitle || "");
+    const productId = String(payload?.productId || "").trim();
+    const productHandle =
+      String(payload?.productHandle || payload?.productId || "product").trim();
+    const productTitle =
+      String(payload?.productTitle || payload?.productHandle || "Product").trim();
     if (
       !productId ||
       !productHandle ||
