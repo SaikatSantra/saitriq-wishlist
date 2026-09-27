@@ -8,13 +8,28 @@ export default function HowToUsePage() {
           Works with any Online Store 2.0 theme (Dawn, Sense, Craft, Refresh, etc.).
           No code editing required.
         </s-paragraph>
-        <s-ordered-list>
-          <s-list-item>Go to <strong>Online Store → Themes → Customize</strong>.</s-list-item>
-          <s-list-item>Open the <strong>Product</strong> template → Add block → <strong>Saitriq Wishlist → Wishlist</strong>. Save.</s-list-item>
-          <s-list-item>Open the <strong>Collection</strong> template → Add the <strong>Collection wishlist icons</strong> block to the product grid section. Save.</s-list-item>
-          <s-list-item>Create a page in <strong>Online Store → Pages</strong> with handle <code>wishlist</code>. Open it in the theme editor, add the <strong>Wishlist page</strong> block. Save.</s-list-item>
-          <s-list-item>Add a header link to <code>/pages/wishlist</code> in your navigation menu.</s-list-item>
-        </s-ordered-list>
+        <s-grid gap="small-200">
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-badge tone="info">1</s-badge>
+            <s-paragraph>Go to <strong>Online Store → Themes → Customize</strong>.</s-paragraph>
+          </s-stack>
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-badge tone="info">2</s-badge>
+            <s-paragraph>Open the <strong>Product</strong> template → Add block → <strong>Saitriq Wishlist → Wishlist</strong>. Save.</s-paragraph>
+          </s-stack>
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-badge tone="info">3</s-badge>
+            <s-paragraph>Open the <strong>Collection</strong> template → Add the <strong>Collection wishlist icons</strong> block. Save.</s-paragraph>
+          </s-stack>
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-badge tone="info">4</s-badge>
+            <s-paragraph>Create a page with handle <code>wishlist</code>. Add the <strong>Wishlist page</strong> block in the theme editor. Save.</s-paragraph>
+          </s-stack>
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-badge tone="info">5</s-badge>
+            <s-paragraph>Add a header link to <code>/pages/wishlist</code> in your navigation menu.</s-paragraph>
+          </s-stack>
+        </s-grid>
       </s-section>
 
       {/* ── Method 2: Manual (older themes) ── */}
@@ -209,35 +224,39 @@ export default function HowToUsePage() {
         </s-paragraph>
       </s-section>
 
-      {/* ── Troubleshooting ── */}
       <s-section heading="Troubleshooting">
-        <s-unordered-list>
-          <s-list-item>
-            <strong>Could not find asset snippets/wishlist-header-link.liquid</strong> — this file
-            is in the app extension, not your theme. Paste the code directly into your header
-            section file as shown in Step 4 above.
-          </s-list-item>
-          <s-list-item>
-            <strong>Heart button not appearing on collection page</strong> — the inject snippet
-            looks for product card links inside <code>li</code>, <code>article</code>,
-            <code>.card</code>, <code>.grid__item</code>, and elements with
-            <code>product-card</code> or <code>product-item</code> in the class name.
-            If your theme uses a different wrapper, add <code>position: relative</code> to it.
-          </s-list-item>
-          <s-list-item>
-            <strong>Wishlist not syncing for logged-in customers</strong> — confirm the app proxy
-            is active. Go to your Shopify Partner dashboard → App setup and verify the proxy URL.
-            Run <code>shopify app deploy</code> if you recently changed it.
-          </s-list-item>
-          <s-list-item>
-            <strong>Items disappear after login</strong> — expected on first sync. Guest items
-            saved before login are merged into the customer account automatically.
-          </s-list-item>
-          <s-list-item>
-            <strong>CSS conflicts</strong> — all classes are prefixed with <code>.sai-wishlist</code>.
-            Override them in your theme CSS.
-          </s-list-item>
-        </s-unordered-list>
+        <s-grid gap="base">
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-200">
+              <s-text><strong>Could not find asset snippets/wishlist-header-link.liquid</strong></s-text>
+              <s-paragraph>This file is in the app extension, not your theme. Paste the code directly into your header section file as shown in Step 4 above.</s-paragraph>
+            </s-grid>
+          </s-box>
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-200">
+              <s-text><strong>Heart button not appearing on collection page</strong></s-text>
+              <s-paragraph>The inject snippet looks for product card links inside <code>li</code>, <code>article</code>, <code>.card</code>, <code>.grid__item</code>, and elements with <code>product-card</code> or <code>product-item</code> in the class name. If your theme uses a different wrapper, add <code>position: relative</code> to it.</s-paragraph>
+            </s-grid>
+          </s-box>
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-200">
+              <s-text><strong>Wishlist not syncing for logged-in customers</strong></s-text>
+              <s-paragraph>Confirm the app proxy is active. Go to your Shopify Partner dashboard → App setup and verify the proxy URL. Run <code>shopify app deploy</code> if you recently changed it.</s-paragraph>
+            </s-grid>
+          </s-box>
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-200">
+              <s-text><strong>Items disappear after login</strong></s-text>
+              <s-paragraph>Expected on first sync. Guest items saved before login are merged into the customer account automatically.</s-paragraph>
+            </s-grid>
+          </s-box>
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-200">
+              <s-text><strong>CSS conflicts</strong></s-text>
+              <s-paragraph>All classes are prefixed with <code>.sai-wishlist</code>. Override them in your theme CSS.</s-paragraph>
+            </s-grid>
+          </s-box>
+        </s-grid>
       </s-section>
 
     </s-page>

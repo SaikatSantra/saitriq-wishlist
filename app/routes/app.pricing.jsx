@@ -11,8 +11,6 @@ import {
 
 const monthKey = () => new Date().toISOString().slice(0, 7);
 
-// ─── Loader ───────────────────────────────────────────────────────────────────
-
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
@@ -39,8 +37,6 @@ export const loader = async ({ request }) => {
 
 export const headers = () => ({ "Cache-Control": "no-store, max-age=0" });
 
-// ─── Action ───────────────────────────────────────────────────────────────────
-
 export const action = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
@@ -48,28 +44,20 @@ export const action = async ({ request }) => {
   const intent = formData.get("intent");
   const planId = String(formData.get("planId") || "");
 
-  // Downgrade to free
   if (intent === "downgrade") {
     await downgradeToFree(admin, shop);
     return { success: true, message: "You are now on the Free plan." };
   }
 
-  // Upgrade to paid plan
   if (intent === "upgrade") {
     const plan = PLANS.find((p) => p.id === planId);
-    if (!plan || plan.price === 0) {
-      return { error: "Invalid plan selected." };
-    }
+    if (!plan || plan.price === 0) return { error: "Invalid plan selected." };
 
     const appUrl = process.env.SHOPIFY_APP_URL || "";
     const returnUrl = `${appUrl}/app/billing?planId=${planId}&shop=${shop}`;
 
     try {
-      const { confirmationUrl } = await createSubscription(
-        admin,
-        planId,
-        returnUrl,
-      );
+      const { confirmationUrl } = await createSubscription(admin, planId, returnUrl);
       return redirect(confirmationUrl);
     } catch (err) {
       console.error("Subscription creation error:", err);
@@ -80,38 +68,50 @@ export const action = async ({ request }) => {
   return { error: "Unknown action." };
 };
 
-// ─── UI ───────────────────────────────────────────────────────────────────────
-
 export default function PricingPage() {
   const { plans, activePlanId, usage } = useLoaderData();
   const fetcher = useFetcher();
   const actionData = fetcher.data;
   const isSubmitting = fetcher.state !== "idle";
 
+  const activePlan = plans.find((p) => p.id === activePlanId);
+
   return (
     <s-page heading="Pricing">
 
+      {/* ── Usage summary ── */}
       <s-section heading="Current usage">
-        <s-stack direction="inline" gap="base">
-          <s-box background="subdued" borderRadius="base" padding="base">
-            <s-paragraph>Wishlist saves used this month</s-paragraph>
-            <s-paragraph>{usage.used}</s-paragraph>
+        <s-grid
+          gridTemplateColumns="@container (inline-size <= 400px) 1fr, 1fr auto 1fr auto 1fr"
+          gap="small"
+        >
+          <s-box padding="base">
+            <s-grid gap="small-300">
+              <s-text color="subdued">Plan</s-text>
+              <s-stack direction="inline" gap="small-200" alignItems="center">
+                <s-heading>{activePlan?.name ?? "Free"}</s-heading>
+                {activePlanId !== "free" && <s-badge tone="success">Paid</s-badge>}
+              </s-stack>
+            </s-grid>
           </s-box>
-          <s-box background="subdued" borderRadius="base" padding="base">
-            <s-paragraph>Saves remaining</s-paragraph>
-            <s-paragraph>
-              {usage.remaining === null ? "Unlimited" : usage.remaining}
-            </s-paragraph>
+          <s-divider direction="block" />
+          <s-box padding="base">
+            <s-grid gap="small-300">
+              <s-text color="subdued">Saves used</s-text>
+              <s-heading>{usage.used}</s-heading>
+            </s-grid>
           </s-box>
-          <s-box background="subdued" borderRadius="base" padding="base">
-            <s-paragraph>Current plan</s-paragraph>
-            <s-paragraph>
-              {plans.find((p) => p.id === activePlanId)?.name ?? "Free"}
-            </s-paragraph>
+          <s-divider direction="block" />
+          <s-box padding="base">
+            <s-grid gap="small-300">
+              <s-text color="subdued">Remaining</s-text>
+              <s-heading>{usage.remaining === null ? "Unlimited" : usage.remaining}</s-heading>
+            </s-grid>
           </s-box>
-        </s-stack>
+        </s-grid>
       </s-section>
 
+      {/* ── Feedback banners ── */}
       {actionData?.error && (
         <s-banner tone="critical" heading="Billing error">
           {actionData.error}
@@ -123,46 +123,59 @@ export default function PricingPage() {
         </s-banner>
       )}
 
-      <s-section heading="Plans">
-        <s-stack direction="inline" gap="base" wrap>
+      {/* ── Plan cards ── */}
+      <s-section heading="Choose a plan">
+        <s-grid gridTemplateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap="base">
           {plans.map((plan) => {
             const isActive = plan.id === activePlanId;
-            const isDowngrade = plan.price < (plans.find((p) => p.id === activePlanId)?.price ?? 0);
-            const isUpgrade = !isActive && !isDowngrade;
+            const activePlanPrice = activePlan?.price ?? 0;
+            const isDowngrade = plan.price < activePlanPrice;
 
             return (
               <s-box
                 key={plan.id}
-                padding="base"
-                borderWidth="base"
+                border="base"
                 borderRadius="base"
-                background={isActive ? "strong" : "subdued"}
-                minWidth="220px"
+                padding="base"
+                background={isActive ? "strong" : "base"}
               >
-                <s-stack direction="block" gap="small">
-                  <s-heading>{plan.name}</s-heading>
-                  <s-paragraph>
-                    {plan.price === 0 ? "Free" : `$${plan.price} / month`}
-                  </s-paragraph>
-                  <s-paragraph>
-                    {plan.limit === Infinity
-                      ? "Unlimited wishlist saves"
-                      : `${plan.limit.toLocaleString()} saves / month`}
-                  </s-paragraph>
-                  <s-paragraph>{plan.description}</s-paragraph>
+                <s-grid gap="base">
+                  {/* Plan header */}
+                  <s-grid gap="small-200">
+                    <s-stack direction="inline" gap="small-200" alignItems="center">
+                      <s-heading>{plan.name}</s-heading>
+                      {isActive && <s-badge tone="success">Current</s-badge>}
+                      {plan.trialDays > 0 && !isActive && (
+                        <s-badge tone="info">{plan.trialDays}-day trial</s-badge>
+                      )}
+                    </s-stack>
+                    <s-text>
+                      {plan.price === 0 ? "Free forever" : `$${plan.price} / month`}
+                    </s-text>
+                    <s-text color="subdued">
+                      {plan.limit === Infinity
+                        ? "Unlimited saves / month"
+                        : `${plan.limit.toLocaleString()} saves / month`}
+                    </s-text>
+                  </s-grid>
 
-                  <s-stack direction="block" gap="extraSmall">
+                  <s-divider />
+
+                  {/* Features */}
+                  <s-grid gap="small-200">
                     {plan.features.map((f) => (
-                      <s-paragraph key={f}>✓ {f}</s-paragraph>
+                      <s-stack key={f} direction="inline" gap="small-200" alignItems="center">
+                        <s-icon source="check-circle" tone="success" />
+                        <s-text>{f}</s-text>
+                      </s-stack>
                     ))}
-                  </s-stack>
+                  </s-grid>
 
-                  {plan.trialDays > 0 && !isActive && (
-                    <s-paragraph>{plan.trialDays}-day free trial</s-paragraph>
-                  )}
+                  <s-divider />
 
+                  {/* Action */}
                   {isActive ? (
-                    <s-button variant="primary" disabled>
+                    <s-button variant="secondary" disabled inlineSize="fill">
                       Current plan
                     </s-button>
                   ) : isDowngrade ? (
@@ -171,8 +184,10 @@ export default function PricingPage() {
                       <input type="hidden" name="planId" value={plan.id} />
                       <s-button
                         type="submit"
-                        variant="secondary"
+                        variant="tertiary"
+                        tone="neutral"
                         disabled={isSubmitting}
+                        inlineSize="fill"
                       >
                         Downgrade to Free
                       </s-button>
@@ -184,37 +199,39 @@ export default function PricingPage() {
                       <s-button
                         type="submit"
                         variant="primary"
-                        disabled={isSubmitting}
+                        loading={isSubmitting}
+                        inlineSize="fill"
                       >
-                        {isSubmitting ? "Redirecting…" : `Upgrade to ${plan.name}`}
+                        Upgrade to {plan.name}
                       </s-button>
                     </fetcher.Form>
                   )}
-                </s-stack>
+                </s-grid>
               </s-box>
             );
           })}
-        </s-stack>
+        </s-grid>
       </s-section>
 
+      {/* ── Billing notes ── */}
       <s-section heading="Billing notes">
-        <s-unordered-list>
-          <s-list-item>
-            Paid plans are billed monthly through Shopify. You can cancel at any time
-            and your plan stays active until the end of the billing period.
-          </s-list-item>
-          <s-list-item>
+        <s-grid gap="small-200">
+          <s-paragraph>
+            Paid plans are billed monthly through Shopify. You can cancel at any time and your
+            plan stays active until the end of the billing period.
+          </s-paragraph>
+          <s-paragraph>
             Growth and Unlimited plans include a {plans.find((p) => p.id === "growth")?.trialDays}-day
             free trial. You will not be charged until the trial ends.
-          </s-list-item>
-          <s-list-item>
-            Downgrading to Free takes effect immediately. Any saves above 100 per month
-            will no longer be accepted until the next billing cycle begins.
-          </s-list-item>
-          <s-list-item>
+          </s-paragraph>
+          <s-paragraph>
+            Downgrading to Free takes effect immediately. Saves above 100/month will be declined
+            until the next calendar month begins.
+          </s-paragraph>
+          <s-paragraph>
             Monthly save counts reset on the first day of each calendar month.
-          </s-list-item>
-        </s-unordered-list>
+          </s-paragraph>
+        </s-grid>
       </s-section>
 
     </s-page>

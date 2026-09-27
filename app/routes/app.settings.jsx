@@ -107,19 +107,34 @@ export default function WishlistSettingsPage() {
               <s-option value="custom-svg">Custom SVG</s-option>
             </s-select>
             <s-paragraph>Upload an SVG icon (maximum 20 KB) or paste SVG markup below.</s-paragraph>
-            <label>
-              <s-button type="button">Choose SVG file</s-button>
+            <s-stack direction="inline" gap="small-200" alignItems="center">
+              <s-button
+                type="button"
+                variant="secondary"
+                onClick="document.getElementById('svg-file-input').click()"
+              >
+                Choose SVG file
+              </s-button>
               <input
+                id="svg-file-input"
                 name="customSvgFile"
                 type="file"
                 accept=".svg,image/svg+xml"
                 style={{ display: "none" }}
               />
-            </label>
+            </s-stack>
             <s-text-area label="Custom SVG markup" name="customSvg" value={settings.customSvg} rows={8} />
+            {actionData?.saved && (
+              <s-banner tone="success" heading="Settings saved">
+                Your wishlist page design settings have been updated.
+              </s-banner>
+            )}
+            {actionData?.error && (
+              <s-banner tone="critical" heading="Error">
+                {actionData.error}
+              </s-banner>
+            )}
             <s-button type="submit" variant="primary">Save design settings</s-button>
-            {actionData?.saved && <s-paragraph>Settings saved.</s-paragraph>}
-            {actionData?.error && <s-paragraph>{actionData.error}</s-paragraph>}
           </s-stack>
         </Form>
       </s-section>
