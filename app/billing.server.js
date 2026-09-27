@@ -154,49 +154,56 @@ export const cancelSubscription = async (admin, subscriptionId) => {
  * Returns the planId string.
  */
 export const syncSubscriptionFromShopify = async (admin, shop) => {
-  const response = await admin.graphql(APP_SUBSCRIPTIONS_ACTIVE);
-  const payload = await response.json();
-  const subs =
-    payload?.data?.currentAppInstallation?.activeSubscriptions ?? [];
+  try {
+    const response = await admin.graphql(APP_SUBSCRIPTIONS_ACTIVE);
+    const payload = await response.json();
+    const subs =
+      payload?.data?.currentAppInstallation?.activeSubscriptions ?? [];
 
-  if (subs.length === 0) {
-    // No active subscription — ensure DB reflects free plan
+    if (subs.length === 0) {
+      await prisma.activeSubscription.upsert({
+        where: { shop },
+        create: { shop, planId: "free", status: "active" },
+        update: { planId: "free", subscriptionId: null, status: "active" },
+      });
+      return "free";
+    }
+
+    const sub = subs[0];
+    const planId = planIdFromName(sub.name);
+
     await prisma.activeSubscription.upsert({
       where: { shop },
-      create: { shop, planId: "free", status: "active" },
-      update: { planId: "free", subscriptionId: null, status: "active" },
+      create: {
+        shop,
+        planId,
+        subscriptionId: sub.id,
+        status: sub.status.toLowerCase(),
+        trialEndsOn: sub.trialDays
+          ? new Date(Date.now() + sub.trialDays * 86400000)
+          : null,
+        currentPeriodEnd: sub.currentPeriodEnd
+          ? new Date(sub.currentPeriodEnd)
+          : null,
+      },
+      update: {
+        planId,
+        subscriptionId: sub.id,
+        status: sub.status.toLowerCase(),
+        currentPeriodEnd: sub.currentPeriodEnd
+          ? new Date(sub.currentPeriodEnd)
+          : null,
+      },
     });
-    return "free";
+
+    return planId;
+  } catch (err) {
+    if (err?.code === "P2021" || err?.message?.includes("does not exist")) {
+      console.warn("ActiveSubscription table missing — defaulting to free plan.");
+      return "free";
+    }
+    throw err;
   }
-
-  const sub = subs[0];
-  const planId = planIdFromName(sub.name);
-
-  await prisma.activeSubscription.upsert({
-    where: { shop },
-    create: {
-      shop,
-      planId,
-      subscriptionId: sub.id,
-      status: sub.status.toLowerCase(),
-      trialEndsOn: sub.trialDays
-        ? new Date(Date.now() + sub.trialDays * 86400000)
-        : null,
-      currentPeriodEnd: sub.currentPeriodEnd
-        ? new Date(sub.currentPeriodEnd)
-        : null,
-    },
-    update: {
-      planId,
-      subscriptionId: sub.id,
-      status: sub.status.toLowerCase(),
-      currentPeriodEnd: sub.currentPeriodEnd
-        ? new Date(sub.currentPeriodEnd)
-        : null,
-    },
-  });
-
-  return planId;
 };
 
 /**
@@ -225,15 +232,24 @@ export const activateSubscription = async (shop, planId, subscriptionId) => {
  * Pass `admin` to re-sync from Shopify if the DB has no record.
  */
 export const getActivePlan = async (shop, admin = null) => {
-  const record = await prisma.activeSubscription.findUnique({
-    where: { shop },
-  });
+  try {
+    const record = await prisma.activeSubscription.findUnique({
+      where: { shop },
+    });
 
-  if (record && record.status === "active") return record.planId;
+    if (record && record.status === "active") return record.planId;
 
-  // No DB record — sync from Shopify if we have an admin client
-  if (admin) {
-    return syncSubscriptionFromShopify(admin, shop);
+    // No DB record — sync from Shopify if we have an admin client
+    if (admin) {
+      return syncSubscriptionFromShopify(admin, shop);
+    }
+  } catch (err) {
+    // Table may not exist yet (migration pending) — degrade gracefully to free
+    if (err?.code === "P2021" || err?.message?.includes("does not exist")) {
+      console.warn("ActiveSubscription table missing — defaulting to free plan. Run pending migrations.");
+      return "free";
+    }
+    throw err;
   }
 
   return "free";
