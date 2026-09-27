@@ -37,7 +37,10 @@ export const action = async ({ request }) => {
   customSvg = customSvg
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/\s(?:href|xlink:href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    .replace(/\s(?:href|xlink:href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
+    .replace(/<use\b[^>]*>/gi, "")
+    .replace(/<image\b/gi, "<img-blocked");
   if (customSvg && !/^<svg[\s>]/i.test(customSvg.trim())) {
     return { error: "Custom icon must contain a valid SVG root element." };
   }

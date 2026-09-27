@@ -1,33 +1,18 @@
 import { useEffect, useState } from "react";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
-import prisma from "../db.server";
 import {
-  countWishlistSavesForMonth,
-  getAnalytics,
+  currentUsage,
   monthlyLimit,
-} from "../metaobjects.server";
+} from "../db.wishlist.server";
 
 export const loader = async ({ request }) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const month = new Date().toISOString().slice(0, 7);
-  const analytics = await getAnalytics(admin, month);
-  const savedRecords = await countWishlistSavesForMonth(admin, month);
-  const used = Math.max(analytics.adds, savedRecords);
-  const settings =
-    (await prisma.wishlistSettings.findUnique({ where: { shop: session.shop } })) ||
-    {
-      heading: "My wishlist",
-      emptyMessage: "You have not saved any products yet.",
-      columns: 4,
-      showPrices: true,
-      showRemove: true,
-      buttonLabel: "Remove",
-    };
+  const used = await currentUsage(session.shop, month);
 
   return {
     stats: { used, remaining: Math.max(0, monthlyLimit("free") - used), limit: monthlyLimit("free") },
-    settings,
     extensionName: "wishlist-product",
     blocks: [
       {
@@ -58,39 +43,6 @@ export const headers = () => ({
 });
 
 export const shouldRevalidate = () => true;
-
-export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const formData = await request.formData();
-  const columns = Math.min(6, Math.max(2, Number(formData.get("columns")) || 4));
-
-  await prisma.wishlistSettings.upsert({
-    where: { shop: session.shop },
-    create: {
-      shop: session.shop,
-      heading: String(formData.get("heading") || "My wishlist").trim(),
-      emptyMessage: String(
-        formData.get("emptyMessage") || "You have not saved any products yet.",
-      ).trim(),
-      columns,
-      showPrices: formData.get("showPrices") === "on",
-      showRemove: formData.get("showRemove") === "on",
-      buttonLabel: String(formData.get("buttonLabel") || "Remove").trim(),
-    },
-    update: {
-      heading: String(formData.get("heading") || "My wishlist").trim(),
-      emptyMessage: String(
-        formData.get("emptyMessage") || "You have not saved any products yet.",
-      ).trim(),
-      columns,
-      showPrices: formData.get("showPrices") === "on",
-      showRemove: formData.get("showRemove") === "on",
-      buttonLabel: String(formData.get("buttonLabel") || "Remove").trim(),
-    },
-  });
-
-  return { saved: true };
-};
 
 export default function WishlistDashboard() {
   const { extensionName, blocks, stats } = useLoaderData();
@@ -182,9 +134,8 @@ export default function WishlistDashboard() {
 
       <s-section heading="Current data mode">
         <s-paragraph>
-          Wishlist saves are stored in Shopify metaobjects through the app
-          proxy. The storefront keeps a local copy for immediate UI updates,
-          while the dashboard reads the server-side analytics record.
+          Wishlist saves are stored in the app database. The storefront keeps a local copy for immediate UI updates,
+          while the dashboard reads live counts from the server.
         </s-paragraph>
       </s-section>
     </s-page>

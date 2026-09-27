@@ -1,9 +1,5 @@
 import { authenticate } from "../shopify.server";
-import {
-  countWishlistSavesForMonth,
-  getAnalytics,
-  monthlyLimit,
-} from "../metaobjects.server";
+import { currentUsage, monthlyLimit } from "../db.wishlist.server";
 
 const json = (data) =>
   new Response(JSON.stringify(data), {
@@ -15,13 +11,9 @@ const json = (data) =>
   });
 
 export const loader = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const month = new Date().toISOString().slice(0, 7);
-  const [analytics, savedRecords] = await Promise.all([
-    getAnalytics(admin, month),
-    countWishlistSavesForMonth(admin, month),
-  ]);
-  const used = Math.max(analytics.adds, savedRecords);
+  const used = await currentUsage(session.shop, month);
   const limit = monthlyLimit("free");
 
   return json({

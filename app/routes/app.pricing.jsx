@@ -1,23 +1,15 @@
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { PLANS } from "../plans";
-import {
-  countWishlistSavesForMonth,
-  getAnalytics,
-  monthlyLimit,
-} from "../metaobjects.server";
+import { currentUsage, monthlyLimit } from "../db.wishlist.server";
 
 export const loader = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const month = new Date().toISOString().slice(0, 7);
-  const analytics = await getAnalytics(admin, month);
-  const savedRecords = await countWishlistSavesForMonth(admin, month);
+  const used = await currentUsage(session.shop, month);
   return {
     plans: PLANS,
-    usage: {
-      used: Math.max(analytics.adds, savedRecords),
-      limit: monthlyLimit("free"),
-    },
+    usage: { used, limit: monthlyLimit("free") },
   };
 };
 
@@ -31,7 +23,10 @@ export default function PricingPage() {
     <s-page heading="Pricing">
       <s-section heading="Monthly wishlist usage">
         <s-paragraph>
-          {usage.used} wishlist saves used this month. {usage.limit === Infinity ? "Unlimited saves remain." : `${Math.max(0, usage.limit - usage.used)} saves remain.`}
+          {usage.used} wishlist saves used this month.{" "}
+          {usage.limit === Infinity
+            ? "Unlimited saves remain."
+            : `${Math.max(0, usage.limit - usage.used)} saves remain.`}
         </s-paragraph>
       </s-section>
       <s-section heading="Choose a plan">
@@ -39,10 +34,17 @@ export default function PricingPage() {
           {plans.map((plan) => (
             <s-box key={plan.id} padding="base" borderWidth="base" borderRadius="base" background="subdued">
               <s-heading>{plan.name}</s-heading>
-              <s-paragraph>{plan.limit === Infinity ? "Unlimited" : `${plan.limit} wishlist saves`} per month</s-paragraph>
+              <s-paragraph>
+                {plan.limit === Infinity ? "Unlimited" : `${plan.limit} wishlist saves`} per month
+              </s-paragraph>
               <s-paragraph>${plan.price} per month</s-paragraph>
               <s-paragraph>{plan.description}</s-paragraph>
-              <s-button variant={plan.id === "free" ? "primary" : "secondary"} disabled={plan.id === "free"}>{plan.id === "free" ? "Current plan" : "Contact us to upgrade"}</s-button>
+              <s-button
+                variant={plan.id === "free" ? "primary" : "secondary"}
+                disabled={plan.id === "free"}
+              >
+                {plan.id === "free" ? "Current plan" : "Contact us to upgrade"}
+              </s-button>
             </s-box>
           ))}
         </s-stack>

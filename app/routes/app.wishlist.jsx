@@ -1,16 +1,15 @@
 import { useEffect } from "react";
 import { useLoaderData, useRevalidator } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getAnalyticsHistory } from "../metaobjects.server";
+import { getAnalyticsHistory } from "../db.wishlist.server";
 
 const monthKey = () => new Date().toISOString().slice(0, 7);
 
 export const loader = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const month = monthKey();
-  const history = await getAnalyticsHistory(admin, month);
+  const history = await getAnalyticsHistory(session.shop, month);
   const maxAdds = Math.max(1, ...history.map((entry) => entry.adds));
-
   return { month, history, maxAdds };
 };
 
@@ -22,7 +21,6 @@ export default function WishlistOverview() {
     const refreshTimer = window.setInterval(() => {
       revalidator.revalidate();
     }, 10000);
-
     return () => window.clearInterval(refreshTimer);
   }, [revalidator]);
 

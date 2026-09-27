@@ -75,17 +75,21 @@
       ) === index);
 
     const productData = async (handle) => {
+      if (productData._cache.has(handle)) return productData._cache.get(handle);
       const response = await fetch(`/products/${encodeURIComponent(handle)}.js`);
       if (!response.ok) throw new Error(`Product lookup failed: ${response.status}`);
       const product = await response.json();
-      return {
+      const data = {
         id: String(product.id),
         handle: product.handle,
         title: product.title,
         image: product.featured_image || product.images?.[0] || '',
         price: product.price ? (product.price / 100).toFixed(2) : ''
       };
+      productData._cache.set(handle, data);
+      return data;
     };
+    productData._cache = new Map();
 
     const sync = async (operation, item) => {
       if (!customerAuthenticated) {

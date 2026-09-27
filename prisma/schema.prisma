@@ -49,6 +49,19 @@ model WishlistItem {
   @@index([shop, customerId])
 }
 
+model WishlistAnalytics {
+  id        Int      @id @default(autoincrement())
+  shop      String
+  month     String   // "YYYY-MM"
+  day       String   // "YYYY-MM-DD"
+  adds      Int      @default(0)
+  removes   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([shop, day])
+  @@index([shop, month])
+}
+
 model WishlistSettings {
   id              Int      @id @default(autoincrement())
   shop            String   @unique

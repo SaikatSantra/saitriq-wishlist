@@ -153,6 +153,12 @@
       return window.saitriqWishlistSyncPromise;
     };
 
+    const esc = (str) => {
+      const div = document.createElement('div');
+      div.textContent = String(str ?? '');
+      return div.innerHTML;
+    };
+
     const render = () => {
       const items = getItems();
       page.querySelector('h2').textContent = settings.heading;
@@ -170,9 +176,9 @@
             <img data-sai-wishlist-image alt="" loading="lazy">
           </a>
           <div>
-            <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${item.title || 'Product'}</a>
-            ${settings.showPrices && item.price ? `<div class="sai-wishlist-page__price">${item.price}</div>` : ''}
-            ${settings.showRemove ? `<button type="button" class="sai-wishlist-page__remove">${settings.buttonLabel}</button>` : ''}
+            <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${esc(item.title) || 'Product'}</a>
+            ${settings.showPrices && item.price ? `<div class="sai-wishlist-page__price">${esc(item.price)}</div>` : ''}
+            ${settings.showRemove ? `<button type="button" class="sai-wishlist-page__remove">${esc(settings.buttonLabel)}</button>` : ''}
           </div>
         `;
         const image = card.querySelector('[data-sai-wishlist-image]');
