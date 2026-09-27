@@ -27,7 +27,7 @@ export const PLANS = [
     price: 30,
     limit: Infinity,
     description: "No limits. For high-volume stores.",
-    features: ["Unlimited wishlist saves", "All storefront blocks", "Full analytics", "Priority support", "Custom branding options"],
+    features: ["Unlimited wishlist saves", "All storefront blocks", "Full analytics", "Priority support"],
     trialDays: 7,
   },
 ];

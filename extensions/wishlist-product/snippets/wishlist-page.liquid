@@ -89,9 +89,14 @@
 <section class="sai-wishlist-page" data-sai-wishlist-page>
   <div class="sai-wishlist-page__header">
     <h2 class="sai-wishlist-page__heading">{{ wp_heading }}</h2>
-    <button type="button" class="sai-wishlist-page__clear" data-sai-wishlist-clear hidden>
-      Clear all
-    </button>
+    <div class="sai-wishlist-page__actions">
+      <button type="button" class="sai-wishlist-page__share" data-sai-wishlist-share hidden>
+        Share wishlist
+      </button>
+      <button type="button" class="sai-wishlist-page__clear" data-sai-wishlist-clear hidden>
+        Clear all
+      </button>
+    </div>
   </div>
   <p class="sai-wishlist-page__empty" data-sai-wishlist-empty hidden>{{ wp_empty_msg }}</p>
   <ul class="sai-wishlist-page__items" data-sai-wishlist-items
@@ -125,6 +130,7 @@
     const itemsEl  = page.querySelector('[data-sai-wishlist-items]');
     const emptyEl  = page.querySelector('[data-sai-wishlist-empty]');
     const clearBtn = page.querySelector('[data-sai-wishlist-clear]');
+    const shareBtn = page.querySelector('[data-sai-wishlist-share]');
     if (!itemsEl || !emptyEl || !clearBtn) return;
 
     // ── Helpers ──────────────────────────────────────────────────────────
@@ -158,6 +164,7 @@
       emptyEl.textContent   = settings.emptyMessage;
       emptyEl.hidden        = items.length > 0;
       clearBtn.hidden       = items.length === 0;
+      if (shareBtn) shareBtn.hidden = items.length === 0;
       itemsEl.style.setProperty('--sai-wishlist-columns', settings.columns);
       itemsEl.replaceChildren();
 
@@ -280,9 +287,63 @@
       return run;
     };
 
+    // ── Share wishlist ─────────────────────────────────────────────────────
+    const buildShareUrl = () => {
+      const items = getItems();
+      const payload = items.map((item) => ({
+        i: item.id, h: item.handle, t: item.title, m: item.image, p: item.price
+      }));
+      const token = btoa(encodeURIComponent(JSON.stringify(payload)));
+      const url = new URL(window.location.href);
+      url.searchParams.set('share', token);
+      url.searchParams.delete('logged_in_customer_id');
+      return url.toString();
+    };
+
+    const loadSharedItems = () => {
+      try {
+        const token = new URLSearchParams(window.location.search).get('share');
+        if (!token) return null;
+        const payload = JSON.parse(decodeURIComponent(atob(token)));
+        if (!Array.isArray(payload)) return null;
+        return payload.map((item) => ({
+          id: item.i, handle: item.h, title: item.t,
+          image: item.m || '', price: item.p || '', addedAt: ''
+        }));
+      } catch { return null; }
+    };
+
+    const sharedItems = loadSharedItems();
+    const isSharedView = sharedItems !== null;
+
+    if (isSharedView) {
+      setItems(sharedItems);
+      settings.showRemove = false;
+      settings.heading = 'Shared wishlist';
+      clearBtn.hidden = true;
+      if (shareBtn) shareBtn.hidden = true;
+    }
+
+    if (shareBtn) {
+      shareBtn.addEventListener('click', async () => {
+        const shareUrl = buildShareUrl();
+        if (navigator.share) {
+          try { await navigator.share({ title: 'My wishlist', url: shareUrl }); return; } catch {}
+        }
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          const orig = shareBtn.textContent;
+          shareBtn.textContent = 'Link copied!';
+          setTimeout(() => { shareBtn.textContent = orig; }, 2500);
+        } catch {
+          prompt('Copy this link to share your wishlist:', shareUrl);
+        }
+      });
+    }
+
     // ── Boot ──────────────────────────────────────────────────────────────
     render();
-    syncItems().catch(() => {});
+    if (!isSharedView) syncItems().catch(() => {});
     window.addEventListener('saitriq:wishlist-updated', render);
     window.addEventListener('storage', (e) => { if (e.key === storageKey) render(); });
   })();

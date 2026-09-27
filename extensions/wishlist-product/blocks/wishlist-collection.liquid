@@ -28,8 +28,8 @@
 
     const persistLocalFallback = (operation, item) => {
       const items = readItems();
-      const index = items.findIndex((saved) => String(saved.id) === String(item.id));
-      if (operation === 'add' && index < 0) items.push({ ...item, addedAt: new Date().toISOString() });
+      const index = items.findIndex((saved) => String(saved.id) === String(item.productId));
+      if (operation === 'add' && index < 0) items.push({ ...toLocalItem(item), addedAt: new Date().toISOString() });
       if (operation === 'remove' && index >= 0) items.splice(index, 1);
       saveItems(items);
       window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
@@ -79,17 +79,27 @@
       const response = await fetch(`/products/${encodeURIComponent(handle)}.js`);
       if (!response.ok) throw new Error(`Product lookup failed: ${response.status}`);
       const product = await response.json();
+      // Field names match what the proxy action expects (productId, productHandle, etc.)
       const data = {
-        id: String(product.id),
-        handle: product.handle,
-        title: product.title,
-        image: product.featured_image || product.images?.[0] || '',
-        price: product.price ? (product.price / 100).toFixed(2) : ''
+        productId:     String(product.id),
+        productHandle: product.handle,
+        productTitle:  product.title,
+        productImage:  product.featured_image || product.images?.[0] || '',
+        productPrice:  product.price ? (product.price / 100).toFixed(2) : ''
       };
       productData._cache.set(handle, data);
       return data;
     };
     productData._cache = new Map();
+
+    // Map proxy field names → localStorage shape for local fallback
+    const toLocalItem = (item) => ({
+      id:      item.productId,
+      handle:  item.productHandle,
+      title:   item.productTitle,
+      image:   item.productImage || '',
+      price:   item.productPrice || '',
+    });
 
     const sync = async (operation, item) => {
       if (!customerAuthenticated) {
@@ -124,7 +134,7 @@
     };
 
     const render = (button, item) => {
-      const saved = readItems().some((entry) => String(entry.id) === String(item.id));
+      const saved = readItems().some((entry) => String(entry.id) === String(item.productId));
       button.textContent = saved ? '♥' : '♡';
       button.classList.toggle('is-active', saved);
       button.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
@@ -135,6 +145,27 @@
       const response = await fetch(endpoint, { credentials: 'same-origin' });
       const data = await response.json().catch(() => ({}));
       customerAuthenticated = data.authenticated === true;
+      // Merge any locally saved items into the server for logged-in customers
+      if (customerAuthenticated && Array.isArray(data.items)) {
+        const serverIds = new Set(data.items.map((i) => String(i.productId)));
+        const localOnly = readItems().filter((i) => !serverIds.has(String(i.id)));
+        for (const local of localOnly) {
+          fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              operation: 'add',
+              visitorId: getVisitorId(),
+              productId: local.id,
+              productHandle: local.handle,
+              productTitle: local.title,
+              productImage: local.image,
+              productPrice: local.price
+            })
+          }).catch(() => {});
+        }
+      }
     };
 
     const attach = async (link) => {
@@ -175,7 +206,16 @@
     const scan = () => productLinks().forEach((link) => attach(link));
     detectAuthentication().finally(scan);
     new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('saitriq:wishlist-updated', scan);
+    window.addEventListener('saitriq:wishlist-updated', () => {
+      // Re-render all buttons when wishlist changes (add/remove from another block)
+      document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn) => {
+        const card = btn.parentElement;
+        const link = card && card.querySelector('a[href*="/products/"]');
+        if (!link) return;
+        const handle = productHandleFromLink(link);
+        if (handle && productData._cache.has(handle)) render(btn, productData._cache.get(handle));
+      });
+    });
   })();
 </script>
 

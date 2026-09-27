@@ -57,8 +57,8 @@
     // ── Local fallback ─────────────────────────────────────────────────────
     const persistLocal = (operation, item) => {
       const items = readItems();
-      const idx = items.findIndex((s) => String(s.id) === String(item.id));
-      if (operation === 'add' && idx < 0) items.push({ ...item, addedAt: new Date().toISOString() });
+      const idx = items.findIndex((s) => String(s.id) === String(item.productId));
+      if (operation === 'add' && idx < 0) items.push({ ...toLocalItem(item), addedAt: new Date().toISOString() });
       if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
       saveItems(items);
       window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
@@ -90,17 +90,42 @@
       const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
       if (!res.ok) throw new Error(`Product lookup failed: ${res.status}`);
       const p = await res.json();
-      const data = { id: String(p.id), handle: p.handle, title: p.title, image: p.featured_image || p.images?.[0] || '', price: p.price ? (p.price / 100).toFixed(2) : '' };
+      // Field names match proxy expectations (productId, productHandle, etc.)
+      const data = {
+        productId:     String(p.id),
+        productHandle: p.handle,
+        productTitle:  p.title,
+        productImage:  p.featured_image || p.images?.[0] || '',
+        productPrice:  p.price ? (p.price / 100).toFixed(2) : ''
+      };
       productDataCache.set(handle, data);
       return data;
     };
 
-    // ── Detect auth ────────────────────────────────────────────────────────
+    // Map proxy fields → localStorage shape
+    const toLocalItem = (item) => ({
+      id:     item.productId,
+      handle: item.productHandle,
+      title:  item.productTitle,
+      image:  item.productImage || '',
+      price:  item.productPrice || '',
+    });
+
+    // ── Detect auth + merge local items to server ──────────────────────────
     const detectAuth = async () => {
       try {
         const res = await fetch(endpoint, { credentials: 'same-origin' });
         const data = await res.json().catch(() => ({}));
         customerAuthenticated = data.authenticated === true;
+        if (customerAuthenticated && Array.isArray(data.items)) {
+          const serverIds = new Set(data.items.map((i) => String(i.productId)));
+          readItems().filter((i) => !serverIds.has(String(i.id))).forEach((local) => {
+            fetch(endpoint, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+              body: JSON.stringify({ operation: 'add', visitorId: getVisitorId(), productId: local.id, productHandle: local.handle, productTitle: local.title, productImage: local.image, productPrice: local.price })
+            }).catch(() => {});
+          });
+        }
       } catch {}
     };
 
@@ -111,7 +136,8 @@
     };
 
     const renderButton = (btn, item) => {
-      const saved = readItems().some((e) => String(e.id) === String(item.id));
+      // item uses proxy field names (productId) after the productData fix
+      const saved = readItems().some((e) => String(e.id) === String(item.productId));
       btn.textContent = saved ? '♥' : '♡';
       btn.classList.toggle('is-active', saved);
       btn.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
@@ -144,7 +170,7 @@
         btn.disabled = true;
         try {
           const item = await productData(handle);
-          const isSaved = readItems().some((e) => String(e.id) === String(item.id));
+          const isSaved = readItems().some((e) => String(e.id) === String(item.productId));
           await sync(isSaved ? 'remove' : 'add', item);
           renderButton(btn, item);
         } catch (err) {

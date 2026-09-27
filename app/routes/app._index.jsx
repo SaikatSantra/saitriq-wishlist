@@ -18,6 +18,7 @@ export const loader = async ({ request }) => {
   const limit = monthlyLimit(planId);
 
   return {
+    shop,
     stats: {
       used,
       limit,
@@ -25,12 +26,11 @@ export const loader = async ({ request }) => {
       planName: plan.name,
       planId,
     },
-    extensionName: "wishlist-product",
     blocks: [
       { title: "Product page", description: "Add the Wishlist block to the product template." },
       { title: "Collection page", description: "Add the Wishlist block inside the product-card section." },
       { title: "Wishlist page", description: "Create a page with handle wishlist, then add the Wishlist page block." },
-      { title: "Header icon", description: "Add a link to /pages/wishlist in your theme header." },
+      { title: "Header link", description: "Add a link to /pages/wishlist in your theme header or navigation." },
     ],
   };
 };
@@ -38,9 +38,45 @@ export const loader = async ({ request }) => {
 export const headers = () => ({ "Cache-Control": "no-store, max-age=0" });
 export const shouldRevalidate = () => true;
 
+const FAQ_ITEMS = [
+  {
+    q: "Will this app slow down my site or break my theme?",
+    a: "No. Saitriq Wishlist loads asynchronously — the heart buttons and wishlist page render after your theme and product images. The app uses localStorage for instant UI updates with no blocking network calls on page load. It has been tested with Dawn, Sense, Debut, Brooklyn, Craft, and other popular themes.",
+  },
+  {
+    q: "How easy is it to install and customize the button to match my brand?",
+    a: "For OS 2.0 themes (Dawn, Sense, Craft, etc.) installation takes under 2 minutes — open Theme Editor, add the Saitriq Wishlist app block, save. No code required. You can customize the button style (icon only, icon + text, or your own SVG), the remove button label, grid columns, and inject custom CSS — all from the Page design settings page.",
+  },
+  {
+    q: "Is a credit card required for the trial, and will I be charged automatically?",
+    a: "No credit card is required to start the 7-day free trial on paid plans. Shopify handles all billing. You will only be charged if you keep the plan active after the trial ends. You can downgrade to Free at any time from the Pricing page and you will not be charged.",
+  },
+  {
+    q: "Will you help my developer with custom code, APIs, or conflicts?",
+    a: "Yes. Saitriq Wishlist ships with a full Developer API accessible from the storefront at /apps/saitriq-wishlist. The Developer API page in this app documents every endpoint with copy-paste JavaScript examples. For custom integrations, conflicts, or theme-specific issues on paid plans, contact us and we will respond within 24 hours.",
+  },
+  {
+    q: "Does Saitriq Wishlist integrate with marketing apps like Klaviyo or Mailchimp?",
+    a: "Wishlist data is accessible via the API at /apps/saitriq-wishlist?api=items. Any marketing tool that can read a JSON endpoint can pull your customers' saved products. Server-to-server access is available via the Admin API at /app/api — see the Developer API page for full documentation.",
+  },
+  {
+    q: "How do I know the app is actually driving sales?",
+    a: "The Wishlist activity page shows daily saves and removals for the current month. You can track which products are being saved most by querying /app/api?resource=all to export all wishlist data. Shoppers who save products return to buy at higher rates — the wishlist page keeps those products one tap away.",
+  },
+  {
+    q: "What happens to wishlist data if a shopper is not logged in?",
+    a: "Guest saves are stored in the browser's localStorage immediately so the shopper sees instant feedback. When they log in, any locally saved items are automatically merged into their account on the server. Guest saves are also counted in your monthly analytics so usage is always accurate.",
+  },
+  {
+    q: "Can shoppers share their wishlist with others?",
+    a: "Yes. The wishlist page includes a Share button. On mobile it opens the native share sheet (WhatsApp, Messages, etc.). On desktop it copies a shareable link to the clipboard. The shared link shows the wishlist in read-only mode — the recipient can click any product to buy it.",
+  },
+];
+
 export default function WishlistDashboard() {
-  const { extensionName, blocks, stats } = useLoaderData();
+  const { shop, blocks, stats } = useLoaderData();
   const [liveStats, setLiveStats] = useState(stats);
+  const [openFaq, setOpenFaq] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,8 +105,36 @@ export default function WishlistDashboard() {
     ? Math.min(100, Math.round((liveStats.used / liveStats.limit) * 100))
     : 0;
 
+  const themeEditorUrl = `https://${shop}/admin/themes/current/editor`;
+
   return (
     <s-page heading="Saitriq Wishlist">
+
+      {/* ── Hero callout ── */}
+      <s-section>
+        <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
+          <s-grid gap="small-300">
+            <s-heading>Turn wishlisted products into repeat sales</s-heading>
+            <s-paragraph>
+              Let shoppers save products, share their wishlist, and come back to buy.
+              Works on any Shopify theme — no coding needed.
+            </s-paragraph>
+            <s-stack direction="inline" gap="small-200">
+              <s-button href="/app/how-to-use" variant="primary">Get started</s-button>
+              <s-button href="/app/pricing" variant="secondary">View plans</s-button>
+            </s-stack>
+          </s-grid>
+          {liveStats.planId === "free" && (
+            <s-box border="base" borderRadius="base" padding="base">
+              <s-grid gap="small-200">
+                <s-badge tone="info">Free trial</s-badge>
+                <s-paragraph>Try Growth or Unlimited free for 7 days. No card required.</s-paragraph>
+                <s-button href="/app/pricing" variant="primary">Start free trial</s-button>
+              </s-grid>
+            </s-box>
+          )}
+        </s-grid>
+      </s-section>
 
       {/* ── Usage metrics ── */}
       <s-section heading="This month">
@@ -91,40 +155,31 @@ export default function WishlistDashboard() {
               </s-stack>
             </s-grid>
           </s-box>
-
           <s-divider direction="block" />
-
           <s-box padding="base">
             <s-grid gap="small-300">
               <s-text color="subdued">Saves remaining</s-text>
-              <s-heading>
-                {liveStats.remaining === null ? "Unlimited" : liveStats.remaining}
-              </s-heading>
+              <s-heading>{liveStats.remaining === null ? "Unlimited" : liveStats.remaining}</s-heading>
             </s-grid>
           </s-box>
-
           <s-divider direction="block" />
-
           <s-box padding="base">
             <s-grid gap="small-300">
               <s-text color="subdued">Active plan</s-text>
               <s-stack direction="inline" gap="small-200" alignItems="center">
                 <s-heading>{liveStats.planName ?? "Free"}</s-heading>
-                {liveStats.planId !== "free" && (
-                  <s-badge tone="success">Paid</s-badge>
-                )}
+                {liveStats.planId !== "free" && <s-badge tone="success">Paid</s-badge>}
               </s-stack>
             </s-grid>
           </s-box>
         </s-grid>
 
-        {liveStats.planId === "free" && (
-          <s-banner tone="info" heading="On the Free plan">
-            You have {liveStats.remaining} saves left this month.{" "}
-            <s-link href="/app/pricing">Upgrade for more capacity.</s-link>
+        {liveStats.planId === "free" && liveStats.remaining !== null && liveStats.remaining < 20 && liveStats.remaining > 0 && (
+          <s-banner tone="warning" heading="Running low">
+            Only {liveStats.remaining} saves left this month.{" "}
+            <s-link href="/app/pricing">Upgrade to avoid hitting the limit.</s-link>
           </s-banner>
         )}
-
         {Number.isFinite(liveStats.limit) && liveStats.remaining === 0 && (
           <s-banner tone="critical" heading="Monthly limit reached">
             Shoppers can&apos;t add new wishlist items until next month.{" "}
@@ -133,37 +188,132 @@ export default function WishlistDashboard() {
         )}
       </s-section>
 
-      {/* ── Theme extension info ── */}
-      <s-section heading="Theme extension">
+      {/* ── App embed status ── */}
+      <s-section heading="App embed status">
         <s-paragraph>
-          The wishlist UI is delivered through the <strong>{extensionName}</strong> theme app
-          extension. Open Online Store → Themes → Customize, pick the template, and add a
-          Saitriq Wishlist block.
+          The wishlist UI is powered by the <strong>wishlist-product</strong> theme app extension.
+          Add the blocks to your theme to start showing the wishlist button to shoppers.
         </s-paragraph>
+        <s-grid gridTemplateColumns="repeat(auto-fit, minmax(260px, 1fr))" gap="base">
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-300">
+              <s-heading>Product &amp; Collection blocks</s-heading>
+              <s-badge tone="warning">Needs setup</s-badge>
+              <s-paragraph>
+                Add the Wishlist block to your product template and the Collection wishlist icons
+                block to your collection template so shoppers can save products.
+              </s-paragraph>
+              <s-button
+                href={themeEditorUrl}
+                target="_blank"
+                variant="primary"
+              >
+                Open Theme Editor
+              </s-button>
+            </s-grid>
+          </s-box>
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-300">
+              <s-heading>Wishlist page</s-heading>
+              <s-badge tone="warning">Needs setup</s-badge>
+              <s-paragraph>
+                Create a page with handle <strong>wishlist</strong> in Online Store → Pages,
+                then add the Wishlist page block so shoppers can view their saved items.
+              </s-paragraph>
+              <s-button
+                href={`https://${shop}/admin/pages/new`}
+                target="_blank"
+                variant="secondary"
+              >
+                Create wishlist page
+              </s-button>
+            </s-grid>
+          </s-box>
+        </s-grid>
       </s-section>
 
       {/* ── Setup checklist ── */}
       <s-section heading="Setup checklist">
         <s-grid gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" gap="base">
-          {blocks.map((block) => (
+          {blocks.map((block, i) => (
             <s-box key={block.title} border="base" borderRadius="base" padding="base">
               <s-grid gap="small-200">
-                <s-heading>{block.title}</s-heading>
+                <s-stack direction="inline" gap="small-200" alignItems="center">
+                  <s-badge tone="info">{i + 1}</s-badge>
+                  <s-heading>{block.title}</s-heading>
+                </s-stack>
                 <s-paragraph>{block.description}</s-paragraph>
               </s-grid>
             </s-box>
           ))}
         </s-grid>
+        <s-stack direction="inline" gap="base">
+          <s-button href="/app/how-to-use" variant="secondary">Full setup guide</s-button>
+          <s-button href="/app/api-docs" variant="tertiary" tone="neutral">Developer API</s-button>
+        </s-stack>
       </s-section>
 
-      {/* ── Quick links ── */}
-      <s-section heading="Quick links">
-        <s-stack direction="inline" gap="base">
-          <s-button href="/app/settings" variant="secondary">Page design settings</s-button>
-          <s-button href="/app/wishlist" variant="secondary">View activity</s-button>
-          <s-button href="/app/pricing" variant="secondary">Manage plan</s-button>
-          <s-button href="/app/how-to-use" variant="tertiary" tone="neutral">Setup guide</s-button>
-        </s-stack>
+      {/* ── FAQ ── */}
+      <s-section heading="Have questions?">
+        <s-grid gap="small-200">
+          {FAQ_ITEMS.map((item, i) => (
+            <s-box
+              key={i}
+              border="base"
+              borderRadius="base"
+              background={openFaq === i ? "base" : "subdued"}
+            >
+              <s-box padding="base">
+                <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
+                  <s-text>{item.q}</s-text>
+                  <s-button
+                    variant="tertiary"
+                    tone="neutral"
+                    icon={openFaq === i ? "chevron-up" : "chevron-down"}
+                    accessibilityLabel={openFaq === i ? "Collapse answer" : "Expand answer"}
+                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  />
+                </s-grid>
+              </s-box>
+              {openFaq === i && (
+                <s-box padding="base">
+                  <s-paragraph>{item.a}</s-paragraph>
+                </s-box>
+              )}
+            </s-box>
+          ))}
+        </s-grid>
+      </s-section>
+
+      {/* ── Help footer ── */}
+      <s-section>
+        <s-grid gridTemplateColumns="repeat(auto-fit, minmax(240px, 1fr))" gap="base">
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-300">
+              <s-heading>Setup guide</s-heading>
+              <s-paragraph>
+                Step-by-step instructions for app blocks, manual snippet install, and the
+                developer API with copy-paste code examples.
+              </s-paragraph>
+              <s-button href="/app/how-to-use" variant="secondary">View setup guide</s-button>
+            </s-grid>
+          </s-box>
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gap="small-300">
+              <s-heading>Need help?</s-heading>
+              <s-paragraph>
+                Having trouble with installation, custom themes, or the API?
+                We respond to all support requests within 24 hours.
+              </s-paragraph>
+              <s-button
+                href="mailto:info@saitriq.com"
+                variant="secondary"
+              >
+                Contact support
+              </s-button>
+            </s-grid>
+          </s-box>
+        </s-grid>
       </s-section>
 
     </s-page>
