@@ -4,21 +4,25 @@ import { authenticate } from "../shopify.server";
 import { currentUsage } from "../db.wishlist.server";
 import { getActivePlan, syncSubscriptionFromShopify } from "../billing.server";
 import { monthlyLimit, getPlan } from "../plans";
+import { checkEmbedEnabled } from "../embed.server";
 
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
   const month = new Date().toISOString().slice(0, 7);
 
-  const planId = await syncSubscriptionFromShopify(admin, shop).catch(
-    () => getActivePlan(shop),
-  );
+  const [planId, used, embed] = await Promise.all([
+    syncSubscriptionFromShopify(admin, shop).catch(() => getActivePlan(shop)),
+    currentUsage(shop, month),
+    checkEmbedEnabled(admin),
+  ]);
+
   const plan = getPlan(planId);
-  const used = await currentUsage(shop, month);
   const limit = monthlyLimit(planId);
 
   return {
     shop,
+    embed, // { enabled: bool|null, themeName: string|null, themeId: string|null }
     stats: {
       used,
       limit,
@@ -74,7 +78,7 @@ const FAQ_ITEMS = [
 ];
 
 export default function WishlistDashboard() {
-  const { shop, blocks, stats } = useLoaderData();
+  const { shop, blocks, stats, embed } = useLoaderData();
   const [liveStats, setLiveStats] = useState(stats);
   const [openFaq, setOpenFaq] = useState(null);
 
@@ -104,8 +108,6 @@ export default function WishlistDashboard() {
   const usedPct = liveStats.limit && Number.isFinite(liveStats.limit)
     ? Math.min(100, Math.round((liveStats.used / liveStats.limit) * 100))
     : 0;
-
-  const themeEditorUrl = `https://${shop}/admin/themes/current/editor`;
 
   return (
     <s-page heading="Saitriq Wishlist">
@@ -190,42 +192,63 @@ export default function WishlistDashboard() {
 
       {/* ── App embed status ── */}
       <s-section heading="App embed status">
-        <s-paragraph>
-          The wishlist UI is powered by the <strong>wishlist-product</strong> theme app extension.
-          Add the blocks to your theme to start showing the wishlist button to shoppers.
-        </s-paragraph>
+        {embed.enabled === false && (
+          <s-banner tone="critical" heading="App embed is not enabled">
+            The wishlist button and CSS will not appear on your storefront until you enable
+            the app embed in Theme Editor.{" "}
+            <s-link href={`https://${shop}/admin/themes/current/editor?context=apps`} target="_blank">
+              Enable it now
+            </s-link>
+          </s-banner>
+        )}
+        {embed.enabled === true && (
+          <s-banner tone="success" heading="App embed is enabled">
+            The Saitriq Wishlist embed is active on{" "}
+            <strong>{embed.themeName ?? "your theme"}</strong>.
+            Shoppers can see the wishlist buttons on your storefront.
+          </s-banner>
+        )}
+
         <s-grid gridTemplateColumns="repeat(auto-fit, minmax(260px, 1fr))" gap="base">
+          {/* Embed toggle card */}
           <s-box border="base" borderRadius="base" padding="base">
             <s-grid gap="small-300">
-              <s-heading>Product &amp; Collection blocks</s-heading>
-              <s-badge tone="warning">Needs setup</s-badge>
+              <s-stack direction="inline" gap="small-200" alignItems="center">
+                <s-heading>App embed</s-heading>
+                {embed.enabled === true && <s-badge tone="success">Enabled</s-badge>}
+                {embed.enabled === false && <s-badge tone="critical">Not enabled</s-badge>}
+                {embed.enabled === null && <s-badge tone="neutral">Unknown</s-badge>}
+              </s-stack>
               <s-paragraph>
-                Add the Wishlist block to your product template and the Collection wishlist icons
-                block to your collection template so shoppers can save products.
+                The app embed loads the wishlist CSS globally and activates the heart button
+                on every page. Enable it once under <strong>App embeds</strong> in Theme Editor
+                — it applies to your whole theme.
               </s-paragraph>
               <s-button
-                href={themeEditorUrl}
+                href={`https://${shop}/admin/themes/current/editor?context=apps`}
                 target="_blank"
-                variant="primary"
+                variant={embed.enabled ? "secondary" : "primary"}
               >
-                Open Theme Editor
+                {embed.enabled ? "Manage in Theme Editor" : "Enable in Theme Editor"}
               </s-button>
             </s-grid>
           </s-box>
+
+          {/* Blocks card */}
           <s-box border="base" borderRadius="base" padding="base">
             <s-grid gap="small-300">
-              <s-heading>Wishlist page</s-heading>
-              <s-badge tone="warning">Needs setup</s-badge>
+              <s-heading>Wishlist blocks</s-heading>
               <s-paragraph>
-                Create a page with handle <strong>wishlist</strong> in Online Store → Pages,
-                then add the Wishlist page block so shoppers can view their saved items.
+                After enabling the embed, add the individual blocks to your templates:
+                Wishlist button on the product page, Collection icons on the collection page,
+                and Wishlist page on your dedicated wishlist page.
               </s-paragraph>
               <s-button
-                href={`https://${shop}/admin/pages/new`}
+                href={`https://${shop}/admin/themes/current/editor`}
                 target="_blank"
                 variant="secondary"
               >
-                Create wishlist page
+                Open Theme Editor
               </s-button>
             </s-grid>
           </s-box>
@@ -247,10 +270,12 @@ export default function WishlistDashboard() {
             </s-box>
           ))}
         </s-grid>
-        <s-stack direction="inline" gap="base">
-          <s-button href="/app/how-to-use" variant="secondary">Full setup guide</s-button>
-          <s-button href="/app/api-docs" variant="tertiary" tone="neutral">Developer API</s-button>
-        </s-stack>
+        <s-box padding="base">
+          <s-stack direction="inline" gap="base">
+            <s-button href="/app/how-to-use" variant="secondary">Full setup guide</s-button>
+            <s-button href="/app/api-docs" variant="tertiary" tone="neutral">Developer API</s-button>
+          </s-stack>
+        </s-box>
       </s-section>
 
       {/* ── FAQ ── */}

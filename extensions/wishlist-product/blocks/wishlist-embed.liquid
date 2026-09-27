@@ -1,0 +1,23 @@
+{% comment %}
+  Saitriq Wishlist — App Embed block
+  ─────────────────────────────────
+  This block is enabled/disabled from:
+  Online Store → Themes → Customize → App embeds → Saitriq Wishlist
+
+  When enabled it loads the wishlist CSS globally so the heart buttons
+  and toast notification work on every page without needing a block
+  on each template.
+
+  The actual wishlist buttons are added as separate app blocks on
+  the product template, collection template, and wishlist page.
+{% endcomment %}
+
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+{% schema %}
+{
+  "name": "Saitriq Wishlist",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}
