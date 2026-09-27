@@ -1,18 +1,29 @@
 {% comment %}
   Saitriq Wishlist — App Embed block
-  ─────────────────────────────────
-  This block is enabled/disabled from:
-  Online Store → Themes → Customize → App embeds → Saitriq Wishlist
+  ─────────────────────────────────────────────────────────────────────────────
+  This is the MASTER ON/OFF switch for the entire wishlist app.
 
-  When enabled it loads the wishlist CSS globally so the heart buttons
-  and toast notification work on every page without needing a block
-  on each template.
+  Merchants enable/disable it from:
+    Online Store → Themes → Customize → App embeds → Saitriq Wishlist
 
-  The actual wishlist buttons are added as separate app blocks on
-  the product template, collection template, and wishlist page.
+  When ENABLED:
+    - Loads wishlist.css globally (once, for the whole page)
+    - Sets window.saitriqEmbedEnabled = true
+    - All wishlist blocks (product button, collection icons, wishlist page)
+      check this flag before activating. If it's not set they render nothing.
+
+  When DISABLED:
+    - This block is not rendered at all by Shopify
+    - window.saitriqEmbedEnabled is never set
+    - All wishlist blocks silently output nothing
+    - No JS runs, no CSS loads, no proxy calls are made
 {% endcomment %}
 
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+<script>
+  window.saitriqEmbedEnabled = true;
+</script>
 
 {% schema %}
 {

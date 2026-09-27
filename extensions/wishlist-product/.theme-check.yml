@@ -1,7 +1,17 @@
 # Theme Check configuration for Saitriq Wishlist extension
-# Snippets in this extension are designed for manual installation
-# by merchants — they are not rendered from within the extension
-# itself, so OrphanedSnippet warnings are expected and suppressed.
+#
+# OrphanedSnippet: suppressed because snippets in this extension are
+# designed for manual installation by merchants — they are intentionally
+# not rendered from within the extension itself.
+#
+# ValidSchema: suppressed because Theme Check's JSON schema validator does
+# not fully recognise all valid app block schema properties:
+#   - "target" is valid for app blocks (section, body) per Shopify docs
+#   - "autofill" is valid for product picker settings in app blocks
+# These are confirmed valid by the Shopify CLI deploy process.
 
 OrphanedSnippet:
+  enabled: false
+
+ValidSchema:
   enabled: false

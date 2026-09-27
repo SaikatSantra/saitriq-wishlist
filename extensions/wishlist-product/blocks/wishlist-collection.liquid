@@ -1,9 +1,10 @@
-{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+{% comment %}CSS loaded globally by the Saitriq Wishlist app embed block{% endcomment %}
 
 <div data-sai-wishlist-collection></div>
 
 <script>
   (() => {
+    if (!window.saitriqEmbedEnabled) return; // app embed must be enabled in Theme Editor
     const storageKey = 'saitriq_wishlist';
     const visitorStorageKey = 'saitriq_wishlist_visitor';
     const endpoint = '/apps/saitriq-wishlist';
