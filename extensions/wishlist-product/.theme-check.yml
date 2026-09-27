@@ -1,0 +1,7 @@
+# Theme Check configuration for Saitriq Wishlist extension
+# Snippets in this extension are designed for manual installation
+# by merchants — they are not rendered from within the extension
+# itself, so OrphanedSnippet warnings are expected and suppressed.
+
+OrphanedSnippet:
+  enabled: false

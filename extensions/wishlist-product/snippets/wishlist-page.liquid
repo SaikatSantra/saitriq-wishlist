@@ -78,24 +78,24 @@
 
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
 
-{% assign _heading      = heading      | default: 'My wishlist' %}
-{% assign _empty_msg    = empty_message | default: 'You have not saved any products yet.' %}
-{% assign _columns      = columns      | default: 4 %}
-{% assign _show_prices  = show_prices  | default: true %}
-{% assign _show_remove  = show_remove  | default: true %}
-{% assign _btn_label    = button_label | default: 'Remove' %}
-{% assign _card_class   = card_class   | default: '' %}
+{% assign wp_heading      = heading       | default: 'My wishlist' %}
+{% assign wp_empty_msg    = empty_message | default: 'You have not saved any products yet.' %}
+{% assign wp_columns      = columns       | default: 4 %}
+{% assign wp_show_prices  = show_prices   | default: true %}
+{% assign wp_show_remove  = show_remove   | default: true %}
+{% assign wp_btn_label    = button_label  | default: 'Remove' %}
+{% assign wp_card_class   = card_class    | default: '' %}
 
 <section class="sai-wishlist-page" data-sai-wishlist-page>
   <div class="sai-wishlist-page__header">
-    <h2 class="sai-wishlist-page__heading">{{ _heading }}</h2>
+    <h2 class="sai-wishlist-page__heading">{{ wp_heading }}</h2>
     <button type="button" class="sai-wishlist-page__clear" data-sai-wishlist-clear hidden>
       Clear all
     </button>
   </div>
-  <p class="sai-wishlist-page__empty" data-sai-wishlist-empty hidden>{{ _empty_msg }}</p>
+  <p class="sai-wishlist-page__empty" data-sai-wishlist-empty hidden>{{ wp_empty_msg }}</p>
   <ul class="sai-wishlist-page__items" data-sai-wishlist-items
-      style="--sai-wishlist-columns: {{ _columns }}"></ul>
+      style="--sai-wishlist-columns: {{ wp_columns }}"></ul>
 </section>
 
 <script>
@@ -106,13 +106,13 @@
 
     // Default settings from Liquid — overridden by proxy response for logged-in customers
     let settings = {
-      heading:      {{ _heading     | json }},
-      emptyMessage: {{ _empty_msg   | json }},
-      columns:      {{ _columns     | json }},
-      showPrices:   {{ _show_prices | json }},
-      showRemove:   {{ _show_remove | json }},
-      buttonLabel:  {{ _btn_label   | json }},
-      cardClass:    {{ _card_class  | json }},
+      heading:      {{ wp_heading     | json }},
+      emptyMessage: {{ wp_empty_msg   | json }},
+      columns:      {{ wp_columns     | json }},
+      showPrices:   {{ wp_show_prices | json }},
+      showRemove:   {{ wp_show_remove | json }},
+      buttonLabel:  {{ wp_btn_label   | json }},
+      cardClass:    {{ wp_card_class  | json }},
       customCss:    ''
     };
 

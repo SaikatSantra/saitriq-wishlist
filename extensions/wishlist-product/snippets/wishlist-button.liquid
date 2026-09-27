@@ -14,18 +14,18 @@
 
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
 
-{% assign _wp = product %}
+{% assign wp = product %}
 
 <div data-sai-wishlist>
   <button
     type="button"
     class="sai-wishlist"
     data-sai-wishlist-button
-    data-product-id="{{ _wp.id }}"
-    data-product-handle="{{ _wp.handle }}"
-    data-product-title="{{ _wp.title | escape }}"
-    data-product-image="{{ _wp.featured_image | image_url: width: 600 | escape }}"
-    data-product-price="{{ _wp.price | money | escape }}"
+    data-product-id="{{ wp.id }}"
+    data-product-handle="{{ wp.handle }}"
+    data-product-title="{{ wp.title | escape }}"
+    data-product-image="{{ wp.featured_image | image_url: width: 600 | escape }}"
+    data-product-price="{{ wp.price | money | escape }}"
   >
     <span class="sai-wishlist__icon" aria-hidden="true">♡</span>
     <span class="sai-wishlist__label">Add to wishlist</span>
