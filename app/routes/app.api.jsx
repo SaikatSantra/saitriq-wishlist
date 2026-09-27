@@ -31,8 +31,9 @@ import {
   getAnalytics,
   getAnalyticsHistory,
   currentUsage,
-  monthlyLimit,
 } from "../db.wishlist.server";
+import { getActivePlan } from "../billing.server";
+import { monthlyLimit } from "../plans";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -122,12 +123,13 @@ export const loader = async ({ request }) => {
 
     // ── GET analytics for a month ──────────────────────────────────────────
     case "analytics": {
-      const [totals, history, used] = await Promise.all([
+      const [totals, history, used, planId] = await Promise.all([
         getAnalytics(shop, month),
         getAnalyticsHistory(shop, month),
         currentUsage(shop, month),
+        getActivePlan(shop),
       ]);
-      const limit = monthlyLimit("free");
+      const limit = monthlyLimit(planId);
       return json({
         month,
         adds: totals.adds,
@@ -162,8 +164,11 @@ export const loader = async ({ request }) => {
 
     // ── GET current usage ──────────────────────────────────────────────────
     case "usage": {
-      const used = await currentUsage(shop, month);
-      const limit = monthlyLimit("free");
+      const [used, planId] = await Promise.all([
+        currentUsage(shop, month),
+        getActivePlan(shop),
+      ]);
+      const limit = monthlyLimit(planId);
       return json({
         month,
         used,
@@ -214,8 +219,12 @@ export const action = async ({ request }) => {
 
     // ── add ────────────────────────────────────────────────────────────────
     if (operation === "add") {
-      const used = await currentUsage(shop, month);
-      if (used >= limit) {
+      const [used, planId] = await Promise.all([
+        currentUsage(shop, month),
+        getActivePlan(shop),
+      ]);
+      const limit = monthlyLimit(planId);
+      if (Number.isFinite(limit) && used >= limit) {
         return json(
           { error: "Monthly wishlist limit reached.", used, limit },
           { status: 429 },

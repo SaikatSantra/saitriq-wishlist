@@ -1,5 +1,7 @@
 import { authenticate } from "../shopify.server";
-import { currentUsage, monthlyLimit } from "../db.wishlist.server";
+import { currentUsage } from "../db.wishlist.server";
+import { getActivePlan } from "../billing.server";
+import { monthlyLimit, getPlan } from "../plans";
 
 const json = (data) =>
   new Response(JSON.stringify(data), {
@@ -12,13 +14,22 @@ const json = (data) =>
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
+  const shop = session.shop;
   const month = new Date().toISOString().slice(0, 7);
-  const used = await currentUsage(session.shop, month);
-  const limit = monthlyLimit("free");
+
+  const [planId, used] = await Promise.all([
+    getActivePlan(shop),
+    currentUsage(shop, month),
+  ]);
+
+  const limit = monthlyLimit(planId);
+  const plan = getPlan(planId);
 
   return json({
     used,
     limit,
     remaining: Number.isFinite(limit) ? Math.max(0, limit - used) : null,
+    planName: plan.name,
+    planId,
   });
 };

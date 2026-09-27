@@ -7,10 +7,11 @@ import {
   listCustomerWishlistItems,
   recordAnalytics,
   currentUsage,
-  monthlyLimit,
   getAnalytics,
   getAnalyticsHistory,
 } from "../db.wishlist.server";
+import { getActivePlan } from "../billing.server";
+import { monthlyLimit } from "../plans";
 
 const json = (data, init = {}) =>
   new Response(JSON.stringify(data), {
@@ -18,7 +19,7 @@ const json = (data, init = {}) =>
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
-      "X-Saitriq-Wishlist-Version": "proxy-v12",
+      "X-Saitriq-Wishlist-Version": "proxy-v13",
       ...(init.headers || {}),
     },
   });
@@ -46,7 +47,7 @@ const monthKey = () => new Date().toISOString().slice(0, 7);
 const usageFor = (used, limit) => ({
   used,
   limit,
-  remaining: Number.isFinite(limit) ? Math.max(0, limit - used) : Infinity,
+  remaining: Number.isFinite(limit) ? Math.max(0, limit - used) : null,
 });
 
 const defaultSettings = {
@@ -58,69 +59,43 @@ const defaultSettings = {
   buttonLabel: "Remove",
 };
 
-// ─── API endpoint router (GET ?api=<endpoint>) ────────────────────────────────
-//
-// Storefront JavaScript can call these from any page:
-//
-//   GET /apps/saitriq-wishlist?api=items
-//   GET /apps/saitriq-wishlist?api=check&productId=123
-//   GET /apps/saitriq-wishlist?api=analytics
-//   GET /apps/saitriq-wishlist?api=analytics&month=2026-09
-//   GET /apps/saitriq-wishlist?api=settings
-//   GET /apps/saitriq-wishlist?api=usage
-//
+// ─── ?api= routes ─────────────────────────────────────────────────────────────
+
 const handleApiGet = async (api, url, session, customerId) => {
   const shop = session.shop;
   const month = url.searchParams.get("month") || monthKey();
 
   switch (api) {
-
-    // Returns all wishlist items for the current logged-in customer
     case "items": {
       if (!customerId) return json({ error: "Customer not authenticated." }, { status: 401 });
       const items = await listCustomerWishlistItems(shop, customerId);
       return json({ items });
     }
-
-    // Returns whether a specific product is in the customer's wishlist
     case "check": {
       if (!customerId) return json({ saved: false, authenticated: false });
       const productId = url.searchParams.get("productId");
       if (!productId) return json({ error: "productId is required." }, { status: 400 });
       const items = await listCustomerWishlistItems(shop, customerId);
-      const saved = items.some((i) => String(i.productId) === String(productId));
-      return json({ saved, authenticated: true, productId });
+      return json({ saved: items.some((i) => String(i.productId) === String(productId)), authenticated: true, productId });
     }
-
-    // Returns analytics totals (and optional daily history)
     case "analytics": {
-      const [totals, history] = await Promise.all([
+      const [totals, history, used] = await Promise.all([
         getAnalytics(shop, month),
         getAnalyticsHistory(shop, month),
+        currentUsage(shop, month),
       ]);
-      const used = await currentUsage(shop, month);
-      return json({
-        month,
-        adds: totals.adds,
-        removes: totals.removes,
-        history,
-        usage: usageFor(used, monthlyLimit("free")),
-      });
+      const planId = await getActivePlan(shop);
+      const limit = monthlyLimit(planId);
+      return json({ month, adds: totals.adds, removes: totals.removes, history, usage: usageFor(used, limit) });
     }
-
-    // Returns the merchant display settings
     case "settings": {
       const settings = await prisma.wishlistSettings.findUnique({ where: { shop } });
       return json({ settings: settings || defaultSettings });
     }
-
-    // Returns current monthly usage
     case "usage": {
-      const used = await currentUsage(shop, month);
-      const limit = monthlyLimit("free");
-      return json(usageFor(used, limit));
+      const [used, planId] = await Promise.all([currentUsage(shop, month), getActivePlan(shop)]);
+      return json(usageFor(used, monthlyLimit(planId)));
     }
-
     default:
       return json({ error: `Unknown api endpoint: ${api}` }, { status: 400 });
   }
@@ -135,16 +110,15 @@ export const loader = async ({ request }) => {
 
   if (!session) return json({ authenticated: false, items: [] });
 
-  // ?api= routes
   const api = url.searchParams.get("api");
   if (api) return handleApiGet(api, url, session, customerId);
 
-  // Default: sync response for storefront blocks
   if (!customerId) return json({ authenticated: false, items: [] });
 
   const shop = session.shop;
   const month = monthKey();
-  const [used, items, settings] = await Promise.all([
+  const [planId, used, items, settings] = await Promise.all([
+    getActivePlan(shop),
     currentUsage(shop, month),
     listCustomerWishlistItems(shop, customerId),
     prisma.wishlistSettings.findUnique({ where: { shop } }),
@@ -154,7 +128,7 @@ export const loader = async ({ request }) => {
     authenticated: true,
     items,
     settings: settings || defaultSettings,
-    usage: usageFor(used, monthlyLimit("free")),
+    usage: usageFor(used, monthlyLimit(planId)),
   });
 };
 
@@ -180,7 +154,8 @@ export const action = async ({ request }) => {
     }
 
     const month = monthKey();
-    const limit = monthlyLimit("free");
+    const [planId] = await Promise.all([getActivePlan(shop)]);
+    const limit = monthlyLimit(planId);
 
     // ── clear ─────────────────────────────────────────────────────────────────
     if (operation === "clear") {
@@ -210,24 +185,39 @@ export const action = async ({ request }) => {
 
     if (operation === "add" && customerId) {
       const used = await currentUsage(shop, month);
-      if (used >= limit) {
-        return json({ error: "This store has reached its monthly wishlist limit.", usage: { used, limit, remaining: 0 } }, { status: 429 });
+      if (Number.isFinite(limit) && used >= limit) {
+        return json({
+          error: "This store has reached its monthly wishlist limit.",
+          usage: { used, limit, remaining: 0 },
+        }, { status: 429 });
       }
     }
 
     if (operation === "add") {
       if (customerId) {
-        const result = await upsertWishlistItem(shop, customerId, { productId, productHandle, productTitle, productImage: payload.productImage, productPrice: payload.productPrice });
-        if (result.created) await recordAnalytics(shop, { adds: 1 }).catch((e) => console.error("Analytics update failed on add", e));
+        const result = await upsertWishlistItem(shop, customerId, {
+          productId, productHandle, productTitle,
+          productImage: payload.productImage,
+          productPrice: payload.productPrice,
+        });
+        if (result.created) {
+          await recordAnalytics(shop, { adds: 1 }).catch((e) =>
+            console.error("Analytics update failed on add", e));
+        }
       } else {
-        await recordAnalytics(shop, { adds: 1 }).catch((e) => console.error("Analytics update failed on guest add", e));
+        await recordAnalytics(shop, { adds: 1 }).catch((e) =>
+          console.error("Analytics update failed on guest add", e));
       }
     } else {
       if (customerId) {
         const removed = await deleteWishlistItem(shop, customerId, productId);
-        if (removed) await recordAnalytics(shop, { removes: 1 }).catch((e) => console.error("Analytics update failed on remove", e));
+        if (removed) {
+          await recordAnalytics(shop, { removes: 1 }).catch((e) =>
+            console.error("Analytics update failed on remove", e));
+        }
       } else {
-        await recordAnalytics(shop, { removes: 1 }).catch((e) => console.error("Analytics update failed on guest remove", e));
+        await recordAnalytics(shop, { removes: 1 }).catch((e) =>
+          console.error("Analytics update failed on guest remove", e));
       }
     }
 

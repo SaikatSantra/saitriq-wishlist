@@ -9,7 +9,7 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const month = monthKey();
   const history = await getAnalyticsHistory(session.shop, month);
-  const maxAdds = Math.max(1, ...history.map((entry) => entry.adds));
+  const maxAdds = Math.max(1, ...history.map((e) => e.adds));
   return { month, history, maxAdds };
 };
 
@@ -18,74 +18,79 @@ export default function WishlistOverview() {
   const revalidator = useRevalidator();
 
   useEffect(() => {
-    const refreshTimer = window.setInterval(() => {
-      revalidator.revalidate();
-    }, 10000);
-    return () => window.clearInterval(refreshTimer);
+    const timer = window.setInterval(() => revalidator.revalidate(), 10000);
+    return () => window.clearInterval(timer);
   }, [revalidator]);
 
   return (
     <s-page heading="Wishlist activity">
-      <s-section heading={`Daily wishlist saves · ${month}`}>
-        {history.length > 0 ? (
-          <s-stack direction="block" gap="base">
+
+      <s-section heading={`Daily saves · ${month}`}>
+        {history.length === 0 ? (
+          <s-banner tone="info" heading="No activity yet">
+            Daily wishlist saves will appear here after shoppers save products.
+          </s-banner>
+        ) : (
+          <s-grid gap="small">
             {history.map((entry) => (
-              <s-box
-                key={entry.day}
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <s-stack direction="block" gap="small">
+              <s-box key={entry.day} border="base" borderRadius="base" padding="base">
+                <s-grid gap="small-200">
                   <s-stack direction="inline" gap="base" alignItems="center">
-                    <s-text type="strong">{entry.day}</s-text>
-                    <s-text>{entry.adds} saves</s-text>
-                    <s-text tone="neutral">{entry.removes} removals</s-text>
+                    <s-text>{entry.day}</s-text>
+                    <s-badge tone="success">{entry.adds} saves</s-badge>
+                    {entry.removes > 0 && (
+                      <s-badge tone="neutral">{entry.removes} removals</s-badge>
+                    )}
                   </s-stack>
-                  <s-stack direction="inline" gap="small">
-                    {Array.from({ length: 10 }, (_, index) => (
+                  {/* Bar chart */}
+                  <s-stack direction="inline" gap="small-200">
+                    {Array.from({ length: 10 }, (_, i) => (
                       <s-box
-                        key={`${entry.day}-bar-${index}`}
+                        key={`${entry.day}-bar-${i}`}
                         padding="small"
+                        borderRadius="base"
                         background={
-                          index < Math.ceil((entry.adds / maxAdds) * 10)
+                          i < Math.ceil((entry.adds / maxAdds) * 10)
                             ? "strong"
                             : "subdued"
                         }
-                        borderRadius="base"
                       />
                     ))}
                   </s-stack>
-                </s-stack>
+                </s-grid>
               </s-box>
             ))}
-          </s-stack>
-        ) : (
-          <s-banner tone="info" heading="No wishlist activity yet">
-            Daily wishlist saves will appear here after shoppers save products.
-          </s-banner>
+          </s-grid>
         )}
       </s-section>
 
-      <s-section heading="Datewise analytics">
+      <s-section heading="Daily breakdown" padding="none">
         <s-table variant="auto">
           <s-table-header-row>
-            <s-table-header listSlot="primary">Date</s-table-header>
-            <s-table-header format="numeric">Wishlist saves</s-table-header>
+            <s-table-header>Date</s-table-header>
+            <s-table-header format="numeric">Saves</s-table-header>
             <s-table-header format="numeric">Removals</s-table-header>
           </s-table-header-row>
           <s-table-body>
-            {history.map((entry) => (
-              <s-table-row key={`table-${entry.day}`}>
-                <s-table-cell>{entry.day}</s-table-cell>
-                <s-table-cell>{entry.adds}</s-table-cell>
-                <s-table-cell>{entry.removes}</s-table-cell>
+            {history.length === 0 ? (
+              <s-table-row>
+                <s-table-cell>No data for this month</s-table-cell>
+                <s-table-cell>—</s-table-cell>
+                <s-table-cell>—</s-table-cell>
               </s-table-row>
-            ))}
+            ) : (
+              history.map((entry) => (
+                <s-table-row key={`table-${entry.day}`}>
+                  <s-table-cell>{entry.day}</s-table-cell>
+                  <s-table-cell>{entry.adds}</s-table-cell>
+                  <s-table-cell>{entry.removes}</s-table-cell>
+                </s-table-row>
+              ))
+            )}
           </s-table-body>
         </s-table>
       </s-section>
+
     </s-page>
   );
 }

@@ -71,3 +71,15 @@ model WishlistSettings {
   customSvg    String   @default("")
   updatedAt    DateTime @updatedAt
 }
+
+model ActiveSubscription {
+  id                   Int       @id @default(autoincrement())
+  shop                 String    @unique
+  planId               String    @default("free")
+  subscriptionId       String?   // Shopify gid://shopify/AppSubscription/...
+  status               String    @default("active") // active | pending | cancelled | expired
+  trialEndsOn          DateTime?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}

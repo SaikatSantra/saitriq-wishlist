@@ -1,10 +1,5 @@
 import prisma from "./db.server";
 
-// ─── Plans ────────────────────────────────────────────────────────────────────
-
-export const monthlyLimit = (plan) =>
-  ({ free: 100, standard: 500, enterprise: Infinity })[plan] ?? 100;
-
 // ─── Wishlist items ───────────────────────────────────────────────────────────
 
 export const upsertWishlistItem = async (shop, customerId, item) => {
