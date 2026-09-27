@@ -5,7 +5,7 @@ application_url = "https://saitriq-wishlist.vercel.app"
 embedded = true
 
 [access_scopes]
-scopes = "write_app_proxy"
+scopes = ""
 
 [webhooks]
 api_version = "2026-10"
