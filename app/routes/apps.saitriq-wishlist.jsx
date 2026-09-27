@@ -8,6 +8,8 @@ import {
   recordAnalytics,
   currentUsage,
   monthlyLimit,
+  getAnalytics,
+  getAnalyticsHistory,
 } from "../db.wishlist.server";
 
 const json = (data, init = {}) =>
@@ -16,22 +18,15 @@ const json = (data, init = {}) =>
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
-      "X-Saitriq-Wishlist-Version": "proxy-v11",
+      "X-Saitriq-Wishlist-Version": "proxy-v12",
       ...(init.headers || {}),
     },
   });
 
 const readPayload = async (request) => {
-  const rawBody = await request
-    .clone()
-    .text()
-    .catch(() => "");
+  const rawBody = await request.clone().text().catch(() => "");
   if (rawBody.trim().startsWith("{")) {
-    try {
-      return JSON.parse(rawBody);
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(rawBody); } catch { return null; }
   }
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) return null;
@@ -63,15 +58,89 @@ const defaultSettings = {
   buttonLabel: "Remove",
 };
 
+// ─── API endpoint router (GET ?api=<endpoint>) ────────────────────────────────
+//
+// Storefront JavaScript can call these from any page:
+//
+//   GET /apps/saitriq-wishlist?api=items
+//   GET /apps/saitriq-wishlist?api=check&productId=123
+//   GET /apps/saitriq-wishlist?api=analytics
+//   GET /apps/saitriq-wishlist?api=analytics&month=2026-09
+//   GET /apps/saitriq-wishlist?api=settings
+//   GET /apps/saitriq-wishlist?api=usage
+//
+const handleApiGet = async (api, url, session, customerId) => {
+  const shop = session.shop;
+  const month = url.searchParams.get("month") || monthKey();
+
+  switch (api) {
+
+    // Returns all wishlist items for the current logged-in customer
+    case "items": {
+      if (!customerId) return json({ error: "Customer not authenticated." }, { status: 401 });
+      const items = await listCustomerWishlistItems(shop, customerId);
+      return json({ items });
+    }
+
+    // Returns whether a specific product is in the customer's wishlist
+    case "check": {
+      if (!customerId) return json({ saved: false, authenticated: false });
+      const productId = url.searchParams.get("productId");
+      if (!productId) return json({ error: "productId is required." }, { status: 400 });
+      const items = await listCustomerWishlistItems(shop, customerId);
+      const saved = items.some((i) => String(i.productId) === String(productId));
+      return json({ saved, authenticated: true, productId });
+    }
+
+    // Returns analytics totals (and optional daily history)
+    case "analytics": {
+      const [totals, history] = await Promise.all([
+        getAnalytics(shop, month),
+        getAnalyticsHistory(shop, month),
+      ]);
+      const used = await currentUsage(shop, month);
+      return json({
+        month,
+        adds: totals.adds,
+        removes: totals.removes,
+        history,
+        usage: usageFor(used, monthlyLimit("free")),
+      });
+    }
+
+    // Returns the merchant display settings
+    case "settings": {
+      const settings = await prisma.wishlistSettings.findUnique({ where: { shop } });
+      return json({ settings: settings || defaultSettings });
+    }
+
+    // Returns current monthly usage
+    case "usage": {
+      const used = await currentUsage(shop, month);
+      const limit = monthlyLimit("free");
+      return json(usageFor(used, limit));
+    }
+
+    default:
+      return json({ error: `Unknown api endpoint: ${api}` }, { status: 400 });
+  }
+};
+
 // ─── Loader (GET) ─────────────────────────────────────────────────────────────
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.public.appProxy(request);
+  const url = new URL(request.url);
   const customerId = getCustomerId(request);
 
-  if (!session || !customerId) {
-    return json({ authenticated: false, items: [] });
-  }
+  if (!session) return json({ authenticated: false, items: [] });
+
+  // ?api= routes
+  const api = url.searchParams.get("api");
+  if (api) return handleApiGet(api, url, session, customerId);
+
+  // Default: sync response for storefront blocks
+  if (!customerId) return json({ authenticated: false, items: [] });
 
   const shop = session.shop;
   const month = monthKey();
@@ -95,10 +164,7 @@ export const action = async ({ request }) => {
   try {
     const { session } = await authenticate.public.appProxy(request);
     if (!session) {
-      return json(
-        { authenticated: false, error: "Wishlist service is unavailable." },
-        { status: 502 },
-      );
+      return json({ authenticated: false, error: "Wishlist service is unavailable." }, { status: 502 });
     }
 
     const shop = session.shop;
@@ -106,34 +172,23 @@ export const action = async ({ request }) => {
     const payload = await readPayload(request);
     const operation = payload?.operation;
 
-    // Guest visitor ID (used for analytics tracking even when not logged in)
     const visitorId = String(payload?.visitorId || "")
-      .trim()
-      .replace(/[^a-zA-Z0-9_-]/g, "-")
-      .slice(0, 80);
-
-    // Guests: track analytics but don't persist wishlist items server-side
+      .trim().replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80);
     const actorId = customerId || visitorId || null;
     if (!actorId) {
-      return json(
-        { authenticated: false, error: "A valid wishlist visitor is required." },
-        { status: 400 },
-      );
+      return json({ authenticated: false, error: "A valid wishlist visitor is required." }, { status: 400 });
     }
 
     const month = monthKey();
     const limit = monthlyLimit("free");
 
-    // ── clear ────────────────────────────────────────────────────────────────
+    // ── clear ─────────────────────────────────────────────────────────────────
     if (operation === "clear") {
       let removedCount = 0;
-      if (customerId) {
-        removedCount = await clearCustomerWishlist(shop, customerId);
-      }
+      if (customerId) removedCount = await clearCustomerWishlist(shop, customerId);
       if (removedCount > 0) {
-        await recordAnalytics(shop, { removes: removedCount }).catch((err) =>
-          console.error("Analytics update failed on clear", err),
-        );
+        await recordAnalytics(shop, { removes: removedCount }).catch((e) =>
+          console.error("Analytics update failed on clear", e));
       }
       const used = await currentUsage(shop, month);
       return json({
@@ -144,74 +199,35 @@ export const action = async ({ request }) => {
       });
     }
 
-    // ── add / remove ─────────────────────────────────────────────────────────
+    // ── add / remove ──────────────────────────────────────────────────────────
     const productId = String(payload?.productId || "").trim();
-    const productHandle = String(
-      payload?.productHandle || payload?.productId || "product",
-    ).trim();
-    const productTitle = String(
-      payload?.productTitle || payload?.productHandle || "Product",
-    ).trim();
+    const productHandle = String(payload?.productHandle || payload?.productId || "product").trim();
+    const productTitle = String(payload?.productTitle || payload?.productHandle || "Product").trim();
 
-    if (
-      !productId ||
-      !productHandle ||
-      !productTitle ||
-      !["add", "remove"].includes(operation)
-    ) {
-      return json(
-        { error: "A valid wishlist operation and product details are required." },
-        { status: 400 },
-      );
+    if (!productId || !productHandle || !productTitle || !["add", "remove"].includes(operation)) {
+      return json({ error: "A valid wishlist operation and product details are required." }, { status: 400 });
     }
 
-    // Rate-limit check (only for logged-in customers persisting to DB)
     if (operation === "add" && customerId) {
       const used = await currentUsage(shop, month);
       if (used >= limit) {
-        return json(
-          {
-            error: "This store has reached its monthly wishlist limit.",
-            usage: { used, limit, remaining: 0 },
-          },
-          { status: 429 },
-        );
+        return json({ error: "This store has reached its monthly wishlist limit.", usage: { used, limit, remaining: 0 } }, { status: 429 });
       }
     }
 
     if (operation === "add") {
       if (customerId) {
-        const result = await upsertWishlistItem(shop, customerId, {
-          productId,
-          productHandle,
-          productTitle,
-          productImage: payload.productImage,
-          productPrice: payload.productPrice,
-        });
-        if (result.created) {
-          await recordAnalytics(shop, { adds: 1 }).catch((err) =>
-            console.error("Analytics update failed on add", err),
-          );
-        }
+        const result = await upsertWishlistItem(shop, customerId, { productId, productHandle, productTitle, productImage: payload.productImage, productPrice: payload.productPrice });
+        if (result.created) await recordAnalytics(shop, { adds: 1 }).catch((e) => console.error("Analytics update failed on add", e));
       } else {
-        // Guest: just track analytics
-        await recordAnalytics(shop, { adds: 1 }).catch((err) =>
-          console.error("Analytics update failed on guest add", err),
-        );
+        await recordAnalytics(shop, { adds: 1 }).catch((e) => console.error("Analytics update failed on guest add", e));
       }
     } else {
-      // remove
       if (customerId) {
         const removed = await deleteWishlistItem(shop, customerId, productId);
-        if (removed) {
-          await recordAnalytics(shop, { removes: 1 }).catch((err) =>
-            console.error("Analytics update failed on remove", err),
-          );
-        }
+        if (removed) await recordAnalytics(shop, { removes: 1 }).catch((e) => console.error("Analytics update failed on remove", e));
       } else {
-        await recordAnalytics(shop, { removes: 1 }).catch((err) =>
-          console.error("Analytics update failed on guest remove", err),
-        );
+        await recordAnalytics(shop, { removes: 1 }).catch((e) => console.error("Analytics update failed on guest remove", e));
       }
     }
 
@@ -224,9 +240,6 @@ export const action = async ({ request }) => {
     });
   } catch (error) {
     console.error("Wishlist proxy operation failed", error);
-    return json(
-      { authenticated: true, error: "The wishlist could not be synchronized." },
-      { status: 502 },
-    );
+    return json({ authenticated: true, error: "The wishlist could not be synchronized." }, { status: 502 });
   }
 };

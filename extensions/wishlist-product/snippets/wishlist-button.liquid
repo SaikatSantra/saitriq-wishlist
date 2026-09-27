@@ -1,0 +1,175 @@
+{% comment %}
+  Saitriq Wishlist — Product page button (manual install)
+  -------------------------------------------------------
+  Paste this line anywhere inside your product template
+  (e.g. product.liquid, main-product.liquid, product-form.liquid):
+
+    {% render 'wishlist-button' %}
+
+  The snippet auto-reads the `product` object from the template context.
+  Pass a custom product if needed:
+
+    {% render 'wishlist-button', product: product %}
+{% endcomment %}
+
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+{% assign _wp = product %}
+
+<div data-sai-wishlist>
+  <button
+    type="button"
+    class="sai-wishlist"
+    data-sai-wishlist-button
+    data-product-id="{{ _wp.id }}"
+    data-product-handle="{{ _wp.handle }}"
+    data-product-title="{{ _wp.title | escape }}"
+    data-product-image="{{ _wp.featured_image | image_url: width: 600 | escape }}"
+    data-product-price="{{ _wp.price | money | escape }}"
+  >
+    <span class="sai-wishlist__icon" aria-hidden="true">♡</span>
+    <span class="sai-wishlist__label">Add to wishlist</span>
+  </button>
+</div>
+
+<script>
+  (() => {
+    const storageKey = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
+    const syncEndpoint = '/apps/saitriq-wishlist';
+    const script = document.currentScript;
+    const block = script && script.previousElementSibling;
+    const button = block && block.querySelector('[data-sai-wishlist-button]');
+    if (!button) return;
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    const announce = (message) => {
+      let toast = document.querySelector('[data-sai-wishlist-toast]');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.dataset.saiWishlistToast = '';
+        toast.className = 'sai-wishlist__toast';
+        toast.setAttribute('role', 'status');
+        document.body.append(toast);
+      }
+      toast.textContent = message;
+      toast.classList.add('is-visible');
+      clearTimeout(window.saitriqWishlistToastTimer);
+      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
+    };
+    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
+
+    // ── State ──────────────────────────────────────────────────────────────
+    const productId    = button.dataset.productId;
+    const productHandle = button.dataset.productHandle;
+    const productTitle  = button.dataset.productTitle;
+    const productImage  = button.dataset.productImage;
+    const productPrice  = button.dataset.productPrice;
+    let buttonSettings = { buttonMode: 'icon-text', customSvg: '' };
+    let requestInFlight = false;
+    let customerAuthenticated = false;
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    const getWishlist = () => {
+      try { const v = JSON.parse(localStorage.getItem(storageKey) || '[]'); return Array.isArray(v) ? v : []; }
+      catch { return []; }
+    };
+    const saveWishlist = (items) => {
+      try { localStorage.setItem(storageKey, JSON.stringify(items)); } catch {}
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+    };
+    const getVisitorId = () => {
+      let id = localStorage.getItem(visitorStorageKey);
+      if (!id) { id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,14)}`; localStorage.setItem(visitorStorageKey, id); }
+      return id;
+    };
+    const renderIcon = (isSaved) => {
+      const icon = button.querySelector('.sai-wishlist__icon');
+      if (buttonSettings.buttonMode === 'custom-svg' && buttonSettings.customSvg) icon.innerHTML = buttonSettings.customSvg;
+      else icon.textContent = isSaved ? '♥' : '♡';
+      button.querySelector('.sai-wishlist__label').hidden = (buttonSettings.buttonMode === 'icon-only');
+    };
+    const updateView = (isSaved) => {
+      button.classList.toggle('is-active', isSaved);
+      renderIcon(isSaved);
+      button.querySelector('.sai-wishlist__label').textContent = isSaved ? 'Saved' : 'Add to wishlist';
+    };
+    const refresh = () => updateView(getWishlist().some((i) => String(i.id) === String(productId)));
+
+    // ── Local fallback ─────────────────────────────────────────────────────
+    const persistLocal = (operation, item) => {
+      const items = getWishlist();
+      const idx = items.findIndex((s) => String(s.id) === String(item.productId));
+      if (operation === 'add' && idx < 0) items.push({ id: item.productId, handle: item.productHandle, title: item.productTitle, image: item.productImage || '', price: item.productPrice || '', addedAt: new Date().toISOString() });
+      if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
+      saveWishlist(items);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
+      return items;
+    };
+
+    // ── Sync ───────────────────────────────────────────────────────────────
+    const sync = async (operation, item) => {
+      if (!customerAuthenticated) {
+        try {
+          await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item }) });
+        } catch {}
+        return persistLocal(operation, item);
+      }
+      const res = await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item }) });
+      if (!res.ok) { customerAuthenticated = false; return persistLocal(operation, item); }
+      const data = await res.json();
+      if (!Array.isArray(data.items)) { customerAuthenticated = false; return sync(operation, item); }
+      const synced = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
+      saveWishlist(synced);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
+      return synced;
+    };
+
+    // ── Initial sync ───────────────────────────────────────────────────────
+    const initialSync = (() => {
+      if (window.saitriqWishlistSyncPromise) return window.saitriqWishlistSyncPromise;
+      const run = (async () => {
+        const res = await fetch(syncEndpoint, { credentials: 'same-origin' }).catch(() => null);
+        if (!res || !res.ok) { refresh(); return; }
+        const data = await res.json();
+        customerAuthenticated = data.authenticated === true;
+        if (data.settings) buttonSettings = { ...buttonSettings, ...data.settings };
+        if (!data.authenticated || !Array.isArray(data.items)) { refresh(); return; }
+        let synced = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
+        for (const item of getWishlist()) {
+          if (!synced.some((s) => String(s.id) === String(item.id))) {
+            const merged = await sync('add', { productId: item.id, productHandle: item.handle, productTitle: item.title, productImage: item.image, productPrice: item.price });
+            if (merged) synced = merged;
+          }
+        }
+        saveWishlist(synced);
+        refresh();
+      })();
+      window.saitriqWishlistSyncPromise = run.finally(() => { window.saitriqWishlistSyncPromise = null; });
+      return window.saitriqWishlistSyncPromise;
+    })();
+
+    // ── Button click ───────────────────────────────────────────────────────
+    button.addEventListener('click', async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      button.disabled = true;
+      try {
+        await initialSync;
+        const isSaved = getWishlist().some((i) => String(i.id) === String(productId));
+        const synced = await sync(isSaved ? 'remove' : 'add', { productId, productHandle, productTitle, productImage, productPrice });
+        if (synced) updateView(!isSaved);
+      } catch (err) {
+        console.error('Wishlist request failed', err);
+        announce('Wishlist is temporarily unavailable. Please try again.');
+      } finally {
+        button.disabled = false;
+        requestInFlight = false;
+      }
+    });
+
+    refresh();
+    window.addEventListener('saitriq:wishlist-updated', refresh);
+    window.addEventListener('storage', (e) => { if (e.key === storageKey) refresh(); });
+  })();
+</script>

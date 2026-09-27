@@ -1,0 +1,199 @@
+{% comment %}
+  Saitriq Wishlist — Collection page auto-inject (manual install)
+  ---------------------------------------------------------------
+  Paste this line ONCE anywhere that loads on every page
+  (e.g. theme.liquid just before </body>, or collection.liquid):
+
+    {% render 'wishlist-collection-inject' %}
+
+  The snippet scans for product card links and injects a heart button
+  into each card automatically. Works with any theme structure.
+{% endcomment %}
+
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+<script>
+  (() => {
+    if (window.saitriqWishlistCollectionLoaded) return;
+    window.saitriqWishlistCollectionLoaded = true;
+
+    const storageKey = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
+    const endpoint = '/apps/saitriq-wishlist';
+    let customerAuthenticated = false;
+
+    // ── Storage helpers ────────────────────────────────────────────────────
+    const readItems = () => {
+      try { const v = JSON.parse(localStorage.getItem(storageKey) || '[]'); return Array.isArray(v) ? v : []; }
+      catch { return []; }
+    };
+    const saveItems = (items) => {
+      localStorage.setItem(storageKey, JSON.stringify(items));
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+    };
+    const getVisitorId = () => {
+      let id = localStorage.getItem(visitorStorageKey);
+      if (!id) { id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,14)}`; localStorage.setItem(visitorStorageKey, id); }
+      return id;
+    };
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    const announce = (message) => {
+      let toast = document.querySelector('[data-sai-wishlist-toast]');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.dataset.saiWishlistToast = '';
+        toast.className = 'sai-wishlist__toast';
+        toast.setAttribute('role', 'status');
+        document.body.append(toast);
+      }
+      toast.textContent = message;
+      toast.classList.add('is-visible');
+      clearTimeout(window.saitriqWishlistToastTimer);
+      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
+    };
+    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
+
+    // ── Local fallback ─────────────────────────────────────────────────────
+    const persistLocal = (operation, item) => {
+      const items = readItems();
+      const idx = items.findIndex((s) => String(s.id) === String(item.id));
+      if (operation === 'add' && idx < 0) items.push({ ...item, addedAt: new Date().toISOString() });
+      if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
+      saveItems(items);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
+      return items;
+    };
+
+    // ── Server sync ────────────────────────────────────────────────────────
+    const sync = async (operation, item) => {
+      if (!customerAuthenticated) {
+        try { await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item }) }); } catch {}
+        return persistLocal(operation, item);
+      }
+      const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(data.items)) {
+        customerAuthenticated = false;
+        return persistLocal(operation, item);
+      }
+      const synced = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
+      saveItems(synced);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
+      return synced;
+    };
+
+    // ── Product data cache ─────────────────────────────────────────────────
+    const productDataCache = new Map();
+    const productData = async (handle) => {
+      if (productDataCache.has(handle)) return productDataCache.get(handle);
+      const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
+      if (!res.ok) throw new Error(`Product lookup failed: ${res.status}`);
+      const p = await res.json();
+      const data = { id: String(p.id), handle: p.handle, title: p.title, image: p.featured_image || p.images?.[0] || '', price: p.price ? (p.price / 100).toFixed(2) : '' };
+      productDataCache.set(handle, data);
+      return data;
+    };
+
+    // ── Detect auth ────────────────────────────────────────────────────────
+    const detectAuth = async () => {
+      try {
+        const res = await fetch(endpoint, { credentials: 'same-origin' });
+        const data = await res.json().catch(() => ({}));
+        customerAuthenticated = data.authenticated === true;
+      } catch {}
+    };
+
+    // ── Card helpers ───────────────────────────────────────────────────────
+    const handleFromLink = (link) => {
+      const m = new URL(link.href, window.location.origin).pathname.match(/^\/products\/([^/?#]+)/);
+      return m ? decodeURIComponent(m[1]) : '';
+    };
+
+    const renderButton = (btn, item) => {
+      const saved = readItems().some((e) => String(e.id) === String(item.id));
+      btn.textContent = saved ? '♥' : '♡';
+      btn.classList.toggle('is-active', saved);
+      btn.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
+      btn.title = btn.getAttribute('aria-label');
+    };
+
+    const attach = async (link) => {
+      const handle = handleFromLink(link);
+      if (!handle) return;
+      // find the closest product card container
+      const card = link.closest([
+        'li', 'article',
+        '.card', '.product-card', '.grid__item',
+        '[class*="product-card"]', '[class*="product-item"]',
+        '[class*="card--product"]'
+      ].join(','));
+      if (!card || card.querySelector('[data-sai-collection-wishlist]')) return;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sai-wishlist sai-wishlist--collection';
+      btn.dataset.saiCollectionWishlist = '';
+      btn.textContent = '♡';
+      btn.setAttribute('aria-label', 'Add to wishlist');
+
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          const item = await productData(handle);
+          const isSaved = readItems().some((e) => String(e.id) === String(item.id));
+          await sync(isSaved ? 'remove' : 'add', item);
+          renderButton(btn, item);
+        } catch (err) {
+          console.error('Collection wishlist failed', err);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      card.style.position = card.style.position || 'relative';
+      card.append(btn);
+
+      try {
+        const item = await productData(handle);
+        renderButton(btn, item);
+      } catch {
+        btn.remove();
+      }
+    };
+
+    // ── Scan page for product links ────────────────────────────────────────
+    const seen = new Set();
+    const scan = () => {
+      [...document.querySelectorAll('a[href*="/products/"]')]
+        .filter((link) => handleFromLink(link))
+        .filter((link, i, arr) => arr.findIndex((l) => handleFromLink(l) === handleFromLink(link)) === i)
+        .filter((link) => {
+          const h = handleFromLink(link);
+          if (seen.has(h)) return false;
+          seen.add(h);
+          return true;
+        })
+        .forEach((link) => attach(link));
+    };
+
+    // ── Re-render on wishlist change ───────────────────────────────────────
+    window.addEventListener('saitriq:wishlist-updated', () => {
+      document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn) => {
+        const card = btn.closest('[data-sai-collection-wishlist]')?.parentElement || btn.parentElement;
+        const link = card?.querySelector('a[href*="/products/"]');
+        if (!link) return;
+        const handle = handleFromLink(link);
+        if (handle && productDataCache.has(handle)) renderButton(btn, productDataCache.get(handle));
+      });
+    });
+
+    // ── Boot ───────────────────────────────────────────────────────────────
+    detectAuth().finally(scan);
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('storage', (e) => { if (e.key === storageKey) scan(); });
+  })();
+</script>

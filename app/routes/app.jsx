@@ -21,6 +21,7 @@ export default function App() {
         <s-link href="/app/settings">Page design settings</s-link>
         <s-link href="/app/pricing">Pricing</s-link>
         <s-link href="/app/how-to-use">How to use</s-link>
+        <s-link href="/app/api-docs">Developer API</s-link>
       </s-app-nav>
       <Outlet />
     </AppProvider>

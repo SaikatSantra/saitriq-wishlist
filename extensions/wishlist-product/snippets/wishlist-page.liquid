@@ -1,0 +1,289 @@
+{% comment %}
+  Saitriq Wishlist — Wishlist page (manual install)
+  ─────────────────────────────────────────────────
+  Drop this snippet into any Liquid template to render
+  the full wishlist page: grid, images, prices, remove
+  buttons, and a "Clear all" control.
+
+  ── BASIC USAGE ────────────────────────────────────────
+  Create a page in Online Store → Pages with the handle
+  set to "wishlist", then add to its template:
+
+    {% render 'wishlist-page' %}
+
+  Or paste it directly into any section / template file.
+
+  ── CUSTOMISE WITH VARIABLES ───────────────────────────
+  Override any default by passing variables when rendering:
+
+    {% render 'wishlist-page',
+       heading:      'Saved items',
+       empty_message:'Nothing saved yet.',
+       columns:      3,
+       show_prices:  true,
+       show_remove:  true,
+       button_label: 'Remove',
+       card_class:   'product-card'
+    %}
+
+  Variable reference
+  ──────────────────
+  heading       (string)  — Section heading text.
+                            Default: "My wishlist"
+
+  empty_message (string)  — Text shown when the list is empty.
+                            Default: "You have not saved any products yet."
+
+  columns       (number)  — Grid columns on desktop (2–6).
+                            Default: 4
+
+  show_prices   (boolean) — Show the saved product price.
+                            Default: true
+
+  show_remove   (boolean) — Show the remove button on each card.
+                            Default: true
+
+  button_label  (string)  — Label for the per-card remove button.
+                            Default: "Remove"
+
+  card_class    (string)  — Extra CSS class added to every product card <li>.
+                            Useful to inherit your theme's card styling.
+                            Default: "" (empty — only sai-wishlist-page__item applied)
+
+  ── SETTINGS FROM THE APP DASHBOARD ───────────────────
+  When a logged-in customer opens the page the snippet
+  also fetches live settings from the app proxy and
+  merges them over the Liquid defaults, so changes made
+  in the Saitriq Wishlist → Page design settings screen
+  apply automatically even on manual installs.
+
+  ── CSS CUSTOMISATION ──────────────────────────────────
+  All classes are prefixed with .sai-wishlist-page__
+  Override them in your theme CSS, e.g.:
+
+    .sai-wishlist-page__items { gap: 2rem; }
+    .sai-wishlist-page__title { color: #333; }
+    .sai-wishlist-page__remove { color: red; }
+
+  The grid column count is controlled by the CSS variable
+  --sai-wishlist-columns set on the <ul> element. You can
+  override it per breakpoint in your CSS:
+
+    @media (max-width: 768px) {
+      .sai-wishlist-page__items {
+        --sai-wishlist-columns: 2;
+      }
+    }
+{% endcomment %}
+
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+{% assign _heading      = heading      | default: 'My wishlist' %}
+{% assign _empty_msg    = empty_message | default: 'You have not saved any products yet.' %}
+{% assign _columns      = columns      | default: 4 %}
+{% assign _show_prices  = show_prices  | default: true %}
+{% assign _show_remove  = show_remove  | default: true %}
+{% assign _btn_label    = button_label | default: 'Remove' %}
+{% assign _card_class   = card_class   | default: '' %}
+
+<section class="sai-wishlist-page" data-sai-wishlist-page>
+  <div class="sai-wishlist-page__header">
+    <h2 class="sai-wishlist-page__heading">{{ _heading }}</h2>
+    <button type="button" class="sai-wishlist-page__clear" data-sai-wishlist-clear hidden>
+      Clear all
+    </button>
+  </div>
+  <p class="sai-wishlist-page__empty" data-sai-wishlist-empty hidden>{{ _empty_msg }}</p>
+  <ul class="sai-wishlist-page__items" data-sai-wishlist-items
+      style="--sai-wishlist-columns: {{ _columns }}"></ul>
+</section>
+
+<script>
+  (() => {
+    const storageKey     = 'saitriq_wishlist';
+    const visitorKey     = 'saitriq_wishlist_visitor';
+    const syncEndpoint   = '/apps/saitriq-wishlist';
+
+    // Default settings from Liquid — overridden by proxy response for logged-in customers
+    let settings = {
+      heading:      {{ _heading     | json }},
+      emptyMessage: {{ _empty_msg   | json }},
+      columns:      {{ _columns     | json }},
+      showPrices:   {{ _show_prices | json }},
+      showRemove:   {{ _show_remove | json }},
+      buttonLabel:  {{ _btn_label   | json }},
+      cardClass:    {{ _card_class  | json }},
+      customCss:    ''
+    };
+
+    let customerAuthenticated = false;
+
+    const script        = document.currentScript;
+    const page          = script && script.previousElementSibling;
+    if (!page) return;
+
+    const itemsEl  = page.querySelector('[data-sai-wishlist-items]');
+    const emptyEl  = page.querySelector('[data-sai-wishlist-empty]');
+    const clearBtn = page.querySelector('[data-sai-wishlist-clear]');
+    if (!itemsEl || !emptyEl || !clearBtn) return;
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    const getItems = () => {
+      try { const v = JSON.parse(localStorage.getItem(storageKey) || '[]'); return Array.isArray(v) ? v : []; }
+      catch { return []; }
+    };
+    const setItems = (items) => localStorage.setItem(storageKey, JSON.stringify(items));
+
+    const getVisitorId = () => {
+      let id = localStorage.getItem(visitorKey);
+      if (!id) { id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,14)}`; localStorage.setItem(visitorKey, id); }
+      return id;
+    };
+
+    const esc = (str) => { const d = document.createElement('div'); d.textContent = String(str ?? ''); return d.innerHTML; };
+
+    const dispatch = (name, detail) => window.dispatchEvent(new CustomEvent(name, detail ? { detail } : undefined));
+
+    // ── Custom CSS injection ──────────────────────────────────────────────
+    const applyCustomCss = (css) => {
+      let el = document.querySelector('[data-sai-wishlist-custom-css]');
+      if (!el) { el = document.createElement('style'); el.dataset.saiWishlistCustomCss = ''; document.head.append(el); }
+      el.textContent = css || '';
+    };
+
+    // ── Render ────────────────────────────────────────────────────────────
+    const render = () => {
+      const items = getItems();
+      page.querySelector('.sai-wishlist-page__heading').textContent = settings.heading;
+      emptyEl.textContent   = settings.emptyMessage;
+      emptyEl.hidden        = items.length > 0;
+      clearBtn.hidden       = items.length === 0;
+      itemsEl.style.setProperty('--sai-wishlist-columns', settings.columns);
+      itemsEl.replaceChildren();
+
+      items.forEach((item) => {
+        const li = document.createElement('li');
+        li.className = `sai-wishlist-page__item ${settings.cardClass || ''}`.trim();
+        li.innerHTML = `
+          <a href="/products/${encodeURIComponent(item.handle)}">
+            <img data-sai-wishlist-image alt="" loading="lazy">
+          </a>
+          <div class="sai-wishlist-page__info">
+            <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${esc(item.title) || 'Product'}</a>
+            ${settings.showPrices && item.price ? `<div class="sai-wishlist-page__price">${esc(item.price)}</div>` : ''}
+            ${settings.showRemove ? `<button type="button" class="sai-wishlist-page__remove">${esc(settings.buttonLabel)}</button>` : ''}
+          </div>
+        `;
+
+        // Image with fallback
+        const img = li.querySelector('[data-sai-wishlist-image]');
+        img.alt = item.title || 'Product';
+        img.src = item.image || '';
+        img.addEventListener('error', async () => {
+          if (img.dataset.fallbackAttempted) return;
+          img.dataset.fallbackAttempted = 'true';
+          try {
+            const r = await fetch(`/products/${encodeURIComponent(item.handle)}.js`);
+            if (!r.ok) return;
+            const p = await r.json();
+            const fb = p.featured_image || p.images?.[0];
+            if (fb) img.src = fb;
+          } catch {}
+        }, { once: true });
+
+        // Remove button
+        const removeBtn = li.querySelector('.sai-wishlist-page__remove');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', async () => {
+            removeBtn.disabled = true;
+            try {
+              if (!customerAuthenticated) {
+                // Guest: local remove + analytics tracking
+                try { await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, productHandle: item.handle, productTitle: item.title }) }); } catch {}
+                setItems(getItems().filter((s) => String(s.id) !== String(item.id)));
+                dispatch('saitriq:wishlist-updated');
+                dispatch('saitriq:wishlist-toast', { message: 'Removed from wishlist' });
+                render();
+                return;
+              }
+              const res = await fetch(syncEndpoint, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+                body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, productHandle: item.handle, productTitle: item.title, productImage: item.image })
+              });
+              if (!res.ok) throw new Error('Remove failed');
+              const data = await res.json();
+              if (!Array.isArray(data.items)) throw new Error('Invalid response');
+              setItems(data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt })));
+              dispatch('saitriq:wishlist-updated');
+              dispatch('saitriq:wishlist-toast', { message: 'Removed from wishlist' });
+              render();
+            } catch (err) {
+              emptyEl.textContent = 'Could not remove item. Please try again.';
+              emptyEl.hidden = false;
+            } finally {
+              removeBtn.disabled = false;
+            }
+          });
+        }
+
+        itemsEl.append(li);
+      });
+    };
+
+    // ── Clear all ─────────────────────────────────────────────────────────
+    clearBtn.addEventListener('click', async () => {
+      if (clearBtn.disabled || getItems().length === 0) return;
+      clearBtn.disabled = true;
+      try {
+        if (!customerAuthenticated) {
+          try { await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation: 'clear', visitorId: getVisitorId() }) }); } catch {}
+          setItems([]);
+          dispatch('saitriq:wishlist-updated');
+          dispatch('saitriq:wishlist-toast', { message: 'Wishlist cleared' });
+          render();
+          return;
+        }
+        const res = await fetch(syncEndpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+          body: JSON.stringify({ operation: 'clear', visitorId: getVisitorId() })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Clear failed');
+        setItems(Array.isArray(data.items) ? data.items : []);
+        dispatch('saitriq:wishlist-updated');
+        render();
+      } catch (err) {
+        emptyEl.textContent = 'Could not clear wishlist. Please try again.';
+        emptyEl.hidden = false;
+      } finally {
+        clearBtn.disabled = false;
+      }
+    });
+
+    // ── Initial sync ──────────────────────────────────────────────────────
+    const syncItems = async () => {
+      if (window.saitriqWishlistSyncPromise) return window.saitriqWishlistSyncPromise;
+      const run = (async () => {
+        const res = await fetch(syncEndpoint, { credentials: 'same-origin' }).catch(() => null);
+        if (!res || !res.ok) { render(); return; }
+        const data = await res.json().catch(() => ({}));
+        customerAuthenticated = data.authenticated === true;
+        if (data.settings) {
+          settings = { ...settings, ...data.settings };
+          applyCustomCss(settings.customCss);
+        }
+        if (!data.authenticated || !Array.isArray(data.items)) { render(); return; }
+        setItems(data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt })));
+        render();
+      })();
+      window.saitriqWishlistSyncPromise = run.finally(() => { window.saitriqWishlistSyncPromise = null; });
+      return run;
+    };
+
+    // ── Boot ──────────────────────────────────────────────────────────────
+    render();
+    syncItems().catch(() => {});
+    window.addEventListener('saitriq:wishlist-updated', render);
+    window.addEventListener('storage', (e) => { if (e.key === storageKey) render(); });
+  })();
+</script>
