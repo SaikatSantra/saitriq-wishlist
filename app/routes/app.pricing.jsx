@@ -7,6 +7,9 @@ import {
   getActivePlan,
   createSubscription,
   downgradeToFree,
+  createAddonCharge,
+  getMonthlyAddonSaves,
+  ADDON,
 } from "../billing.server";
 
 const monthKey = () => new Date().toISOString().slice(0, 7);
@@ -16,21 +19,31 @@ export const loader = async ({ request }) => {
   const shop = session.shop;
   const month = monthKey();
 
-  const [activePlanId, used] = await Promise.all([
+  const [activePlanId, used, addonSaves] = await Promise.all([
     getActivePlan(shop, admin),
     currentUsage(shop, month),
+    getMonthlyAddonSaves(shop, month),
   ]);
 
   const activePlan = PLANS.find((p) => p.id === activePlanId) ?? PLANS[0];
-  const limit = activePlan.limit;
+  const planLimit = activePlan.limit;
+  const effectiveLimit = Number.isFinite(planLimit) ? planLimit + addonSaves : Infinity;
+
+  // read query params for post-purchase feedback
+  const url = new URL(request.url);
+  const addonStatus = url.searchParams.get("addon"); // activated | declined | error
 
   return {
     plans: PLANS,
     activePlanId,
+    addonSaves,
+    addon: ADDON,
+    addonStatus,
     usage: {
       used,
-      limit,
-      remaining: Number.isFinite(limit) ? Math.max(0, limit - used) : null,
+      limit: effectiveLimit,
+      planLimit,
+      remaining: Number.isFinite(effectiveLimit) ? Math.max(0, effectiveLimit - used) : null,
     },
   };
 };
@@ -65,11 +78,23 @@ export const action = async ({ request }) => {
     }
   }
 
+  if (intent === "buy-addon") {
+    const appUrl = process.env.SHOPIFY_APP_URL || "";
+    const returnUrl = `${appUrl}/app/addon?shop=${shop}`;
+    try {
+      const { confirmationUrl } = await createAddonCharge(admin, returnUrl);
+      return redirect(confirmationUrl);
+    } catch (err) {
+      console.error("Addon charge error:", err);
+      return { error: "Could not start the addon purchase. Please try again." };
+    }
+  }
+
   return { error: "Unknown action." };
 };
 
 export default function PricingPage() {
-  const { plans, activePlanId, usage } = useLoaderData();
+  const { plans, activePlanId, usage, addonSaves, addon, addonStatus } = useLoaderData();
   const fetcher = useFetcher();
   const actionData = fetcher.data;
   const isSubmitting = fetcher.state !== "idle";
@@ -105,13 +130,33 @@ export default function PricingPage() {
           <s-box padding="base">
             <s-grid gap="small-300">
               <s-text color="subdued">Remaining</s-text>
-              <s-heading>{usage.remaining === null ? "Unlimited" : usage.remaining}</s-heading>
+              <s-stack direction="inline" gap="small-200" alignItems="center">
+                <s-heading>{usage.remaining === null ? "Unlimited" : usage.remaining}</s-heading>
+                {addonSaves > 0 && (
+                  <s-badge tone="info">+{addonSaves.toLocaleString()} addon</s-badge>
+                )}
+              </s-stack>
             </s-grid>
           </s-box>
         </s-grid>
       </s-section>
 
       {/* ── Feedback banners ── */}
+      {addonStatus === "activated" && (
+        <s-banner tone="success" heading="Addon activated">
+          +{addon.saves.toLocaleString()} saves have been added to this month's limit.
+        </s-banner>
+      )}
+      {addonStatus === "declined" && (
+        <s-banner tone="warning" heading="Purchase declined">
+          The addon purchase was cancelled. Your plan limit is unchanged.
+        </s-banner>
+      )}
+      {addonStatus === "error" && (
+        <s-banner tone="critical" heading="Purchase error">
+          Something went wrong activating the addon. Please contact support.
+        </s-banner>
+      )}
       {actionData?.error && (
         <s-banner tone="critical" heading="Billing error">
           {actionData.error}
@@ -121,6 +166,46 @@ export default function PricingPage() {
         <s-banner tone="success" heading="Plan updated">
           {actionData.message}
         </s-banner>
+      )}
+
+      {/* ── Addon card (Growth plan only) ── */}
+      {activePlanId === "growth" && (
+        <s-section heading="Need more saves this month?">
+          <s-box border="base" borderRadius="base" padding="base">
+            <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
+              <s-grid gap="small-200">
+                <s-stack direction="inline" gap="small-200" alignItems="center">
+                  <s-heading>+{addon.saves.toLocaleString()} saves</s-heading>
+                  <s-badge tone="info">One-time</s-badge>
+                </s-stack>
+                <s-paragraph>
+                  Buy an extra {addon.saves.toLocaleString()} saves for this calendar month only.
+                  You can purchase this multiple times — they stack.
+                  Unused saves don&apos;t carry over to next month.
+                </s-paragraph>
+                <s-paragraph>
+                  <strong>${addon.price} one-time charge</strong> · billed immediately through Shopify
+                </s-paragraph>
+              </s-grid>
+              <fetcher.Form method="post">
+                <input type="hidden" name="intent" value="buy-addon" />
+                <s-button
+                  type="submit"
+                  variant="primary"
+                  loading={isSubmitting}
+                >
+                  Buy +{addon.saves.toLocaleString()} saves
+                </s-button>
+              </fetcher.Form>
+            </s-grid>
+            {addonSaves > 0 && (
+              <s-banner tone="info" heading={`${addonSaves.toLocaleString()} addon saves active this month`}>
+                Your effective limit this month is {(usage.planLimit + addonSaves).toLocaleString()} saves
+                ({usage.planLimit.toLocaleString()} plan + {addonSaves.toLocaleString()} addon).
+              </s-banner>
+            )}
+          </s-box>
+        </s-section>
       )}
 
       {/* ── Plan cards ── */}
@@ -223,6 +308,12 @@ export default function PricingPage() {
           <s-paragraph>
             Growth and Unlimited plans include a {plans.find((p) => p.id === "growth")?.trialDays}-day
             free trial. You will not be charged until the trial ends.
+          </s-paragraph>
+          <s-paragraph>
+            <strong>When the monthly save limit is reached</strong>, new wishlist adds are
+            declined for the rest of that calendar month. Existing saved items are unaffected —
+            shoppers can still view and remove their wishlist. The limit resets on the 1st of
+            the next month. If you expect high volume mid-month, upgrade before the limit is hit.
           </s-paragraph>
           <s-paragraph>
             Downgrading to Free takes effect immediately. Saves above 100/month will be declined

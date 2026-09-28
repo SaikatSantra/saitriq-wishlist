@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { currentUsage } from "../db.wishlist.server";
-import { getActivePlan, syncSubscriptionFromShopify } from "../billing.server";
+import { getActivePlan, syncSubscriptionFromShopify, getMonthlyAddonSaves } from "../billing.server";
 import { monthlyLimit, getPlan } from "../plans";
 import { checkEmbedEnabled } from "../embed.server";
 
@@ -11,22 +11,26 @@ export const loader = async ({ request }) => {
   const shop = session.shop;
   const month = new Date().toISOString().slice(0, 7);
 
-  const [planId, used, embed] = await Promise.all([
+  const [planId, used, embed, addonSaves] = await Promise.all([
     syncSubscriptionFromShopify(admin, shop).catch(() => getActivePlan(shop)),
     currentUsage(shop, month),
     checkEmbedEnabled(admin),
+    getMonthlyAddonSaves(shop, month),
   ]);
 
   const plan = getPlan(planId);
   const limit = monthlyLimit(planId);
+  const effLimit = Number.isFinite(limit) ? limit + addonSaves : Infinity;
 
   return {
     shop,
     embed, // { enabled: bool|null, themeName: string|null, themeId: string|null }
     stats: {
       used,
-      limit,
-      remaining: Number.isFinite(limit) ? Math.max(0, limit - used) : null,
+      limit: effLimit,
+      planLimit: limit,
+      addonSaves,
+      remaining: Number.isFinite(effLimit) ? Math.max(0, effLimit - used) : null,
       planName: plan.name,
       planId,
     },
@@ -171,6 +175,9 @@ export default function WishlistDashboard() {
               <s-stack direction="inline" gap="small-200" alignItems="center">
                 <s-heading>{liveStats.planName ?? "Free"}</s-heading>
                 {liveStats.planId !== "free" && <s-badge tone="success">Paid</s-badge>}
+                {liveStats.addonSaves > 0 && (
+                  <s-badge tone="info">+{liveStats.addonSaves?.toLocaleString()} addon</s-badge>
+                )}
               </s-stack>
             </s-grid>
           </s-box>
@@ -180,6 +187,13 @@ export default function WishlistDashboard() {
           <s-banner tone="warning" heading="Running low">
             Only {liveStats.remaining} saves left this month.{" "}
             <s-link href="/app/pricing">Upgrade to avoid hitting the limit.</s-link>
+          </s-banner>
+        )}
+        {liveStats.planId !== "free" && Number.isFinite(liveStats.limit) && liveStats.remaining !== null && liveStats.remaining < 500 && liveStats.remaining > 0 && (
+          <s-banner tone="warning" heading="Approaching monthly limit">
+            {liveStats.remaining} saves remaining this month on the {liveStats.planName} plan.
+            When the limit is reached new wishlist adds will be declined until next month.{" "}
+            <s-link href="/app/pricing">Upgrade to Unlimited</s-link> to remove the cap.
           </s-banner>
         )}
         {Number.isFinite(liveStats.limit) && liveStats.remaining === 0 && (

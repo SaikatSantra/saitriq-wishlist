@@ -10,8 +10,11 @@ import {
   getAnalytics,
   getAnalyticsHistory,
 } from "../db.wishlist.server";
-import { getActivePlan } from "../billing.server";
+import { getActivePlan, getMonthlyAddonSaves } from "../billing.server";
 import { monthlyLimit } from "../plans";
+
+const effectiveLimit = (planLimit, addonSaves) =>
+  Number.isFinite(planLimit) ? planLimit + addonSaves : Infinity;
 
 const json = (data, init = {}) =>
   new Response(JSON.stringify(data), {
@@ -117,18 +120,20 @@ export const loader = async ({ request }) => {
 
   const shop = session.shop;
   const month = monthKey();
-  const [planId, used, items, settings] = await Promise.all([
+  const [planId, used, items, settings, addonSaves] = await Promise.all([
     getActivePlan(shop),
     currentUsage(shop, month),
     listCustomerWishlistItems(shop, customerId),
     prisma.wishlistSettings.findUnique({ where: { shop } }),
+    getMonthlyAddonSaves(shop, month),
   ]);
+  const limit = effectiveLimit(monthlyLimit(planId), addonSaves);
 
   return json({
     authenticated: true,
     items,
     settings: settings || defaultSettings,
-    usage: usageFor(used, monthlyLimit(planId)),
+    usage: usageFor(used, limit),
   });
 };
 
@@ -154,8 +159,8 @@ export const action = async ({ request }) => {
     }
 
     const month = monthKey();
-    const [planId] = await Promise.all([getActivePlan(shop)]);
-    const limit = monthlyLimit(planId);
+    const [planId, addonSaves] = await Promise.all([getActivePlan(shop), getMonthlyAddonSaves(shop, monthKey())]);
+    const limit = effectiveLimit(monthlyLimit(planId), addonSaves);
 
     // ── clear ─────────────────────────────────────────────────────────────────
     if (operation === "clear") {

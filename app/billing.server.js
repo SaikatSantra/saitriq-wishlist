@@ -273,3 +273,90 @@ export const downgradeToFree = async (admin, shop) => {
     update: { planId: "free", subscriptionId: null, status: "active" },
   });
 };
+
+// ─── Addon (one-time purchase) ────────────────────────────────────────────────
+
+export const ADDON = {
+  saves: 5000,
+  price: 5,
+  name: "Saitriq Wishlist: +5,000 saves",
+};
+
+const APP_PURCHASE_ONE_TIME_CREATE = `#graphql
+  mutation AppPurchaseOneTimeCreate(
+    $name: String!
+    $price: MoneyInput!
+    $returnUrl: String!
+    $test: Boolean
+  ) {
+    appPurchaseOneTimeCreate(
+      name: $name
+      price: $price
+      returnUrl: $returnUrl
+      test: $test
+    ) {
+      appPurchaseOneTime { id status }
+      confirmationUrl
+      userErrors { field message }
+    }
+  }
+`;
+
+/**
+ * Create a Shopify one-time charge for the addon.
+ * Returns { confirmationUrl, chargeId }.
+ */
+export const createAddonCharge = async (admin, returnUrl) => {
+  const isTest = process.env.NODE_ENV !== "production";
+  const response = await admin.graphql(APP_PURCHASE_ONE_TIME_CREATE, {
+    variables: {
+      name: ADDON.name,
+      price: { amount: ADDON.price, currencyCode: "USD" },
+      returnUrl,
+      test: isTest,
+    },
+  });
+  const payload = await response.json();
+  const result = payload?.data?.appPurchaseOneTimeCreate;
+  const errors = result?.userErrors ?? [];
+  if (errors.length) {
+    throw new Error(`Addon charge failed: ${errors.map((e) => e.message).join(", ")}`);
+  }
+  return {
+    confirmationUrl: result.confirmationUrl,
+    chargeId: result.appPurchaseOneTime?.id,
+  };
+};
+
+/**
+ * Activate the addon after Shopify confirms the charge.
+ * Stores one row per purchase — multiple purchases stack.
+ */
+export const activateAddon = async (shop, chargeId) => {
+  const month = new Date().toISOString().slice(0, 7);
+  await prisma.addonPurchase.create({
+    data: {
+      shop,
+      month,
+      saves: ADDON.saves,
+      price: ADDON.price,
+      chargeId,
+      status: "active",
+    },
+  });
+};
+
+/**
+ * Total addon saves purchased for a shop in a given month.
+ */
+export const getMonthlyAddonSaves = async (shop, month) => {
+  try {
+    const rows = await prisma.addonPurchase.findMany({
+      where: { shop, month, status: "active" },
+    });
+    return rows.reduce((sum, r) => sum + r.saves, 0);
+  } catch (err) {
+    if (err?.code === "P2021" || err?.message?.includes("does not exist")) return 0;
+    throw err;
+  }
+};

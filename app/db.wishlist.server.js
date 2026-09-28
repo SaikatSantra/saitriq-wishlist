@@ -121,3 +121,6 @@ export const currentUsage = async (shop, month) => {
   ]);
   return Math.max(adds, savedRecords);
 };
+
+// Re-export so callers can get effective limit from one place
+export { getMonthlyAddonSaves } from "./billing.server";

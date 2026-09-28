@@ -83,3 +83,16 @@ model ActiveSubscription {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 }
+
+model AddonPurchase {
+  id             Int      @id @default(autoincrement())
+  shop           String
+  month          String   // "YYYY-MM" — addon applies only to this month
+  saves          Int      // extra saves granted (e.g. 5000)
+  price          Float    // amount charged (e.g. 5.00)
+  chargeId       String?  // Shopify AppPurchaseOneTime GID
+  status         String   @default("active") // active | pending
+  createdAt      DateTime @default(now())
+
+  @@index([shop, month])
+}
