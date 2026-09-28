@@ -213,6 +213,44 @@
   text-decoration: underline;
 }
 
+.sai-wishlist-page__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.5rem;
+}
+
+.sai-wishlist-page__atc-form {
+  margin-top: 0.5rem;
+}
+
+.sai-wishlist-page__add-to-cart {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 0.25rem;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  text-align: center;
+}
+
+.sai-wishlist-page__add-to-cart:hover {
+  background: #333;
+  border-color: #333;
+}
+
+.sai-wishlist-page__add-to-cart:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .sai-wishlist-page__actions {
   display: flex;
   align-items: center;

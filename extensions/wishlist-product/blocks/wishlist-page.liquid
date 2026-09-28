@@ -94,6 +94,8 @@
       showPrices: {{ block.settings.show_prices | default: true | json }},
       showRemove: {{ block.settings.show_remove | default: true | json }},
       buttonLabel: '{{ block.settings.button_label | escape }}',
+      showAddToCart: {{ block.settings.show_add_to_cart | default: false | json }},
+      addToCartLabel: '{{ block.settings.add_to_cart_label | default: "Add to cart" | escape }}',
       cardClass: 'sai-wishlist-page__item',
       customCss: ''
     };
@@ -218,14 +220,37 @@
     // Falls back to the default card if no template is found.
     //
     // Supported hooks (add to any element in the template):
-    //   data-sai-item-link    → href="/products/{handle}"
-    //   data-sai-item-image   → src + alt
-    //   data-sai-item-title   → textContent
-    //   data-sai-item-price   → textContent (hidden if showPrices=false)
-    //   data-sai-item-remove  → click removes item (hidden if showRemove=false)
+    //   data-sai-item-link        → href="/products/{handle}"
+    //   data-sai-item-image       → src + alt
+    //   data-sai-item-title       → textContent
+    //   data-sai-item-price       → textContent (hidden if showPrices=false)
+    //   data-sai-item-remove      → click removes item (hidden if showRemove=false)
+    //   data-sai-item-product-id  → data-product-id attribute (Shopify product GID numeric)
+    //   data-sai-item-variant-id  → data-variant-id attribute (first available variant ID)
     const customTpl = document.querySelector('[data-sai-wishlist-page]');
 
-    const buildCard = (item) => {
+    // Product data cache — fetches id + first available variant lazily
+    const _productDataCache = new Map();
+    const fetchProductData = async (handle) => {
+      if (_productDataCache.has(handle)) return _productDataCache.get(handle);
+      try {
+        const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
+        if (!res.ok) return null;
+        const p = await res.json();
+        const firstAvailableVariant = p.variants?.find((v) => v.available) ?? p.variants?.[0];
+        const data = {
+          productId: String(p.id),
+          variantId: firstAvailableVariant ? String(firstAvailableVariant.id) : null,
+        };
+        _productDataCache.set(handle, data);
+        return data;
+      } catch { return null; }
+    };
+
+    const buildCard = async (item) => {
+      // Pre-fetch product data for id/variant hooks (non-blocking — card renders first)
+      const productData = await fetchProductData(item.handle);
+
       if (customTpl && customTpl.tagName === 'TEMPLATE') {
         // ── Merchant template ──────────────────────────────────────────────
         const clone = customTpl.content.cloneNode(true);
@@ -270,6 +295,19 @@
           }
         }
 
+        // Fill product ID hook
+        const productIdEl = root.querySelector('[data-sai-item-product-id]');
+        if (productIdEl && productData?.productId) {
+          productIdEl.dataset.productId = productData.productId;
+        }
+
+        // Fill variant ID hook (first available variant)
+        const variantIdEl = root.querySelector('[data-sai-item-variant-id]');
+        if (variantIdEl && productData?.variantId) {
+          variantIdEl.dataset.variantId = productData.variantId;
+          variantIdEl.value = productData.variantId; // also set value if it's an <input>
+        }
+
         // Fill remove hook
         const removeBtn = root.querySelector('[data-sai-item-remove]');
         if (removeBtn) {
@@ -297,9 +335,15 @@
           <a href="/products/${encodeURIComponent(item.handle)}">
             <img data-sai-wishlist-image alt="" loading="lazy">
           </a>
-          <div>
+          <div class="sai-wishlist-page__info">
             <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${esc(item.title) || 'Product'}</a>
             ${settings.showPrices && item.price ? `<div class="sai-wishlist-page__price">${esc(item.price)}</div>` : ''}
+            ${settings.showAddToCart ? `
+            <form class="sai-wishlist-page__atc-form" action="/cart/add" method="post">
+              <input type="hidden" name="id" class="sai-wishlist-page__variant-input">
+              <input type="hidden" name="quantity" value="1">
+              <button type="submit" name="add" class="sai-wishlist-page__add-to-cart button">${esc(settings.addToCartLabel)}</button>
+            </form>` : ''}
             ${settings.showRemove ? `<button type="button" class="sai-wishlist-page__remove">${esc(settings.buttonLabel)}</button>` : ''}
           </div>
         `;
@@ -319,6 +363,11 @@
             console.error('Wishlist image fallback failed', error);
           }
         }, { once: true });
+        // Fill variant ID into the add to cart form input
+        if (settings.showAddToCart && productData?.variantId) {
+          const variantInput = card.querySelector('.sai-wishlist-page__variant-input');
+          if (variantInput) variantInput.value = productData.variantId;
+        }
         const removeButton = card.querySelector('.sai-wishlist-page__remove');
         if (removeButton) removeButton.addEventListener('click', () => handleRemove(item, removeButton));
         return card;
@@ -363,7 +412,7 @@
       }
     };
 
-    const render = () => {
+    const render = async () => {
       const items = getItems();
       page.querySelector('h2').textContent = settings.heading;
       emptyMessage.textContent = settings.emptyMessage;
@@ -373,9 +422,9 @@
       clearButton.hidden = items.length === 0;
       if (shareButton) shareButton.hidden = items.length === 0;
 
-      items.forEach((item) => {
-        itemsContainer.append(buildCard(item));
-      });
+      // buildCard is async (fetches variant data) — render all in parallel
+      const cards = await Promise.all(items.map((item) => buildCard(item)));
+      cards.forEach((card) => itemsContainer.append(card));
     };
 
     clearButton.addEventListener('click', async () => {
@@ -561,6 +610,18 @@
       "id": "button_label",
       "label": "Remove button label",
       "default": "Remove"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_add_to_cart",
+      "label": "Show Add to cart button",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "add_to_cart_label",
+      "label": "Add to cart button label",
+      "default": "Add to cart"
     },
     {
       "type": "header",

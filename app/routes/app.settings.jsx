@@ -3,17 +3,19 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 const defaults = {
-  heading: "My wishlist",
-  emptyMessage: "You have not saved any products yet.",
-  columns: 4,
-  showPrices: true,
-  showRemove: true,
-  buttonLabel: "Remove",
-  cardClass: "sai-wishlist-page__item",
-  customCss: "",
-  toastBg: "#1a1a1a",
-  toastColor: "#ffffff",
-  toastPosition: "top-left",
+  heading:        "My wishlist",
+  emptyMessage:   "You have not saved any products yet.",
+  columns:        4,
+  showPrices:     true,
+  showRemove:     true,
+  buttonLabel:    "Remove",
+  showAddToCart:  false,
+  addToCartLabel: "Add to cart",
+  cardClass:      "sai-wishlist-page__item",
+  customCss:      "",
+  toastBg:        "#1a1a1a",
+  toastColor:     "#ffffff",
+  toastPosition:  "top-left",
 };
 
 export const loader = async ({ request }) => {
@@ -42,6 +44,10 @@ export const action = async ({ request }) => {
     showRemove: formData.get("showRemove") === "on",
     buttonLabel: String(
       formData.get("buttonLabel") || defaults.buttonLabel
+    ).trim(),
+    showAddToCart: formData.get("showAddToCart") === "on",
+    addToCartLabel: String(
+      formData.get("addToCartLabel") || defaults.addToCartLabel
     ).trim(),
     cardClass:
       String(formData.get("cardClass") || defaults.cardClass)
@@ -148,6 +154,19 @@ export default function WishlistSettingsPage() {
                 label="Remove button label"
                 name="buttonLabel"
                 value={settings.buttonLabel}
+              />
+
+              <s-checkbox
+                label="Show Add to cart button"
+                name="showAddToCart"
+                checked={settings.showAddToCart}
+              />
+
+              <s-text-field
+                label="Add to cart button label"
+                name="addToCartLabel"
+                value={settings.addToCartLabel}
+                helpText="Label shown on the add to cart button. Only visible when enabled above."
               />
 
               <s-text-field

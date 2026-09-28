@@ -54,15 +54,17 @@ const usageFor = (used, limit) => ({
 });
 
 const defaultSettings = {
-  heading:       "My wishlist",
-  emptyMessage:  "You have not saved any products yet.",
-  columns:       4,
-  showPrices:    true,
-  showRemove:    true,
-  buttonLabel:   "Remove",
-  toastBg:       "#1a1a1a",
-  toastColor:    "#ffffff",
-  toastPosition: "top-left",
+  heading:        "My wishlist",
+  emptyMessage:   "You have not saved any products yet.",
+  columns:        4,
+  showPrices:     true,
+  showRemove:     true,
+  buttonLabel:    "Remove",
+  showAddToCart:  false,
+  addToCartLabel: "Add to cart",
+  toastBg:        "#1a1a1a",
+  toastColor:     "#ffffff",
+  toastPosition:  "top-left",
 };
 
 // ─── ?api= routes ─────────────────────────────────────────────────────────────

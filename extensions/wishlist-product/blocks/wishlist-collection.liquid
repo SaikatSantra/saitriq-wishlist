@@ -286,6 +286,7 @@
       // Auth runs in parallel — re-scan after so saved state is correct
       detectAuthentication().finally(scan);
       new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+      window.addEventListener('storage', (e) => { if (e.key === storageKey) scan(); });
 
       // Re-render all collection buttons when wishlist changes
       window.addEventListener('saitriq:wishlist-updated', () => {
