@@ -593,9 +593,9 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
     const header = document.createElement('div');
     header.innerHTML = \`
       <h2>\${esc(heading)}</h2>
-      <button type="button" class="sai-wishlist-page__clear">Clear all</button>
+      <button type="button" class="sai-wishlist-page__clear button">Clear all</button>
     \`;
-    header.querySelector('.sai-wishlist-page__clear').addEventListener('click', () => {
+    header.querySelector('.sai-wishlist-page__clear button').addEventListener('click', () => {
       SaitriqWishlist.clear();
     });
 

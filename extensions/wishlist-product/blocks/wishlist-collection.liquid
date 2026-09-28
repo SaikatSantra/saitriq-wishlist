@@ -1,234 +1,297 @@
 {% comment %}CSS loaded globally by the Saitriq Wishlist app embed block{% endcomment %}
 
-<div data-sai-wishlist-collection hidden></div>
+{%- comment -%}
+  Collection wishlist icons block.
+  A <template> holds one button. JS clones it onto every product card.
+  JS only toggles .is-active — no innerHTML injection.
+  Schema settings control color and icon appearance.
+{%- endcomment -%}
+
+{%- assign btn_color        = block.settings.button_color | default: '#ffffff' -%}
+{%- assign btn_active_color = block.settings.active_color | default: '#1a1a1a' -%}
+{%- assign icon_color       = block.settings.icon_color   | default: '#1a1a1a' -%}
+{%- assign custom_svg       = block.settings.custom_svg -%}
+
+{%- comment -%}
+  The <template> is invisible until JS clones it onto each product card.
+  All appearance data lives in CSS custom properties set inline.
+{%- endcomment -%}
+<template data-sai-collection-tpl>
+  <button
+    type="button"
+    class="sai-wishlist sai-wishlist--collection"
+    data-sai-collection-wishlist
+    aria-label="Add to wishlist"
+    style="
+      --sai-btn-color: {{ btn_color }};
+      --sai-btn-active-color: {{ btn_active_color }};
+      --sai-icon-color: {{ icon_color }};
+    "
+  >
+    {%- if custom_svg != blank -%}
+      <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
+        {{- custom_svg -}}
+      </span>
+      <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+        {{- custom_svg -}}
+      </span>
+    {%- else -%}
+      <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+            stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      </span>
+    {%- endif -%}
+  </button>
+</template>
 
 <script>
   (() => {
-    // Capture currentScript synchronously — it's null inside async callbacks
-    const _script = document.currentScript;
-
-    // Wait for the embed block to set saitriqEmbedEnabled.
-    // Handles both cases: embed already ran, or runs after this block.
     const whenEmbedReady = (fn) => {
       if (window.saitriqEmbedEnabled) { fn(); return; }
       document.addEventListener('saitriq:embed-ready', fn, { once: true });
     };
 
     whenEmbedReady(() => {
-    const storageKey = 'saitriq_wishlist';
-    const visitorStorageKey = 'saitriq_wishlist_visitor';
-    const endpoint = '/apps/saitriq-wishlist';
-    let customerAuthenticated = false;
-    const root = _script && _script.parentElement
-      && _script.parentElement.querySelector('[data-sai-wishlist-collection]');
-    if (!root || window.saitriqWishlistCollectionLoaded) return;
-    window.saitriqWishlistCollectionLoaded = true;
-    root.hidden = false;
+      if (window.saitriqWishlistCollectionLoaded) return;
+      window.saitriqWishlistCollectionLoaded = true;
 
-    const readItems = () => {
-      try {
-        const value = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        return Array.isArray(value) ? value : [];
-      } catch {
-        return [];
-      }
-    };
+      const storageKey      = 'saitriq_wishlist';
+      const visitorStorageKey = 'saitriq_wishlist_visitor';
+      const endpoint        = '/apps/saitriq-wishlist';
 
-    const saveItems = (items) => {
-      localStorage.setItem(storageKey, JSON.stringify(items));
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-    };
+      // Find the <template> rendered by Liquid
+      const tpl = document.querySelector('[data-sai-collection-tpl]');
+      if (!tpl) return;
 
-    const persistLocalFallback = (operation, item) => {
-      const items = readItems();
-      const index = items.findIndex((saved) => String(saved.id) === String(item.productId));
-      if (operation === 'add' && index < 0) items.push({ ...toLocalItem(item), addedAt: new Date().toISOString() });
-      if (operation === 'remove' && index >= 0) items.splice(index, 1);
-      saveItems(items);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-        detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
-      }));
-      return items;
-    };
+      let customerAuthenticated = false;
 
-    const getVisitorId = () => {
-      let visitorId = localStorage.getItem(visitorStorageKey);
-      if (!visitorId) {
-        visitorId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
-        localStorage.setItem(visitorStorageKey, visitorId);
-      }
-      return visitorId;
-    };
+      // ── Storage ──────────────────────────────────────────────────────────
+      const readItems = () => {
+        try {
+          const v = JSON.parse(localStorage.getItem(storageKey) || '[]');
+          return Array.isArray(v) ? v : [];
+        } catch { return []; }
+      };
+      const saveItems = (items) => {
+        localStorage.setItem(storageKey, JSON.stringify(items));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+      };
 
-    const trackGuest = async (operation, item) => {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+      // ── View — class only, no innerHTML ──────────────────────────────────
+      const renderButton = (button, productId) => {
+        const saved = readItems().some((i) => String(i.id) === String(productId));
+        button.classList.toggle('is-active', saved);
+        button.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
+      };
+
+      // ── Visitor ID ────────────────────────────────────────────────────────
+      const getVisitorId = () => {
+        let id = localStorage.getItem(visitorStorageKey);
+        if (!id) {
+          id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+          localStorage.setItem(visitorStorageKey, id);
+        }
+        return id;
+      };
+
+      // ── Local fallback ────────────────────────────────────────────────────
+      const toLocalItem = (item) => ({
+        id: item.productId, handle: item.productHandle,
+        title: item.productTitle, image: item.productImage || '',
+        price: item.productPrice || ''
+      });
+      const persistLocalFallback = (operation, item) => {
+        const items = readItems();
+        const idx = items.findIndex((s) => String(s.id) === String(item.productId));
+        if (operation === 'add' && idx < 0) items.push({ ...toLocalItem(item), addedAt: new Date().toISOString() });
+        if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
+        saveItems(items);
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+          detail: {
+            message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist',
+            image: item.productImage || '',
+            title: item.productTitle || ''
+          }
+        }));
+        return items;
+      };
+
+      const trackGuest = async (operation, item) => {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.tracked) return;
+        } catch {}
+      };
+
+      // ── Sync ──────────────────────────────────────────────────────────────
+      const sync = async (operation, item) => {
+        if (!customerAuthenticated) {
+          await trackGuest(operation, item);
+          return persistLocalFallback(operation, item);
+        }
+        const res = await fetch(endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
           body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
         });
-        const data = await response.json().catch(() => ({}));
-        if (response.ok && data.tracked === true) return;
-        console.warn('Wishlist analytics tracking unavailable', response.status, data.error || '');
-      } catch (error) {
-        console.warn('Wishlist analytics tracking unavailable', error);
-      }
-    };
 
-    const productHandleFromLink = (link) => {
-      const match = new URL(link.href, window.location.origin).pathname.match(/^\/products\/([^/]+)/);
-      return match ? decodeURIComponent(match[1]) : '';
-    };
-
-    const productLinks = () => [...document.querySelectorAll('a[href*="/products/"]')]
-      .filter((link) => productHandleFromLink(link))
-      .filter((link, index, links) => links.findIndex((candidate) =>
-        productHandleFromLink(candidate) === productHandleFromLink(link)
-      ) === index);
-
-    const productData = async (handle) => {
-      if (productData._cache.has(handle)) return productData._cache.get(handle);
-      const response = await fetch(`/products/${encodeURIComponent(handle)}.js`);
-      if (!response.ok) throw new Error(`Product lookup failed: ${response.status}`);
-      const product = await response.json();
-      // Field names match what the proxy action expects (productId, productHandle, etc.)
-      const data = {
-        productId:     String(product.id),
-        productHandle: product.handle,
-        productTitle:  product.title,
-        productImage:  product.featured_image || product.images?.[0] || '',
-        productPrice:  product.price ? (product.price / 100).toFixed(2) : ''
-      };
-      productData._cache.set(handle, data);
-      return data;
-    };
-    productData._cache = new Map();
-
-    // Map proxy field names → localStorage shape for local fallback
-    const toLocalItem = (item) => ({
-      id:      item.productId,
-      handle:  item.productHandle,
-      title:   item.productTitle,
-      image:   item.productImage || '',
-      price:   item.productPrice || '',
-    });
-
-    const sync = async (operation, item) => {
-      if (!customerAuthenticated) {
-        await trackGuest(operation, item);
-        return persistLocalFallback(operation, item);
-      }
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !Array.isArray(data.items)) {
-        console.warn('Wishlist proxy unavailable; using local fallback:', response.status, data.error || '(empty response)');
-        customerAuthenticated = false;
-        return persistLocalFallback(operation, item);
-      }
-      const items = data.items.map((saved) => ({
-        id: saved.productId,
-        handle: saved.productHandle,
-        title: saved.productTitle,
-        image: saved.productImage || '',
-        price: saved.productPrice || '',
-        addedAt: saved.createdAt
-      }));
-      saveItems(items);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-        detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' }
-      }));
-      return items;
-    };
-
-    const render = (button, item) => {
-      const saved = readItems().some((entry) => String(entry.id) === String(item.productId));
-      button.textContent = saved ? '♥' : '♡';
-      button.classList.toggle('is-active', saved);
-      button.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
-      button.title = saved ? 'Remove from wishlist' : 'Add to wishlist';
-    };
-
-    const detectAuthentication = async () => {
-      const response = await fetch(endpoint, { credentials: 'same-origin' });
-      const data = await response.json().catch(() => ({}));
-      customerAuthenticated = data.authenticated === true;
-      // Merge any locally saved items into the server for logged-in customers
-      if (customerAuthenticated && Array.isArray(data.items)) {
-        const serverIds = new Set(data.items.map((i) => String(i.productId)));
-        const localOnly = readItems().filter((i) => !serverIds.has(String(i.id)));
-        for (const local of localOnly) {
-          fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-              operation: 'add',
-              visitorId: getVisitorId(),
-              productId: local.id,
-              productHandle: local.handle,
-              productTitle: local.title,
-              productImage: local.image,
-              productPrice: local.price
-            })
-          }).catch(() => {});
+        if (res.status === 429) {
+          const data = await res.json().catch(() => ({}));
+          if (operation === 'remove' || operation === 'clear') return readItems();
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+            detail: { message: data.error || 'Monthly wishlist limit reached.' }
+          }));
+          return readItems();
         }
-      }
-    };
 
-    const attach = async (link) => {
-      const handle = productHandleFromLink(link);
-      const card = link.closest('li, article, .card, .product-card, [class*="product-card"]');
-      if (!handle || !card || card.querySelector('[data-sai-collection-wishlist]')) return;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'sai-wishlist sai-wishlist--collection';
-      button.dataset.saiCollectionWishlist = '';
-      button.textContent = '♡';
-      button.addEventListener('click', async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (button.disabled) return;
-        button.disabled = true;
+        if (!res.ok) {
+          customerAuthenticated = false;
+          return persistLocalFallback(operation, item);
+        }
+        const data = await res.json();
+        if (!Array.isArray(data.items)) {
+          customerAuthenticated = false;
+          return persistLocalFallback(operation, item);
+        }
+        const synced = data.items.map((s) => ({
+          id: s.productId, handle: s.productHandle, title: s.productTitle,
+          image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt
+        }));
+        saveItems(synced);
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+          detail: {
+            message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist',
+            image: item.productImage || '',
+            title: item.productTitle || ''
+          }
+        }));
+        return synced;
+      };
+
+      // ── Product data cache ────────────────────────────────────────────────
+      const productCache = new Map();
+      const productData = async (handle) => {
+        if (productCache.has(handle)) return productCache.get(handle);
+        const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
+        if (!res.ok) throw new Error(`Product lookup failed: ${res.status}`);
+        const p = await res.json();
+        const data = {
+          productId:     String(p.id),
+          productHandle: p.handle,
+          productTitle:  p.title,
+          productImage:  p.featured_image || p.images?.[0] || '',
+          productPrice:  p.price ? (p.price / 100).toFixed(2) : ''
+        };
+        productCache.set(handle, data);
+        return data;
+      };
+
+      const handleFromLink = (link) => {
+        const match = new URL(link.href, window.location.origin).pathname.match(/^\/products\/([^/]+)/);
+        return match ? decodeURIComponent(match[1]) : '';
+      };
+
+      // Deduplicated product links on the page
+      const productLinks = () => [...document.querySelectorAll('a[href*="/products/"]')]
+        .filter((a) => handleFromLink(a))
+        .filter((a, i, arr) => arr.findIndex((b) => handleFromLink(b) === handleFromLink(a)) === i);
+
+      // ── Attach button to a product card ───────────────────────────────────
+      const attach = async (link) => {
+        const handle = handleFromLink(link);
+        const card = link.closest('li, article, .card, .product-card, [class*="product-card"]');
+        if (!handle || !card || card.querySelector('[data-sai-collection-wishlist]')) return;
+
+        // Clone the Liquid-rendered template — keeps all Liquid settings
+        const button = tpl.content.cloneNode(true).querySelector('[data-sai-collection-wishlist]');
+        if (!button) return;
+
+        card.style.position = 'relative';
+        card.append(button);
+
+        // Fetch product data and render initial state
         try {
           const item = await productData(handle);
-          const saved = readItems().some((entry) => String(entry.id) === String(item.id));
-          await sync(saved ? 'remove' : 'add', item);
-          render(button, item);
-        } catch (error) {
-          console.error('Collection wishlist request failed', error);
-        } finally {
-          button.disabled = false;
-        }
-      });
-      card.append(button);
-      try {
-        const item = await productData(handle);
-        render(button, item);
-      } catch (error) {
-        button.remove();
-        console.error('Collection wishlist product lookup failed', error);
-      }
-    };
+          renderButton(button, item.productId);
 
-    const scan = () => productLinks().forEach((link) => attach(link));
-    detectAuthentication().finally(scan);
-    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('saitriq:wishlist-updated', () => {
-      // Re-render all buttons when wishlist changes (add/remove from another block)
-      document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn) => {
-        const card = btn.parentElement;
-        const link = card && card.querySelector('a[href*="/products/"]');
-        if (!link) return;
-        const handle = productHandleFromLink(link);
-        if (handle && productData._cache.has(handle)) render(btn, productData._cache.get(handle));
+          button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (button.disabled) return;
+            button.disabled = true;
+            try {
+              const saved = readItems().some((i) => String(i.id) === String(item.productId));
+              await sync(saved ? 'remove' : 'add', item);
+              renderButton(button, item.productId);
+            } catch (err) {
+              console.error('Collection wishlist request failed', err);
+            } finally {
+              button.disabled = false;
+            }
+          });
+        } catch (err) {
+          button.remove();
+          console.error('Collection wishlist product lookup failed', err);
+        }
+      };
+
+      // ── Detect auth + merge local items ───────────────────────────────────
+      const detectAuthentication = async () => {
+        try {
+          const res = await fetch(endpoint, { credentials: 'same-origin' });
+          const data = await res.json().catch(() => ({}));
+          customerAuthenticated = data.authenticated === true;
+          if (customerAuthenticated && Array.isArray(data.items)) {
+            const serverIds = new Set(data.items.map((i) => String(i.productId)));
+            for (const local of readItems()) {
+              if (!serverIds.has(String(local.id))) {
+                fetch(endpoint, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  credentials: 'same-origin',
+                  body: JSON.stringify({
+                    operation: 'add', visitorId: getVisitorId(),
+                    productId: local.id, productHandle: local.handle,
+                    productTitle: local.title, productImage: local.image,
+                    productPrice: local.price
+                  })
+                }).catch(() => {});
+              }
+            }
+          }
+        } catch {}
+      };
+
+      // ── Scan + observe DOM ────────────────────────────────────────────────
+      const scan = () => productLinks().forEach(attach);
+
+      detectAuthentication().finally(scan);
+      new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+
+      // Re-render all collection buttons when wishlist changes
+      window.addEventListener('saitriq:wishlist-updated', () => {
+        document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn) => {
+          const card = btn.parentElement;
+          const link = card && card.querySelector('a[href*="/products/"]');
+          if (!link) return;
+          const handle = handleFromLink(link);
+          if (handle && productCache.has(handle)) {
+            renderButton(btn, productCache.get(handle).productId);
+          }
+        });
       });
-    });
+
     }); // end whenEmbedReady
   })();
 </script>
@@ -237,6 +300,39 @@
 {
   "name": "Collection wishlist icons",
   "target": "section",
-  "settings": []
+  "settings": [
+    {
+      "type": "header",
+      "content": "Button appearance"
+    },
+    {
+      "type": "color",
+      "id": "button_color",
+      "label": "Button background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "active_color",
+      "label": "Button background when saved",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "Icon color",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "header",
+      "content": "Custom icon (optional)"
+    },
+    {
+      "type": "html",
+      "id": "custom_svg",
+      "label": "Custom SVG icon",
+      "info": "Paste your SVG markup here. Leave empty to use the default heart icon."
+    }
+  ]
 }
 {% endschema %}

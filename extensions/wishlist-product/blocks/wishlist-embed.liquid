@@ -1,31 +1,60 @@
 {% comment %}
   Saitriq Wishlist — App Embed block
   ─────────────────────────────────────────────────────────────────────────────
-  This is the MASTER ON/OFF switch for the entire wishlist app.
+  Master ON/OFF switch for the entire wishlist app.
 
-  Merchants enable/disable it from:
+  Merchants enable/disable from:
     Online Store → Themes → Customize → App embeds → Saitriq Wishlist
 
   When ENABLED:
-    - Loads wishlist.css globally (once, for the whole page)
+    - Loads wishlist.css globally
+    - Fetches merchant settings from the app proxy
+    - Injects CSS custom properties for toast appearance onto :root
     - Sets window.saitriqEmbedEnabled = true
-    - All wishlist blocks (product button, collection icons, wishlist page)
-      check this flag before activating. If it's not set they render nothing.
+    - All wishlist blocks check this flag before activating
 
   When DISABLED:
-    - This block is not rendered at all by Shopify
-    - window.saitriqEmbedEnabled is never set
-    - All wishlist blocks silently output nothing
-    - No JS runs, no CSS loads, no proxy calls are made
+    - Nothing is rendered, no JS runs, no CSS loads
 {% endcomment %}
 
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
 
 <script>
-  // Set the global flag — all wishlist blocks wait for this before activating
-  window.saitriqEmbedEnabled = true;
-  // Dispatch event for any blocks that loaded before this embed script ran
-  document.dispatchEvent(new CustomEvent('saitriq:embed-ready'));
+  (() => {
+    const endpoint = '/apps/saitriq-wishlist';
+
+    // Apply toast CSS custom properties from merchant settings
+    const applyToastSettings = (settings) => {
+      if (!settings) return;
+      const root = document.documentElement;
+
+      // Colors
+      if (settings.toastBg)    root.style.setProperty('--sai-toast-bg',    settings.toastBg);
+      if (settings.toastColor) root.style.setProperty('--sai-toast-color', settings.toastColor);
+
+      // Position — map to CSS values
+      const pos = settings.toastPosition || 'top-left';
+      root.style.setProperty('--sai-toast-top',    pos.startsWith('top')    ? '1rem' : 'auto');
+      root.style.setProperty('--sai-toast-bottom', pos.startsWith('bottom') ? '1rem' : 'auto');
+      root.style.setProperty('--sai-toast-left',   pos.endsWith('left')     ? '1rem' : 'auto');
+      root.style.setProperty('--sai-toast-right',  pos.endsWith('right')    ? '1rem' : 'auto');
+
+      // Slide direction — slide from the edge it appears on
+      const slideY = pos.startsWith('top') ? '-0.5rem' : '0.5rem';
+      root.style.setProperty('--sai-toast-slide', slideY);
+    };
+
+    // Fetch settings and apply, then activate embed
+    fetch(`${endpoint}?api=settings`, { credentials: 'same-origin' })
+      .then((r) => r.ok ? r.json() : {})
+      .then((data) => applyToastSettings(data.settings))
+      .catch(() => {})
+      .finally(() => {
+        // Always activate — even if settings fetch fails
+        window.saitriqEmbedEnabled = true;
+        document.dispatchEvent(new CustomEvent('saitriq:embed-ready'));
+      });
+  })();
 </script>
 
 {% schema %}

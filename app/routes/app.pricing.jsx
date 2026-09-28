@@ -1,5 +1,6 @@
 import { redirect } from "react-router";
 import { useLoaderData, useFetcher } from "react-router";
+import { useEffect } from "react";
 import { authenticate } from "../shopify.server";
 import { PLANS } from "../plans";
 import { currentUsage } from "../db.wishlist.server";
@@ -32,6 +33,8 @@ export const loader = async ({ request }) => {
   // read query params for post-purchase feedback
   const url = new URL(request.url);
   const addonStatus = url.searchParams.get("addon"); // activated | declined | error
+  const planActivated = url.searchParams.get("activated") === "1";
+  const planDeclined = url.searchParams.get("declined") === "1";
 
   return {
     plans: PLANS,
@@ -39,6 +42,8 @@ export const loader = async ({ request }) => {
     addonSaves,
     addon: ADDON,
     addonStatus,
+    planActivated,
+    planDeclined,
     usage: {
       used,
       limit: effectiveLimit,
@@ -66,12 +71,19 @@ export const action = async ({ request }) => {
     const plan = PLANS.find((p) => p.id === planId);
     if (!plan || plan.price === 0) return { error: "Invalid plan selected." };
 
-    const appUrl = process.env.SHOPIFY_APP_URL || "";
+    // Build return URL from the incoming request origin so it works
+    // in both local dev (Shopify CLI tunnel) and production (Vercel)
+    const origin = new URL(request.url).origin;
+    const appUrl = process.env.SHOPIFY_APP_URL || origin;
     const returnUrl = `${appUrl}/app/billing?planId=${planId}&shop=${shop}`;
+
+    console.log("[BILLING] Return URL:", returnUrl);
 
     try {
       const { confirmationUrl } = await createSubscription(admin, planId, returnUrl);
-      return redirect(confirmationUrl);
+      // Return the URL to the client — the frontend will open it in the top frame
+      // to avoid X-Frame-Options: deny from admin.shopify.com
+      return { confirmationUrl };
     } catch (err) {
       console.error("Subscription creation error:", err);
       return { error: "Could not start the billing flow. Please try again." };
@@ -79,11 +91,12 @@ export const action = async ({ request }) => {
   }
 
   if (intent === "buy-addon") {
-    const appUrl = process.env.SHOPIFY_APP_URL || "";
+    const origin = new URL(request.url).origin;
+    const appUrl = process.env.SHOPIFY_APP_URL || origin;
     const returnUrl = `${appUrl}/app/addon?shop=${shop}`;
     try {
       const { confirmationUrl } = await createAddonCharge(admin, returnUrl);
-      return redirect(confirmationUrl);
+      return { confirmationUrl };
     } catch (err) {
       console.error("Addon charge error:", err);
       return { error: "Could not start the addon purchase. Please try again." };
@@ -100,6 +113,29 @@ export default function PricingPage() {
   const isSubmitting = fetcher.state !== "idle";
 
   const activePlan = plans.find((p) => p.id === activePlanId);
+
+  // When server returns a confirmationUrl, break out of the iframe
+  // and open it in the top-level window (required by Shopify)
+  useEffect(() => {
+    if (actionData?.confirmationUrl) {
+      window.top.location.href = actionData.confirmationUrl;
+    }
+  }, [actionData?.confirmationUrl]);
+
+  // After billing redirect, page may load blank outside embedded context.
+  // Reload once to re-establish App Bridge session.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const isPostBilling = params.get("activated") === "1" || params.get("addon") === "activated";
+    const alreadyReloaded = sessionStorage.getItem("billing_reloaded") === "1";
+
+    if (isPostBilling && !alreadyReloaded) {
+      sessionStorage.setItem("billing_reloaded", "1");
+      window.location.reload();
+    } else if (!isPostBilling) {
+      sessionStorage.removeItem("billing_reloaded");
+    }
+  }, []);
 
   return (
     <s-page heading="Pricing">
@@ -210,92 +246,110 @@ export default function PricingPage() {
 
       {/* ── Plan cards ── */}
       <s-section heading="Choose a plan">
-        <s-grid gridTemplateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap="base">
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "16px",
+          alignItems: "stretch",
+        }}>
           {plans.map((plan) => {
             const isActive = plan.id === activePlanId;
             const activePlanPrice = activePlan?.price ?? 0;
-            const isDowngrade = plan.price < activePlanPrice;
+            const isDowngrade = plan.price < activePlanPrice && !isActive;
+            const isUpgrade = plan.price > activePlanPrice && !isActive;
 
             return (
-              <s-box
+              <div
                 key={plan.id}
-                border="base"
-                borderRadius="base"
-                padding="base"
-                background={isActive ? "strong" : "base"}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  border: isActive ? "2px solid #008060" : "1px solid #e1e3e5",
+                  borderRadius: "12px",
+                  padding: "20px",
+                  background: isActive ? "#f6fef9" : "#ffffff",
+                  gap: "16px",
+                }}
               >
-                <s-grid gap="base">
-                  {/* Plan header */}
-                  <s-grid gap="small-200">
-                    <s-stack direction="inline" gap="small-200" alignItems="center">
-                      <s-heading>{plan.name}</s-heading>
-                      {isActive && <s-badge tone="success">Current</s-badge>}
-                      {plan.trialDays > 0 && !isActive && (
-                        <s-badge tone="info">{plan.trialDays}-day trial</s-badge>
-                      )}
-                    </s-stack>
-                    <s-text>
-                      {plan.price === 0 ? "Free forever" : `$${plan.price} / month`}
-                    </s-text>
-                    <s-text color="subdued">
-                      {plan.limit === Infinity
-                        ? "Unlimited saves / month"
-                        : `${plan.limit.toLocaleString()} saves / month`}
-                    </s-text>
-                  </s-grid>
+                {/* Header */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <s-heading>{plan.name}</s-heading>
+                    {isActive && <s-badge tone="success">Current plan</s-badge>}
+                    {plan.trialDays > 0 && !isActive && (
+                      <s-badge tone="info">{plan.trialDays}-day free trial</s-badge>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                    {plan.price === 0 ? (
+                      <s-text>Free forever</s-text>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: "24px", fontWeight: "700", color: "#202223" }}>${plan.price}</span>
+                        <s-text color="subdued">/ month</s-text>
+                      </>
+                    )}
+                  </div>
+                  <s-text color="subdued">
+                    {plan.limit === Infinity
+                      ? "Unlimited saves / month"
+                      : `${plan.limit.toLocaleString()} saves / month`}
+                  </s-text>
+                </div>
 
-                  <s-divider />
+                {/* Divider */}
+                <div style={{ height: "1px", background: "#e1e3e5" }} />
 
-                  {/* Features */}
-                  <s-grid gap="small-200">
-                    {plan.features.map((f) => (
-                      <s-stack key={f} direction="inline" gap="small-200" alignItems="center">
-                        <s-icon source="check-circle" tone="success" />
-                        <s-text>{f}</s-text>
-                      </s-stack>
-                    ))}
-                  </s-grid>
+                {/* Features — flex:1 pushes button to bottom */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {plan.features.map((f) => (
+                    <div key={f} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ color: "#008060", fontSize: "16px" }}>✓</span>
+                      <s-text>{f}</s-text>
+                    </div>
+                  ))}
+                </div>
 
-                  <s-divider />
+                {/* Divider */}
+                <div style={{ height: "1px", background: "#e1e3e5" }} />
 
-                  {/* Action */}
-                  {isActive ? (
-                    <s-button variant="secondary" disabled inlineSize="fill">
-                      Current plan
+                {/* Button — always at bottom */}
+                {isActive ? (
+                  <s-button variant="secondary" disabled inlineSize="fill">
+                    Current plan
+                  </s-button>
+                ) : isUpgrade ? (
+                  <fetcher.Form method="post">
+                    <input type="hidden" name="intent" value="upgrade" />
+                    <input type="hidden" name="planId" value={plan.id} />
+                    <s-button
+                      type="submit"
+                      variant="primary"
+                      loading={isSubmitting}
+                      inlineSize="fill"
+                    >
+                      Upgrade to {plan.name}
                     </s-button>
-                  ) : isDowngrade ? (
-                    <fetcher.Form method="post">
-                      <input type="hidden" name="intent" value="downgrade" />
-                      <input type="hidden" name="planId" value={plan.id} />
-                      <s-button
-                        type="submit"
-                        variant="tertiary"
-                        tone="neutral"
-                        disabled={isSubmitting}
-                        inlineSize="fill"
-                      >
-                        Downgrade to Free
-                      </s-button>
-                    </fetcher.Form>
-                  ) : (
-                    <fetcher.Form method="post">
-                      <input type="hidden" name="intent" value="upgrade" />
-                      <input type="hidden" name="planId" value={plan.id} />
-                      <s-button
-                        type="submit"
-                        variant="primary"
-                        loading={isSubmitting}
-                        inlineSize="fill"
-                      >
-                        Upgrade to {plan.name}
-                      </s-button>
-                    </fetcher.Form>
-                  )}
-                </s-grid>
-              </s-box>
+                  </fetcher.Form>
+                ) : isDowngrade ? (
+                  <fetcher.Form method="post">
+                    <input type="hidden" name="intent" value="downgrade" />
+                    <input type="hidden" name="planId" value={plan.id} />
+                    <s-button
+                      type="submit"
+                      variant="tertiary"
+                      tone="critical"
+                      disabled={isSubmitting}
+                      inlineSize="fill"
+                    >
+                      Downgrade to Free
+                    </s-button>
+                  </fetcher.Form>
+                ) : null}
+              </div>
             );
           })}
-        </s-grid>
+        </div>
       </s-section>
 
       {/* ── Billing notes ── */}

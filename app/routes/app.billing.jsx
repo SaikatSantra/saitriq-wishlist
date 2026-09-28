@@ -31,41 +31,56 @@ const SUBSCRIPTION_STATUS = `#graphql
 `;
 
 export const loader = async ({ request }) => {
-  const { session, admin } = await authenticate.admin(request);
-  const shop = session.shop;
-  const url = new URL(request.url);
+  console.log("[BILLING] Route hit! URL:", request.url);
 
+  const url = new URL(request.url);
   const chargeId = url.searchParams.get("charge_id");
   const planId = url.searchParams.get("planId") || "free";
+  const shop = url.searchParams.get("shop") || "";
+
+  // Always authenticate — this re-establishes the session
+  // after the external Shopify billing redirect
+  const { session, admin } = await authenticate.admin(request);
+  const authenticatedShop = session.shop;
+
+  console.log("[BILLING] Authenticated shop:", authenticatedShop, "chargeId:", chargeId, "planId:", planId);
 
   if (!chargeId) {
-    // No charge_id — merchant declined or navigated directly
     return redirect("/app/pricing?declined=1");
   }
 
   try {
-    // Verify the subscription is actually ACTIVE with Shopify
     const response = await admin.graphql(SUBSCRIPTION_STATUS, {
       variables: { id: `gid://shopify/AppSubscription/${chargeId}` },
     });
     const payload = await response.json();
     const sub = payload?.data?.node;
 
+    console.log("[BILLING] Subscription status:", sub?.status, "id:", sub?.id);
+
     if (!sub || sub.status !== "ACTIVE") {
-      // Merchant declined or subscription is not active
       return redirect("/app/pricing?declined=1");
     }
 
-    // Persist to our DB
-    await activateSubscription(shop, planId, sub.id);
+    await activateSubscription(authenticatedShop, planId, sub.id, {
+      trialEndsOn: sub.trialDays
+        ? new Date(Date.now() + sub.trialDays * 86400000).toISOString()
+        : null,
+      currentPeriodEnd: sub.currentPeriodEnd ?? null,
+    });
+    console.log("[BILLING] Plan activated:", planId, "for shop:", authenticatedShop);
 
-    return redirect("/app/pricing?activated=1");
+    // Redirect into the Shopify admin embedded context so App Bridge initializes correctly
+    const host = Buffer.from(`${authenticatedShop}/admin`).toString("base64url");
+    return redirect(`/app/pricing?activated=1&host=${host}`);
   } catch (err) {
-    console.error("Billing callback error:", err);
-    // Fall back to syncing from Shopify directly
+    console.error("[BILLING] Error:", err.message);
     try {
-      await syncSubscriptionFromShopify(admin, shop);
-    } catch {}
-    return redirect("/app/pricing?activated=1");
+      await syncSubscriptionFromShopify(admin, authenticatedShop);
+    } catch (e) {
+      console.error("[BILLING] Fallback sync failed:", e.message);
+    }
+    const host = Buffer.from(`${authenticatedShop}/admin`).toString("base64url");
+    return redirect(`/app/pricing?activated=1&host=${host}`);
   }
 };

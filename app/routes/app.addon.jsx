@@ -30,7 +30,9 @@ export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const chargeId = url.searchParams.get("charge_id");
 
-  if (!chargeId) return redirect("/app/pricing?addon=declined");
+  const host = Buffer.from(`${shop}/admin`).toString("base64url");
+
+  if (!chargeId) return redirect(`/app/pricing?addon=declined&host=${host}`);
 
   try {
     const response = await admin.graphql(VERIFY_CHARGE, {
@@ -40,13 +42,13 @@ export const loader = async ({ request }) => {
     const charge = payload?.data?.node;
 
     if (!charge || charge.status !== "ACTIVE") {
-      return redirect("/app/pricing?addon=declined");
+      return redirect(`/app/pricing?addon=declined&host=${host}`);
     }
 
     await activateAddon(shop, charge.id);
-    return redirect("/app/pricing?addon=activated");
+    return redirect(`/app/pricing?addon=activated&host=${host}`);
   } catch (err) {
     console.error("Addon callback error:", err);
-    return redirect("/app/pricing?addon=error");
+    return redirect(`/app/pricing?addon=error&host=${host}`);
   }
 };

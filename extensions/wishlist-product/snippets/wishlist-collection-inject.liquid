@@ -1,28 +1,57 @@
 {% comment %}
-  Saitriq Wishlist — Collection page auto-inject (manual install)
-  ---------------------------------------------------------------
-  Paste this line ONCE anywhere that loads on every page
+  Saitriq Wishlist — Collection page auto-inject (manual install for legacy themes)
+  ---------------------------------------------------------------------------------
+  Paste this line ONCE anywhere that loads on collection/product pages
   (e.g. theme.liquid just before </body>, or collection.liquid):
 
     {% render 'wishlist-collection-inject' %}
 
-  The snippet scans for product card links and injects a heart button
-  into each card automatically. Works with any theme structure.
+  The snippet renders a <template> with the heart button HTML.
+  JS clones it onto every product card and toggles .is-active only.
+  No innerHTML injection — icon switching is pure CSS.
 {% endcomment %}
 
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
+
+{%- comment -%}
+  <template> holds the button markup. JS clones it for each product card.
+  The default heart uses two spans toggled by CSS .is-active.
+{%- endcomment -%}
+<template id="sai-collection-btn-tpl">
+  <button
+    type="button"
+    class="sai-wishlist sai-wishlist--collection"
+    data-sai-collection-wishlist
+    aria-label="Add to wishlist"
+  >
+    <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+      </svg>
+    </span>
+  </button>
+</template>
 
 <script>
   (() => {
     if (window.saitriqWishlistCollectionLoaded) return;
     window.saitriqWishlistCollectionLoaded = true;
 
-    const storageKey = 'saitriq_wishlist';
+    const storageKey       = 'saitriq_wishlist';
     const visitorStorageKey = 'saitriq_wishlist_visitor';
-    const endpoint = '/apps/saitriq-wishlist';
+    const endpoint         = '/apps/saitriq-wishlist';
+    const tpl              = document.getElementById('sai-collection-btn-tpl');
+    if (!tpl) return;
+
     let customerAuthenticated = false;
 
-    // ── Storage helpers ────────────────────────────────────────────────────
+    // ── Storage ────────────────────────────────────────────────────────────
     const readItems = () => {
       try { const v = JSON.parse(localStorage.getItem(storageKey) || '[]'); return Array.isArray(v) ? v : []; }
       catch { return []; }
@@ -33,64 +62,106 @@
     };
     const getVisitorId = () => {
       let id = localStorage.getItem(visitorStorageKey);
-      if (!id) { id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,14)}`; localStorage.setItem(visitorStorageKey, id); }
+      if (!id) { id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`; localStorage.setItem(visitorStorageKey, id); }
       return id;
     };
 
     // ── Toast ──────────────────────────────────────────────────────────────
-    const announce = (message) => {
+    const announce = (message, image, title) => {
       let toast = document.querySelector('[data-sai-wishlist-toast]');
       if (!toast) {
         toast = document.createElement('div');
         toast.dataset.saiWishlistToast = '';
         toast.className = 'sai-wishlist__toast';
         toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
         document.body.append(toast);
       }
-      toast.textContent = message;
+      if (image || title) {
+        toast.innerHTML = `
+          <div class="sai-wishlist__toast-inner">
+            ${image ? `<img class="sai-wishlist__toast-img" src="${image}" alt="" aria-hidden="true">` : ''}
+            <div class="sai-wishlist__toast-body">
+              <span class="sai-wishlist__toast-label">${message}</span>
+              ${title ? `<span class="sai-wishlist__toast-title">${title}</span>` : ''}
+            </div>
+          </div>`;
+      } else {
+        toast.textContent = message;
+      }
       toast.classList.add('is-visible');
       clearTimeout(window.saitriqWishlistToastTimer);
       window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
     };
-    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
+    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message, e.detail.image, e.detail.title); });
+
+    // ── View — class only, no innerHTML ───────────────────────────────────
+    const renderButton = (btn, productId) => {
+      const saved = readItems().some((i) => String(i.id) === String(productId));
+      btn.classList.toggle('is-active', saved);
+      btn.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
+    };
 
     // ── Local fallback ─────────────────────────────────────────────────────
+    const toLocalItem = (item) => ({
+      id: item.productId, handle: item.productHandle,
+      title: item.productTitle, image: item.productImage || '', price: item.productPrice || ''
+    });
     const persistLocal = (operation, item) => {
       const items = readItems();
       const idx = items.findIndex((s) => String(s.id) === String(item.productId));
       if (operation === 'add' && idx < 0) items.push({ ...toLocalItem(item), addedAt: new Date().toISOString() });
       if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
       saveItems(items);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
+      announce(
+        operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist',
+        item.productImage || '',
+        item.productTitle || ''
+      );
       return items;
     };
 
-    // ── Server sync ────────────────────────────────────────────────────────
+    // ── Sync ───────────────────────────────────────────────────────────────
     const sync = async (operation, item) => {
       if (!customerAuthenticated) {
         try { await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item }) }); } catch {}
         return persistLocal(operation, item);
       }
       const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item }) });
+
+      // Limit reached — block adds, allow removes
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        if (operation === 'remove' || operation === 'clear') return readItems();
+        announce(data.error || 'Monthly wishlist limit reached. Upgrade your plan.');
+        return readItems();
+      }
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !Array.isArray(data.items)) {
         customerAuthenticated = false;
         return persistLocal(operation, item);
       }
-      const synced = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
+      const synced = data.items.map((s) => ({
+        id: s.productId, handle: s.productHandle, title: s.productTitle,
+        image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt
+      }));
       saveItems(synced);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
+      announce(
+        operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist',
+        item.productImage || '',
+        item.productTitle || ''
+      );
       return synced;
     };
 
     // ── Product data cache ─────────────────────────────────────────────────
-    const productDataCache = new Map();
+    const productCache = new Map();
     const productData = async (handle) => {
-      if (productDataCache.has(handle)) return productDataCache.get(handle);
+      if (productCache.has(handle)) return productCache.get(handle);
       const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
       if (!res.ok) throw new Error(`Product lookup failed: ${res.status}`);
       const p = await res.json();
-      // Field names match proxy expectations (productId, productHandle, etc.)
       const data = {
         productId:     String(p.id),
         productHandle: p.handle,
@@ -98,20 +169,11 @@
         productImage:  p.featured_image || p.images?.[0] || '',
         productPrice:  p.price ? (p.price / 100).toFixed(2) : ''
       };
-      productDataCache.set(handle, data);
+      productCache.set(handle, data);
       return data;
     };
 
-    // Map proxy fields → localStorage shape
-    const toLocalItem = (item) => ({
-      id:     item.productId,
-      handle: item.productHandle,
-      title:  item.productTitle,
-      image:  item.productImage || '',
-      price:  item.productPrice || '',
-    });
-
-    // ── Detect auth + merge local items to server ──────────────────────────
+    // ── Auth detection + local→server merge ───────────────────────────────
     const detectAuth = async () => {
       try {
         const res = await fetch(endpoint, { credentials: 'same-origin' });
@@ -135,89 +197,65 @@
       return m ? decodeURIComponent(m[1]) : '';
     };
 
-    const renderButton = (btn, item) => {
-      // item uses proxy field names (productId) after the productData fix
-      const saved = readItems().some((e) => String(e.id) === String(item.productId));
-      btn.textContent = saved ? '♥' : '♡';
-      btn.classList.toggle('is-active', saved);
-      btn.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
-      btn.title = btn.getAttribute('aria-label');
-    };
-
     const attach = async (link) => {
       const handle = handleFromLink(link);
       if (!handle) return;
-      // find the closest product card container
       const card = link.closest([
-        'li', 'article',
-        '.card', '.product-card', '.grid__item',
-        '[class*="product-card"]', '[class*="product-item"]',
-        '[class*="card--product"]'
+        'li', 'article', '.card', '.product-card', '.grid__item',
+        '[class*="product-card"]', '[class*="product-item"]', '[class*="card--product"]'
       ].join(','));
       if (!card || card.querySelector('[data-sai-collection-wishlist]')) return;
 
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'sai-wishlist sai-wishlist--collection';
-      btn.dataset.saiCollectionWishlist = '';
-      btn.textContent = '♡';
-      btn.setAttribute('aria-label', 'Add to wishlist');
-
-      btn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (btn.disabled) return;
-        btn.disabled = true;
-        try {
-          const item = await productData(handle);
-          const isSaved = readItems().some((e) => String(e.id) === String(item.productId));
-          await sync(isSaved ? 'remove' : 'add', item);
-          renderButton(btn, item);
-        } catch (err) {
-          console.error('Collection wishlist failed', err);
-        } finally {
-          btn.disabled = false;
-        }
-      });
+      // Clone the Liquid-rendered template — no innerHTML injection
+      const btn = tpl.content.cloneNode(true).querySelector('[data-sai-collection-wishlist]');
+      if (!btn) return;
 
       card.style.position = card.style.position || 'relative';
       card.append(btn);
 
       try {
         const item = await productData(handle);
-        renderButton(btn, item);
+        renderButton(btn, item.productId);
+
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (btn.disabled) return;
+          btn.disabled = true;
+          try {
+            const saved = readItems().some((i) => String(i.id) === String(item.productId));
+            await sync(saved ? 'remove' : 'add', item);
+            renderButton(btn, item.productId);
+          } catch (err) {
+            console.error('Collection wishlist failed', err);
+          } finally {
+            btn.disabled = false;
+          }
+        });
       } catch {
         btn.remove();
       }
     };
 
-    // ── Scan page for product links ────────────────────────────────────────
-    const seen = new Set();
+    // ── Scan + observe ─────────────────────────────────────────────────────
     const scan = () => {
       [...document.querySelectorAll('a[href*="/products/"]')]
-        .filter((link) => handleFromLink(link))
-        .filter((link, i, arr) => arr.findIndex((l) => handleFromLink(l) === handleFromLink(link)) === i)
-        .filter((link) => {
-          const h = handleFromLink(link);
-          if (seen.has(h)) return false;
-          seen.add(h);
-          return true;
-        })
+        .filter((a) => handleFromLink(a))
+        .filter((a, i, arr) => arr.findIndex((b) => handleFromLink(b) === handleFromLink(a)) === i)
         .forEach((link) => attach(link));
     };
 
-    // ── Re-render on wishlist change ───────────────────────────────────────
+    // Re-render all buttons when wishlist changes
     window.addEventListener('saitriq:wishlist-updated', () => {
       document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn) => {
-        const card = btn.closest('[data-sai-collection-wishlist]')?.parentElement || btn.parentElement;
-        const link = card?.querySelector('a[href*="/products/"]');
+        const card = btn.parentElement;
+        const link = card && card.querySelector('a[href*="/products/"]');
         if (!link) return;
         const handle = handleFromLink(link);
-        if (handle && productDataCache.has(handle)) renderButton(btn, productDataCache.get(handle));
+        if (handle && productCache.has(handle)) renderButton(btn, productCache.get(handle).productId);
       });
     });
 
-    // ── Boot ───────────────────────────────────────────────────────────────
     detectAuth().finally(scan);
     new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
     window.addEventListener('storage', (e) => { if (e.key === storageKey) scan(); });

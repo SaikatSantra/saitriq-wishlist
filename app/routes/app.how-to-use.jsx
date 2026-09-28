@@ -162,7 +162,7 @@ export default function HowToUsePage() {
           <s-banner tone="info">
             <code>{`<a href="/pages/wishlist" class="header-wishlist-link" aria-label="View wishlist" title="Wishlist">
   <span aria-hidden="true">♥</span>
-  <span>Wishlist</span>
+  <span class="hidden hide header-wishlist-text">Wishlist</span>
   <span data-sai-wishlist-count>0</span>
 </a>
 

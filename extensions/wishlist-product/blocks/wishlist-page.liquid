@@ -1,13 +1,50 @@
 {% comment %}CSS loaded globally by the Saitriq Wishlist app embed block{% endcomment %}
 
-<section class="sai-wishlist-page" data-sai-wishlist-page hidden>
+{% liquid
+  assign block_settings = block.settings
+  assign ratio = 1
+
+  case block_settings.image_ratio
+    when 'landscape'
+      assign ratio = '16 / 9'
+    when 'portrait'
+      assign ratio = '4 / 5'
+    when 'square'
+      assign ratio = '1/1'
+  endcase
+
+  if ratio == 0 or ratio == null
+    assign ratio = 1
+  endif
+%}
+<style>
+  .sai-wishlist-page__item img{
+    aspect-ratio: {{ratio}};
+  }
+
+  .sai-wishlist-page__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.sai-wishlist-page__header .wislist-page-title {
+    margin: 0;
+    padding: 0;
+}
+.sai-wishlist-page{padding-block: var(--padding-block-start) var(--padding-block-end);}
+ 
+</style>
+
+<section class="sai-wishlist-page" data-sai-wishlist-page hidden style="--padding-block-start: {{ block.settings.padding-block-start }}px; --padding-block-end: {{ block.settings.padding-block-end }}px;">
   <div class="sai-wishlist-page__header">
-    <h2>{{ block.settings.heading }}</h2>
+    <h2 class="wislist-page-title h2">{{ block.settings.heading }}</h2>
     <div class="sai-wishlist-page__actions">
-      <button type="button" class="sai-wishlist-page__share" data-sai-wishlist-share hidden>
+      <button type="button" class="sai-wishlist-page__share button" data-sai-wishlist-share hidden>
         Share wishlist
       </button>
-      <button type="button" class="sai-wishlist-page__clear" data-sai-wishlist-clear hidden>
+      <button type="button" class="sai-wishlist-page__clear button" data-sai-wishlist-clear hidden>
         Clear all
       </button>
     </div>
@@ -28,7 +65,7 @@
       --product-grid-gap-desktop: 16px 16px;
       container-name: product-grid;
     ">
-      <ul class="sai-wishlist-page__items product-grid--grid product-grid " data-sai-wishlist-items></ul>
+      <div class="sai-wishlist-page__items product-grid--grid product-grid " data-sai-wishlist-items></div>
     </div>
 
   </div>
@@ -186,7 +223,7 @@
       if (shareButton) shareButton.hidden = items.length === 0;
 
       items.forEach((item) => {
-        const card = document.createElement('li');
+        const card = document.createElement('div');
         card.className = `sai-wishlist-page__item product-grid__item ${settings.cardClass || ''}`.trim();
         card.innerHTML = `
           <a href="/products/${encodeURIComponent(item.handle)}">
@@ -431,6 +468,26 @@
       "default": "You have not saved any products yet."
     },
     {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "Aspect ratio",
+      "options": [
+        {
+          "value": "portrait",
+          "label": "Portrait"
+        },
+        {
+          "value": "square",
+          "label": "Square"
+        },
+        {
+          "value": "landscape",
+          "label": "Landscape"
+        }
+      ],
+      "default": "portrait"
+    },
+    {
       "type": "range",
       "id": "columns",
       "label": "Columns",
@@ -456,6 +513,30 @@
       "id": "button_label",
       "label": "Remove button label",
       "default": "Remove"
+    },
+    {
+      "type": "header",
+      "content": "Padding"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "Padding top",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "Padding bottom",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
     }
   ]
 }

@@ -210,7 +210,7 @@ export const syncSubscriptionFromShopify = async (admin, shop) => {
  * Save a newly approved subscription to the DB.
  * Called from the billing callback route after merchant approves.
  */
-export const activateSubscription = async (shop, planId, subscriptionId) => {
+export const activateSubscription = async (shop, planId, subscriptionId, { trialEndsOn, currentPeriodEnd } = {}) => {
   await prisma.activeSubscription.upsert({
     where: { shop },
     create: {
@@ -218,11 +218,15 @@ export const activateSubscription = async (shop, planId, subscriptionId) => {
       planId,
       subscriptionId,
       status: "active",
+      trialEndsOn: trialEndsOn ? new Date(trialEndsOn) : null,
+      currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : null,
     },
     update: {
       planId,
       subscriptionId,
       status: "active",
+      trialEndsOn: trialEndsOn ? new Date(trialEndsOn) : null,
+      currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : null,
     },
   });
 };
@@ -275,18 +279,19 @@ export const downgradeToFree = async (admin, shop) => {
 };
 
 // ─── Addon (one-time purchase) ────────────────────────────────────────────────
+// Change these values to update the addon price and saves granted.
 
 export const ADDON = {
-  saves: 5000,
-  price: 5,
-  name: "Saitriq Wishlist: +5,000 saves",
+  saves: 5000,   // extra saves granted per purchase
+  price: 5,      // price in USD (e.g. 5 = $5.00)
+  name: "Saitriq Wishlist: +5,000 saves", // shown on Shopify billing page
 };
 
 const APP_PURCHASE_ONE_TIME_CREATE = `#graphql
   mutation AppPurchaseOneTimeCreate(
     $name: String!
     $price: MoneyInput!
-    $returnUrl: String!
+    $returnUrl: URL!
     $test: Boolean
   ) {
     appPurchaseOneTimeCreate(
