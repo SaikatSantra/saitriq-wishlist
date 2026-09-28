@@ -64,7 +64,7 @@ export default function ApiDocsPage() {
         </s-section>
 
         <s-section heading="GET ?api=settings — Display settings">
-          <s-paragraph>Returns the merchant's wishlist page display settings.</s-paragraph>
+          <s-paragraph>Returns the merchant's wishlist page and toast notification settings.</s-paragraph>
           <s-banner tone="info">
             <code>GET /apps/saitriq-wishlist?api=settings</code>
           </s-banner>
@@ -78,7 +78,10 @@ export default function ApiDocsPage() {
     "showPrices": true,
     "showRemove": true,
     "buttonLabel": "Remove",
-    "customCss": ""
+    "customCss": "",
+    "toastBg": "#1a1a1a",
+    "toastColor": "#ffffff",
+    "toastPosition": "top-left"
   }
 }`}</code>
           </s-banner>

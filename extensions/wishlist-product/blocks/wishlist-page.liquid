@@ -48,9 +48,9 @@
         Clear all
       </button>
     </div>
-    <p data-sai-wishlist-empty hidden>{{ block.settings.empty_message }}</p>
+   
   </div>
-
+ <p data-sai-wishlist-empty hidden>{{ block.settings.empty_message }}</p>
   <div class=" grid main-collection-grid spacing-style" style="
     --grid--margin--mobile: 0 var(--margin-lg);
     --grid-column--desktop: var(--centered);
@@ -212,17 +212,85 @@
       return div.innerHTML;
     };
 
-    const render = () => {
-      const items = getItems();
-      page.querySelector('h2').textContent = settings.heading;
-      emptyMessage.textContent = settings.emptyMessage;
-      itemsContainer.style.setProperty('--sai-wishlist-columns', settings.columns);
-      itemsContainer.replaceChildren();
-      emptyMessage.hidden = items.length > 0;
-      clearButton.hidden = items.length === 0;
-      if (shareButton) shareButton.hidden = items.length === 0;
+    // ── Custom card template (opt-in) ─────────────────────────────────────
+    // Merchants can place a <template data-sai-wishlist-page> anywhere in
+    // their theme. JS clones it per item and fills data-sai-item-* hooks.
+    // Falls back to the default card if no template is found.
+    //
+    // Supported hooks (add to any element in the template):
+    //   data-sai-item-link    → href="/products/{handle}"
+    //   data-sai-item-image   → src + alt
+    //   data-sai-item-title   → textContent
+    //   data-sai-item-price   → textContent (hidden if showPrices=false)
+    //   data-sai-item-remove  → click removes item (hidden if showRemove=false)
+    const customTpl = document.querySelector('[data-sai-wishlist-page]');
 
-      items.forEach((item) => {
+    const buildCard = (item) => {
+      if (customTpl && customTpl.tagName === 'TEMPLATE') {
+        // ── Merchant template ──────────────────────────────────────────────
+        const clone = customTpl.content.cloneNode(true);
+        const root = document.createElement('div');
+        root.appendChild(clone);
+
+        // Fill link hooks
+        root.querySelectorAll('[data-sai-item-link]').forEach((el) => {
+          el.href = `/products/${encodeURIComponent(item.handle)}`;
+        });
+
+        // Fill image hook
+        const img = root.querySelector('[data-sai-item-image]');
+        if (img) {
+          img.src = item.image || '';
+          img.alt = item.title || '';
+          img.loading = 'lazy';
+          img.addEventListener('error', async () => {
+            if (img.dataset.fallbackAttempted) return;
+            img.dataset.fallbackAttempted = 'true';
+            try {
+              const res = await fetch(`/products/${encodeURIComponent(item.handle)}.js`);
+              if (!res.ok) return;
+              const p = await res.json();
+              const fb = p.featured_image || p.images?.[0];
+              if (fb) img.src = fb;
+            } catch {}
+          }, { once: true });
+        }
+
+        // Fill title hook
+        const title = root.querySelector('[data-sai-item-title]');
+        if (title) title.textContent = item.title || '';
+
+        // Fill price hook
+        const price = root.querySelector('[data-sai-item-price]');
+        if (price) {
+          if (settings.showPrices && item.price) {
+            price.textContent = item.price;
+          } else {
+            price.hidden = true;
+          }
+        }
+
+        // Fill remove hook
+        const removeBtn = root.querySelector('[data-sai-item-remove]');
+        if (removeBtn) {
+          if (settings.showRemove) {
+            if (!removeBtn.textContent.trim()) removeBtn.textContent = settings.buttonLabel;
+            removeBtn.addEventListener('click', () => handleRemove(item, removeBtn));
+          } else {
+            removeBtn.hidden = true;
+          }
+        }
+
+        // Unwrap the temporary root div
+        const fragment = document.createDocumentFragment();
+        while (root.firstChild) fragment.appendChild(root.firstChild);
+        const wrapper = document.createElement('div');
+        wrapper.className = `sai-wishlist-page__item product-grid__item ${settings.cardClass || ''}`.trim();
+        wrapper.appendChild(fragment);
+        return wrapper;
+
+      } else {
+        // ── Default card ───────────────────────────────────────────────────
         const card = document.createElement('div');
         card.className = `sai-wishlist-page__item product-grid__item ${settings.cardClass || ''}`.trim();
         card.innerHTML = `
@@ -252,81 +320,61 @@
           }
         }, { once: true });
         const removeButton = card.querySelector('.sai-wishlist-page__remove');
-        if (!removeButton) {
-          itemsContainer.append(card);
+        if (removeButton) removeButton.addEventListener('click', () => handleRemove(item, removeButton));
+        return card;
+      }
+    };
+
+    // ── Remove handler (shared by both card types) ─────────────────────────
+    const handleRemove = async (item, removeButton) => {
+      removeButton.disabled = true;
+      localRevision += 1;
+      try {
+        if (!customerAuthenticated) {
+          await trackGuest('remove', {
+            productId: item.id, productHandle: item.handle,
+            productTitle: item.title, productImage: item.image
+          });
+          localStorage.setItem(storageKey, JSON.stringify(getItems().filter((s) => String(s.id) !== String(item.id))));
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: 'Removed from wishlist' } }));
+          render();
           return;
         }
-        removeButton.addEventListener('click', async () => {
-          removeButton.disabled = true;
-          localRevision += 1;
-          try {
-            if (!customerAuthenticated) {
-              await trackGuest('remove', {
-                productId: item.id,
-                productHandle: item.handle,
-                productTitle: item.title,
-                productImage: item.image
-              });
-              localStorage.setItem(
-                storageKey,
-                JSON.stringify(getItems().filter((saved) => String(saved.id) !== String(item.id)))
-              );
-              window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-              window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-                detail: { message: 'Removed from wishlist' }
-              }));
-              render();
-              return;
-            }
-            const response = await fetch(syncEndpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'same-origin',
-              body: JSON.stringify({
-                operation: 'remove',
-                visitorId: getVisitorId(),
-                productId: item.id,
-                productHandle: item.handle,
-                productTitle: item.title,
-                productImage: item.image
-              })
-            })
-            if (!response.ok) {
-              const errorBody = await response.text().catch(() => '');
-              console.error(
-                'Wishlist remove proxy request failed:',
-                response.status,
-                errorBody || '(empty response)',
-                response.headers.get('X-Saitriq-Wishlist-Version') || '(no version header)'
-              );
-              throw new Error('Wishlist remove request failed');
-            }
-            const data = await response.json();
-            if (!Array.isArray(data.items)) {
-              throw new Error('Wishlist remove response was invalid');
-            }
-            const serverItems = data.items.map((saved) => ({
-              id: saved.productId,
-              handle: saved.productHandle,
-              title: saved.productTitle,
-              image: saved.productImage || '',
-              price: saved.productPrice || '',
-              addedAt: saved.createdAt
-            }));
-            localStorage.setItem(storageKey, JSON.stringify(serverItems));
-            window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-            window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-              detail: { message: 'Removed from wishlist' }
-            }));
-            render();
-          } catch (error) {
-            emptyMessage.textContent = error.message;
-            emptyMessage.hidden = false;
-          } finally {
-            removeButton.disabled = false;
-          }
+        const response = await fetch(syncEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, productHandle: item.handle, productTitle: item.title, productImage: item.image })
         });
-        itemsContainer.append(card);
+        if (!response.ok) throw new Error('Wishlist remove request failed');
+        const data = await response.json();
+        if (!Array.isArray(data.items)) throw new Error('Wishlist remove response was invalid');
+        const serverItems = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
+        localStorage.setItem(storageKey, JSON.stringify(serverItems));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: 'Removed from wishlist' } }));
+        render();
+      } catch (error) {
+        emptyMessage.textContent = error.message;
+        emptyMessage.hidden = false;
+      } finally {
+        removeButton.disabled = false;
+      }
+    };
+
+    const render = () => {
+      const items = getItems();
+      page.querySelector('h2').textContent = settings.heading;
+      emptyMessage.textContent = settings.emptyMessage;
+      itemsContainer.style.setProperty('--sai-wishlist-columns', settings.columns);
+      itemsContainer.replaceChildren();
+      emptyMessage.hidden = items.length > 0;
+      clearButton.hidden = items.length === 0;
+      if (shareButton) shareButton.hidden = items.length === 0;
+
+      items.forEach((item) => {
+        itemsContainer.append(buildCard(item));
       });
     };
 

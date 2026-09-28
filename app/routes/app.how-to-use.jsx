@@ -8,10 +8,16 @@ export default function HowToUsePage() {
           Works with any Online Store 2.0 theme (Dawn, Sense, Craft, Refresh, etc.).
           No code editing required.
         </s-paragraph>
+        <s-banner tone="warning" heading="Enable the app embed first">
+          Before adding any blocks, you must enable the Saitriq Wishlist app embed.
+          Go to <strong>Online Store → Themes → Customize → App embeds</strong> and toggle
+          <strong>Saitriq Wishlist</strong> on. This loads the CSS and activates all blocks.
+          Without it, no wishlist buttons will appear.
+        </s-banner>
         <s-grid gap="small-200">
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-badge tone="info">1</s-badge>
-            <s-paragraph>Go to <strong>Online Store → Themes → Customize</strong>.</s-paragraph>
+            <s-paragraph>Go to <strong>Online Store → Themes → Customize → App embeds</strong>. Enable <strong>Saitriq Wishlist</strong>. Save.</s-paragraph>
           </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-badge tone="info">2</s-badge>
@@ -71,27 +77,115 @@ export default function HowToUsePage() {
     const block = script && script.previousElementSibling;
     const button = block && block.querySelector('[data-sai-wishlist-button]');
     if (!button) return;
-    const productId = button.dataset.productId;
+
+    const productId     = button.dataset.productId;
     const productHandle = button.dataset.productHandle;
-    const productTitle = button.dataset.productTitle;
-    const productImage = button.dataset.productImage;
-    const productPrice = button.dataset.productPrice;
-    let customerAuthenticated = false;
+    const productTitle  = button.dataset.productTitle;
+    const productImage  = button.dataset.productImage;
+    const productPrice  = button.dataset.productPrice;
     let requestInFlight = false;
+    let customerAuthenticated = false;
+
+    // Toast
+    const announce = (message) => {
+      let toast = document.querySelector('[data-sai-wishlist-toast]');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.dataset.saiWishlistToast = '';
+        toast.className = 'sai-wishlist__toast';
+        toast.setAttribute('role', 'status');
+        document.body.append(toast);
+      }
+      toast.textContent = message;
+      toast.classList.add('is-visible');
+      clearTimeout(window.saitriqWishlistToastTimer);
+      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
+    };
+    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
+
     const getWishlist = () => { try { const v = JSON.parse(localStorage.getItem(storageKey)||'[]'); return Array.isArray(v)?v:[]; } catch{return[];} };
     const saveWishlist = (items) => { try{localStorage.setItem(storageKey,JSON.stringify(items));}catch{} window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated')); };
     const getVisitorId = () => { let id=localStorage.getItem(visitorStorageKey); if(!id){id=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,14);localStorage.setItem(visitorStorageKey,id);} return id; };
-    const updateView = (saved) => { button.classList.toggle('is-active',saved); button.querySelector('.sai-wishlist__icon').textContent=saved?'♥':'♡'; button.querySelector('.sai-wishlist__label').textContent=saved?'Saved':'Add to wishlist'; };
-    const refresh = () => updateView(getWishlist().some(i=>String(i.id)===String(productId)));
-    const post = (body) => fetch(syncEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({visitorId:getVisitorId(),...body})});
-    const sync = async (operation,item) => {
-      if(!customerAuthenticated){post({operation,...item}).catch(()=>{}); const items=getWishlist(); const idx=items.findIndex(i=>String(i.id)===String(item.productId)); if(operation==='add'&&idx<0)items.push({id:item.productId,handle:item.productHandle,title:item.productTitle,image:item.productImage||'',price:item.productPrice||'',addedAt:new Date().toISOString()}); if(operation==='remove'&&idx>=0)items.splice(idx,1); saveWishlist(items); return items; }
-      const res = await post({operation,...item}); if(!res.ok){customerAuthenticated=false;return sync(operation,item);} const data=await res.json(); if(!Array.isArray(data.items)){customerAuthenticated=false;return sync(operation,item);} const synced=data.items.map(s=>({id:s.productId,handle:s.productHandle,title:s.productTitle,image:s.productImage||'',price:s.productPrice||'',addedAt:s.createdAt})); saveWishlist(synced); return synced;
+
+    const updateView = (saved) => {
+      button.classList.toggle('is-active', saved);
+      button.querySelector('.sai-wishlist__icon').textContent = saved ? '♥' : '♡';
+      button.querySelector('.sai-wishlist__label').textContent = saved ? 'Saved' : 'Add to wishlist';
     };
-    (async()=>{ const res=await fetch(syncEndpoint,{credentials:'same-origin'}).catch(()=>null); if(!res||!res.ok){refresh();return;} const data=await res.json(); customerAuthenticated=data.authenticated===true; if(data.authenticated&&Array.isArray(data.items))saveWishlist(data.items.map(s=>({id:s.productId,handle:s.productHandle,title:s.productTitle,image:s.productImage||'',price:s.productPrice||'',addedAt:s.createdAt}))); refresh(); })();
-    button.addEventListener('click',async()=>{ if(requestInFlight)return; requestInFlight=true; button.disabled=true; try{ const saved=getWishlist().some(i=>String(i.id)===String(productId)); await sync(saved?'remove':'add',{productId,productHandle,productTitle,productImage,productPrice}); updateView(!saved); }catch(e){console.error('Wishlist failed',e);}finally{button.disabled=false;requestInFlight=false;} });
+    const refresh = () => updateView(getWishlist().some(i => String(i.id) === String(productId)));
+
+    const persistLocal = (operation, item) => {
+      const items = getWishlist();
+      const idx = items.findIndex(s => String(s.id) === String(item.productId));
+      if (operation === 'add' && idx < 0) items.push({ id: item.productId, handle: item.productHandle, title: item.productTitle, image: item.productImage||'', price: item.productPrice||'', addedAt: new Date().toISOString() });
+      if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
+      saveWishlist(items);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation==='add'?'Added to wishlist':'Removed from wishlist' } }));
+      return items;
+    };
+
+    const sync = async (operation, item) => {
+      if (!customerAuthenticated) {
+        try { await fetch(syncEndpoint, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({ operation, visitorId:getVisitorId(), ...item }) }); } catch {}
+        return persistLocal(operation, item);
+      }
+      // Handle limit reached
+      const res = await fetch(syncEndpoint, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({ operation, visitorId:getVisitorId(), ...item }) });
+      if (res.status === 429) {
+        const d = await res.json().catch(()=>({}));
+        if (operation !== 'add') return getWishlist();
+        announce(d.error || 'Monthly wishlist limit reached. Upgrade your plan.');
+        return getWishlist();
+      }
+      if (!res.ok) { customerAuthenticated = false; return persistLocal(operation, item); }
+      const data = await res.json();
+      if (!Array.isArray(data.items)) { customerAuthenticated = false; return sync(operation, item); }
+      const synced = data.items.map(s => ({ id:s.productId, handle:s.productHandle, title:s.productTitle, image:s.productImage||'', price:s.productPrice||'', addedAt:s.createdAt }));
+      saveWishlist(synced);
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation==='add'?'Added to wishlist':'Removed from wishlist' } }));
+      return synced;
+    };
+
+    // Initial sync (single-flight, merges local guest items)
+    const initialSync = (() => {
+      if (window.saitriqWishlistSyncPromise) return window.saitriqWishlistSyncPromise;
+      const run = (async () => {
+        const res = await fetch(syncEndpoint, { credentials:'same-origin' }).catch(()=>null);
+        if (!res || !res.ok) { refresh(); return; }
+        const data = await res.json();
+        customerAuthenticated = data.authenticated === true;
+        if (!data.authenticated || !Array.isArray(data.items)) { refresh(); return; }
+        let synced = data.items.map(s => ({ id:s.productId, handle:s.productHandle, title:s.productTitle, image:s.productImage||'', price:s.productPrice||'', addedAt:s.createdAt }));
+        for (const item of getWishlist()) {
+          if (!synced.some(s => String(s.id) === String(item.id))) {
+            const merged = await sync('add', { productId:item.id, productHandle:item.handle, productTitle:item.title, productImage:item.image, productPrice:item.price });
+            if (merged) synced = merged;
+          }
+        }
+        saveWishlist(synced);
+        refresh();
+      })();
+      window.saitriqWishlistSyncPromise = run.finally(() => { window.saitriqWishlistSyncPromise = null; });
+      return window.saitriqWishlistSyncPromise;
+    })();
+
+    button.addEventListener('click', async () => {
+      if (requestInFlight) return;
+      requestInFlight = true; button.disabled = true;
+      try {
+        await initialSync;
+        const saved = getWishlist().some(i => String(i.id) === String(productId));
+        const result = await sync(saved ? 'remove' : 'add', { productId, productHandle, productTitle, productImage, productPrice });
+        if (result) updateView(!saved);
+      } catch (err) {
+        console.error('Wishlist failed', err);
+        announce('Wishlist is temporarily unavailable. Please try again.');
+      } finally { button.disabled = false; requestInFlight = false; }
+    });
+
     refresh();
-    window.addEventListener('saitriq:wishlist-updated',refresh);
+    window.addEventListener('saitriq:wishlist-updated', refresh);
+    window.addEventListener('storage', (e) => { if (e.key === storageKey) refresh(); });
   })();
 </script>`}</code>
           </s-banner>
@@ -149,6 +243,61 @@ export default function HowToUsePage() {
           <s-banner tone="info">
             <code>{"{% render 'wishlist-page', heading: 'Saved items', columns: 3, card_class: 'product-card' %}"}</code>
           </s-banner>
+        </s-section>
+
+        {/* ── Optional: custom card template ── */}
+        <s-section heading="Optional — Match your theme's product card layout">
+          <s-paragraph>
+            By default the wishlist page uses a simple card layout. To match your theme's exact
+            product card design, add a <code>{"<template>"}</code> element anywhere on your wishlist
+            page template with the attribute <code>data-sai-wishlist-page</code>.
+            The app will clone it for each saved item instead of using the default card.
+          </s-paragraph>
+          <s-paragraph>
+            Use these data attributes as hooks — the app fills them in automatically:
+          </s-paragraph>
+          <s-grid gap="small-200">
+            <s-stack direction="inline" gap="small-200" alignItems="center">
+              <s-badge tone="info">data-sai-item-link</s-badge>
+              <s-text>Sets <code>href="/products/{"{handle}"}"</code> on any <code>{"<a>"}</code></s-text>
+            </s-stack>
+            <s-stack direction="inline" gap="small-200" alignItems="center">
+              <s-badge tone="info">data-sai-item-image</s-badge>
+              <s-text>Sets <code>src</code> and <code>alt</code> on an <code>{"<img>"}</code></s-text>
+            </s-stack>
+            <s-stack direction="inline" gap="small-200" alignItems="center">
+              <s-badge tone="info">data-sai-item-title</s-badge>
+              <s-text>Sets the product title as text content</s-text>
+            </s-stack>
+            <s-stack direction="inline" gap="small-200" alignItems="center">
+              <s-badge tone="info">data-sai-item-price</s-badge>
+              <s-text>Sets the product price as text content (hidden if "Show prices" is off)</s-text>
+            </s-stack>
+            <s-stack direction="inline" gap="small-200" alignItems="center">
+              <s-badge tone="info">data-sai-item-remove</s-badge>
+              <s-text>Wires up the remove click handler (hidden if "Show remove" is off)</s-text>
+            </s-stack>
+          </s-grid>
+          <s-paragraph>Example — paste into <code>templates/page.wishlist.liquid</code>:</s-paragraph>
+          <s-banner tone="info">
+            <pre style={{fontSize:"0.8rem", whiteSpace:"pre-wrap"}}>{`<template data-sai-wishlist-page>
+  <div class="card product-card">
+    <a class="card__media" data-sai-item-link>
+      <img class="card__image" data-sai-item-image>
+    </a>
+    <div class="card__content">
+      <a class="card__heading" data-sai-item-link data-sai-item-title></a>
+      <span class="card__price" data-sai-item-price></span>
+      <button class="card__btn" data-sai-item-remove>Remove</button>
+    </div>
+  </div>
+</template>`}</pre>
+          </s-banner>
+          <s-paragraph>
+            Any element can have multiple hooks — for example an <code>{"<a>"}</code> with both
+            <code>data-sai-item-link</code> and <code>data-sai-item-title</code> gets both
+            the href and the title text.
+          </s-paragraph>
         </s-section>
 
         {/* ── Step 4: header link ── */}

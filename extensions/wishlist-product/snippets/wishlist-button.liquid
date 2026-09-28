@@ -65,7 +65,6 @@
     const productTitle  = button.dataset.productTitle;
     const productImage  = button.dataset.productImage;
     const productPrice  = button.dataset.productPrice;
-    let buttonSettings = { buttonMode: 'icon-text', customSvg: '' };
     let requestInFlight = false;
     let customerAuthenticated = false;
 
@@ -83,16 +82,12 @@
       if (!id) { id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,14)}`; localStorage.setItem(visitorStorageKey, id); }
       return id;
     };
-    const renderIcon = (isSaved) => {
-      const icon = button.querySelector('.sai-wishlist__icon');
-      if (buttonSettings.buttonMode === 'custom-svg' && buttonSettings.customSvg) icon.innerHTML = buttonSettings.customSvg;
-      else icon.textContent = isSaved ? '♥' : '♡';
-      button.querySelector('.sai-wishlist__label').hidden = (buttonSettings.buttonMode === 'icon-only');
-    };
     const updateView = (isSaved) => {
       button.classList.toggle('is-active', isSaved);
-      renderIcon(isSaved);
-      button.querySelector('.sai-wishlist__label').textContent = isSaved ? 'Saved' : 'Add to wishlist';
+      // CSS handles icon via .is-active — just update the label
+      const label = button.querySelector('.sai-wishlist__label');
+      if (label) label.textContent = isSaved ? 'Saved' : 'Add to wishlist';
+      button.setAttribute('aria-label', isSaved ? 'Saved' : 'Add to wishlist');
     };
     const refresh = () => updateView(getWishlist().some((i) => String(i.id) === String(productId)));
 
@@ -116,6 +111,13 @@
         return persistLocal(operation, item);
       }
       const res = await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item }) });
+      // Handle monthly limit reached
+      if (res.status === 429) {
+        const d = await res.json().catch(() => ({}));
+        if (operation !== 'add') return getWishlist();
+        announce(d.error || 'Monthly wishlist limit reached. Upgrade your plan.');
+        return getWishlist();
+      }
       if (!res.ok) { customerAuthenticated = false; return persistLocal(operation, item); }
       const data = await res.json();
       if (!Array.isArray(data.items)) { customerAuthenticated = false; return sync(operation, item); }
@@ -133,9 +135,9 @@
         if (!res || !res.ok) { refresh(); return; }
         const data = await res.json();
         customerAuthenticated = data.authenticated === true;
-        if (data.settings) buttonSettings = { ...buttonSettings, ...data.settings };
         if (!data.authenticated || !Array.isArray(data.items)) { refresh(); return; }
         let synced = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
+        // Merge any local guest items into server
         for (const item of getWishlist()) {
           if (!synced.some((s) => String(s.id) === String(item.id))) {
             const merged = await sync('add', { productId: item.id, productHandle: item.handle, productTitle: item.title, productImage: item.image, productPrice: item.price });
