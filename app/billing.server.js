@@ -17,7 +17,7 @@ const APP_SUBSCRIPTION_CREATE = `#graphql
   mutation AppSubscriptionCreate(
     $name: String!
     $lineItems: [AppSubscriptionLineItemInput!]!
-    $returnUrl: String!
+    $returnUrl: URL!
     $trialDays: Int
     $test: Boolean
   ) {
