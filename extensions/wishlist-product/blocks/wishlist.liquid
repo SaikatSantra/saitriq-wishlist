@@ -1,22 +1,29 @@
 {% comment %}CSS loaded globally by the Saitriq Wishlist app embed block{% endcomment %}
 {% assign product_for_wishlist = block.settings.product | default: product %}
 
-<div data-sai-wishlist>
-  <button
-    type="button"
-    class="sai-wishlist"
-    data-sai-wishlist-button
-    data-product-id="{{ product_for_wishlist.id }}"
-    data-product-handle="{{ product_for_wishlist.handle }}"
-    data-product-title="{{ product_for_wishlist.title | escape }}"
-    data-product-image="{{ product_for_wishlist.featured_image | image_url: width: 600 | escape }}"
-    data-product-price="{{ product_for_wishlist.price | money | escape }}"
-    data-block-id="{{ block.id }}"
-  >
-    <span class="sai-wishlist__icon" aria-hidden="true">♡</span>
-    <span class="sai-wishlist__label">Add to wishlist</span>
-  </button>
-</div>
+{%- comment -%}
+  Button is inside a <template> — invisible until JS clones it.
+  When app embed is disabled, window.saitriqEmbedEnabled is never set
+  and the JS exits immediately, so nothing ever appears in the DOM.
+{%- endcomment -%}
+<template data-sai-wishlist-tpl>
+  <div data-sai-wishlist>
+    <button
+      type="button"
+      class="sai-wishlist"
+      data-sai-wishlist-button
+      data-product-id="{{ product_for_wishlist.id }}"
+      data-product-handle="{{ product_for_wishlist.handle }}"
+      data-product-title="{{ product_for_wishlist.title | escape }}"
+      data-product-image="{{ product_for_wishlist.featured_image | image_url: width: 600 | escape }}"
+      data-product-price="{{ product_for_wishlist.price | money | escape }}"
+      data-block-id="{{ block.id }}"
+    >
+      <span class="sai-wishlist__icon" aria-hidden="true">♡</span>
+      <span class="sai-wishlist__label">Add to wishlist</span>
+    </button>
+  </div>
+</template>
 
 <script>
   (() => {
@@ -25,9 +32,15 @@
     const visitorStorageKey = 'saitriq_wishlist_visitor';
     const syncEndpoint = '/apps/saitriq-wishlist';
     const script = document.currentScript;
-    const block = script && script.previousElementSibling;
-    const button = block && block.querySelector('[data-sai-wishlist-button]');
 
+    // Clone button from <template> and insert it before the script tag
+    const tpl = script && script.previousElementSibling;
+    if (!tpl || tpl.tagName !== 'TEMPLATE') return;
+    const clone = tpl.content.cloneNode(true);
+    tpl.parentNode.insertBefore(clone, script);
+
+    const block = script.previousElementSibling; // now the cloned <div data-sai-wishlist>
+    const button = block && block.querySelector('[data-sai-wishlist-button]');
     if (!button) return;
 
     const announce = (message) => {

@@ -1,6 +1,6 @@
 {% comment %}CSS loaded globally by the Saitriq Wishlist app embed block{% endcomment %}
 
-<section class="sai-wishlist-page" data-sai-wishlist-page>
+<section class="sai-wishlist-page" data-sai-wishlist-page hidden>
   <div class="sai-wishlist-page__header">
     <h2>{{ block.settings.heading }}</h2>
     <div class="sai-wishlist-page__actions">
@@ -41,8 +41,7 @@
     const visitorStorageKey = 'saitriq_wishlist_visitor';
     const syncEndpoint = '/apps/saitriq-wishlist';
     let localRevision = 0;
-    let customerAuthenticated = false;
-    let settings = {
+    let customerAuthenticated = false;    let settings = {
       heading: '{{ block.settings.heading | escape }}',
       emptyMessage: '{{ block.settings.empty_message | escape }}',
       columns: {{ block.settings.columns | default: 4 }},
@@ -55,6 +54,7 @@
     const script = document.currentScript;
     const page = script && script.previousElementSibling;
     if (!page) return;
+    page.hidden = false; // reveal — embed is confirmed enabled
 
     const itemsContainer = page.querySelector('[data-sai-wishlist-items]');
     const emptyMessage = page.querySelector('[data-sai-wishlist-empty]');
