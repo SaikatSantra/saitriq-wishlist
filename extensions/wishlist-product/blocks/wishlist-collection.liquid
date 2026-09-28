@@ -212,11 +212,15 @@
       const attach = async (link) => {
         const handle = handleFromLink(link);
         const card = link.closest('li, article, .card, .product-card, [class*="product-card"]');
-        if (!handle || !card || card.querySelector('[data-sai-collection-wishlist]')) return;
+        // Guard: skip if no handle, no card, or already attached/pending
+        if (!handle || !card || card.dataset.saiWishlistAttaching || card.querySelector('[data-sai-collection-wishlist]')) return;
+
+        // Mark as pending immediately — prevents duplicate attach() on same card
+        card.dataset.saiWishlistAttaching = '1';
 
         // Clone the Liquid-rendered template — keeps all Liquid settings
         const button = tpl.content.cloneNode(true).querySelector('[data-sai-collection-wishlist]');
-        if (!button) return;
+        if (!button) { delete card.dataset.saiWishlistAttaching; return; }
 
         card.style.position = 'relative';
         card.append(button);
@@ -243,6 +247,7 @@
           });
         } catch (err) {
           button.remove();
+          delete card.dataset.saiWishlistAttaching;
           console.error('Collection wishlist product lookup failed', err);
         }
       };
@@ -276,6 +281,9 @@
       // ── Scan + observe DOM ────────────────────────────────────────────────
       const scan = () => productLinks().forEach(attach);
 
+      // Scan immediately so buttons appear without waiting for auth
+      scan();
+      // Auth runs in parallel — re-scan after so saved state is correct
       detectAuthentication().finally(scan);
       new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
 

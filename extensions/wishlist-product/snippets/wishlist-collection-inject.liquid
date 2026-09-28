@@ -204,11 +204,14 @@
         'li', 'article', '.card', '.product-card', '.grid__item',
         '[class*="product-card"]', '[class*="product-item"]', '[class*="card--product"]'
       ].join(','));
-      if (!card || card.querySelector('[data-sai-collection-wishlist]')) return;
+      // Guard: skip if no card, or already attached/pending
+      if (!card || card.dataset.saiWishlistAttaching || card.querySelector('[data-sai-collection-wishlist]')) return;
 
-      // Clone the Liquid-rendered template — no innerHTML injection
+      // Mark as pending immediately — prevents race condition on async fetch
+      card.dataset.saiWishlistAttaching = '1';
+
       const btn = tpl.content.cloneNode(true).querySelector('[data-sai-collection-wishlist]');
-      if (!btn) return;
+      if (!btn) { delete card.dataset.saiWishlistAttaching; return; }
 
       card.style.position = card.style.position || 'relative';
       card.append(btn);
@@ -234,6 +237,7 @@
         });
       } catch {
         btn.remove();
+        delete card.dataset.saiWishlistAttaching;
       }
     };
 
@@ -245,6 +249,13 @@
         .forEach((link) => attach(link));
     };
 
+    // Scan immediately — buttons appear without waiting for auth
+    scan();
+    // Auth runs in parallel — re-scan after so saved state is correct
+    detectAuth().finally(scan);
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('storage', (e) => { if (e.key === storageKey) scan(); });
+
     // Re-render all buttons when wishlist changes
     window.addEventListener('saitriq:wishlist-updated', () => {
       document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn) => {
@@ -255,9 +266,5 @@
         if (handle && productCache.has(handle)) renderButton(btn, productCache.get(handle).productId);
       });
     });
-
-    detectAuth().finally(scan);
-    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('storage', (e) => { if (e.key === storageKey) scan(); });
   })();
 </script>
