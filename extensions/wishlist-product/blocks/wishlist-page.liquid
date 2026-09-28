@@ -36,7 +36,16 @@
 
 <script>
   (() => {
-    if (!window.saitriqEmbedEnabled) return; // app embed must be enabled in Theme Editor
+    // Capture currentScript synchronously — it's null inside async callbacks
+    const _script = document.currentScript;
+
+    // Wait for embed block — handles both execution orders
+    const whenEmbedReady = (fn) => {
+      if (window.saitriqEmbedEnabled) { fn(); return; }
+      document.addEventListener('saitriq:embed-ready', fn, { once: true });
+    };
+
+    whenEmbedReady(() => {
     const storageKey = 'saitriq_wishlist';
     const visitorStorageKey = 'saitriq_wishlist_visitor';
     const syncEndpoint = '/apps/saitriq-wishlist';
@@ -51,7 +60,7 @@
       cardClass: 'sai-wishlist-page__item',
       customCss: ''
     };
-    const script = document.currentScript;
+    const script = _script;
     const page = script && script.previousElementSibling;
     if (!page) return;
     page.hidden = false; // reveal — embed is confirmed enabled
@@ -400,6 +409,7 @@
     window.addEventListener('storage', (event) => {
       if (event.key === storageKey) render();
     });
+    }); // end whenEmbedReady
   })();
 </script>
 

@@ -4,14 +4,26 @@
 
 <script>
   (() => {
-    if (!window.saitriqEmbedEnabled) return; // app embed must be enabled in Theme Editor
+    // Capture currentScript synchronously — it's null inside async callbacks
+    const _script = document.currentScript;
+
+    // Wait for the embed block to set saitriqEmbedEnabled.
+    // Handles both cases: embed already ran, or runs after this block.
+    const whenEmbedReady = (fn) => {
+      if (window.saitriqEmbedEnabled) { fn(); return; }
+      document.addEventListener('saitriq:embed-ready', fn, { once: true });
+    };
+
+    whenEmbedReady(() => {
     const storageKey = 'saitriq_wishlist';
     const visitorStorageKey = 'saitriq_wishlist_visitor';
     const endpoint = '/apps/saitriq-wishlist';
     let customerAuthenticated = false;
-    const root = document.currentScript && document.currentScript.previousElementSibling;
+    const root = _script && _script.parentElement
+      && _script.parentElement.querySelector('[data-sai-wishlist-collection]');
     if (!root || window.saitriqWishlistCollectionLoaded) return;
     window.saitriqWishlistCollectionLoaded = true;
+    root.hidden = false;
 
     const readItems = () => {
       try {
@@ -217,6 +229,7 @@
         if (handle && productData._cache.has(handle)) render(btn, productData._cache.get(handle));
       });
     });
+    }); // end whenEmbedReady
   })();
 </script>
 

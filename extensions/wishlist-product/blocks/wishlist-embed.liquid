@@ -22,7 +22,10 @@
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
 
 <script>
+  // Set the global flag — all wishlist blocks wait for this before activating
   window.saitriqEmbedEnabled = true;
+  // Dispatch event for any blocks that loaded before this embed script ran
+  document.dispatchEvent(new CustomEvent('saitriq:embed-ready'));
 </script>
 
 {% schema %}

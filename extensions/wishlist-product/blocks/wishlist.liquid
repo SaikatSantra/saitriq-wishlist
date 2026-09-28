@@ -27,19 +27,27 @@
 
 <script>
   (() => {
-    if (!window.saitriqEmbedEnabled) return; // app embed must be enabled in Theme Editor
+    // Capture currentScript synchronously — it's null inside async callbacks
+    const _script = document.currentScript;
+
+    // Wait for embed block — handles both execution orders
+    const whenEmbedReady = (fn) => {
+      if (window.saitriqEmbedEnabled) { fn(); return; }
+      document.addEventListener('saitriq:embed-ready', fn, { once: true });
+    };
+
+    whenEmbedReady(() => {
     const storageKey = 'saitriq_wishlist';
     const visitorStorageKey = 'saitriq_wishlist_visitor';
     const syncEndpoint = '/apps/saitriq-wishlist';
-    const script = document.currentScript;
 
     // Clone button from <template> and insert it before the script tag
-    const tpl = script && script.previousElementSibling;
+    const tpl = _script && _script.previousElementSibling;
     if (!tpl || tpl.tagName !== 'TEMPLATE') return;
     const clone = tpl.content.cloneNode(true);
-    tpl.parentNode.insertBefore(clone, script);
+    tpl.parentNode.insertBefore(clone, _script);
 
-    const block = script.previousElementSibling; // now the cloned <div data-sai-wishlist>
+    const block = _script.previousElementSibling; // now the cloned <div data-sai-wishlist>
     const button = block && block.querySelector('[data-sai-wishlist-button]');
     if (!button) return;
 
@@ -294,6 +302,7 @@
     window.addEventListener('storage', (event) => {
       if (event.key === storageKey) refresh();
     });
+    }); // end whenEmbedReady
   })();
 </script>
 
