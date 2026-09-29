@@ -146,6 +146,13 @@ npx prisma migrate resolve --applied 20260920153143_init
 npm exec prisma migrate deploy
 ```
 
+```
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
 Only use `--applied` when the existing tables match the migration. For a
 different or incomplete schema, stop and inspect the database before changing
 migration history.
