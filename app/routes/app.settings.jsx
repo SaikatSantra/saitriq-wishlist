@@ -5,7 +5,6 @@ import prisma from "../db.server";
 const defaults = {
   heading:        "My wishlist",
   emptyMessage:   "You have not saved any products yet.",
-  columns:        4,
   showPrices:     true,
   showRemove:     true,
   buttonLabel:    "Remove",
@@ -37,10 +36,7 @@ export const action = async ({ request }) => {
     emptyMessage: String(
       formData.get("emptyMessage") || defaults.emptyMessage
     ).trim(),
-    columns: Math.min(
-      6,
-      Math.max(2, Number(formData.get("columns")) || 4)
-    ),
+    
     showPrices: formData.get("showPrices") === "on",
     showRemove: formData.get("showRemove") === "on",
     buttonLabel: String(
@@ -127,18 +123,7 @@ export default function WishlistSettingsPage() {
                 helpText="Shown when the customer has no saved products."
               />
 
-              <s-select
-                label="Grid columns"
-                name="columns"
-                value={String(settings.columns)}
-                helpText="Choose how many products appear in each row."
-              >
-                {[2, 3, 4, 5, 6].map((n) => (
-                  <s-option key={n} value={String(n)}>
-                    {n}
-                  </s-option>
-                ))}
-              </s-select>
+              
 
               <s-checkbox
                 label="Show product prices"

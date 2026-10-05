@@ -155,7 +155,6 @@ export const loader = async ({ request }) => {
         settings: settings || {
           heading: "My wishlist",
           emptyMessage: "You have not saved any products yet.",
-          columns: 4,
           showPrices: true,
           showRemove: true,
           buttonLabel: "Remove",
