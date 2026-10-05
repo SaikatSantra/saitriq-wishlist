@@ -1,0 +1,19 @@
+.sai-wishlist-page__item img {
+  aspect-ratio: var(--sai-image-ratio, 1);
+}
+
+.sai-wishlist-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.sai-wishlist-page__header .wislist-page-title {
+  margin: 0;
+  padding: 0;
+}
+
+.sai-wishlist-page {
+  padding-block: var(--padding-block-start) var(--padding-block-end);
+}

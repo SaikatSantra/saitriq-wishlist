@@ -74,7 +74,6 @@ export default function ApiDocsPage() {
   "settings": {
     "heading": "My wishlist",
     "emptyMessage": "You have not saved any products yet.",
-    "columns": 4,
     "showPrices": true,
     "showRemove": true,
     "buttonLabel": "Remove",
@@ -563,7 +562,7 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
     const showPrices    = settings.showPrices   !== false;
     const showRemove    = settings.showRemove   !== false;
     const buttonLabel   = settings.buttonLabel  || 'Remove';
-    const columns       = settings.columns      || 4;
+    
 
     if (items.length === 0) {
       container.innerHTML = \`<p class="sai-wishlist-page__empty">\${esc(emptyMessage)}</p>\`;
@@ -572,7 +571,6 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
 
     const grid = document.createElement('ul');
     grid.className = 'sai-wishlist-page__items';
-    grid.style.setProperty('--sai-wishlist-columns', columns);
 
     items.forEach((item) => {
       const li = document.createElement('li');
