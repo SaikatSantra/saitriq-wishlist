@@ -1,4 +1,4 @@
-# Saitriq Wishlist
+# Silverclouding Wishlist
 
 Production wishlist app for Shopify stores. It provides theme app blocks for
 product and collection pages, a customer wishlist page, header navigation,
@@ -29,7 +29,7 @@ monthly usage limit.
 - Run `npm exec prisma migrate deploy` against a persistent production database.
 - Use a shared production database for more than one app instance; the default
   SQLite database is suitable only for a single persistent instance.
-- Configure the app proxy route `/apps/saitriq-wishlist` in the Shopify app.
+- Configure the app proxy route `/apps/silverclouding-wishlist` in the Shopify app.
 - Test guest add/remove, customer login sync, theme blocks, custom SVG
   sanitization, and app-proxy requests on a development store before review.
 - Provide a privacy policy, support contact, and accurate App Store listing

@@ -4,7 +4,7 @@ export default function ApiDocsPage() {
 
       <s-section heading="Overview">
         <s-paragraph>
-          Saitriq Wishlist exposes two API surfaces. The <strong>Storefront API</strong> runs
+          Silverclouding Wishlist exposes two API surfaces. The <strong>Storefront API</strong> runs
           through the Shopify app proxy and is callable from any storefront JavaScript.
           The <strong>Admin API</strong> runs inside the embedded app and is intended for
           server-side integrations, custom dashboards, or headless storefronts.
@@ -17,7 +17,7 @@ export default function ApiDocsPage() {
           Base URL (from any storefront page):
         </s-paragraph>
         <s-banner tone="info">
-          <code>https://yourstore.myshopify.com/apps/saitriq-wishlist</code>
+          <code>https://yourstore.myshopify.com/apps/silverclouding-wishlist</code>
         </s-banner>
         <s-paragraph>
           All requests are authenticated automatically by Shopify via HMAC signing
@@ -29,7 +29,7 @@ export default function ApiDocsPage() {
         <s-section heading="GET ?api=items — Customer wishlist">
           <s-paragraph>Returns all saved items for the currently logged-in customer.</s-paragraph>
           <s-banner tone="info">
-            <code>GET /apps/saitriq-wishlist?api=items</code>
+            <code>GET /apps/silverclouding-wishlist?api=items</code>
           </s-banner>
           <s-paragraph>Response:</s-paragraph>
           <s-banner tone="info">
@@ -55,7 +55,7 @@ export default function ApiDocsPage() {
             Useful for rendering the button state server-side or in headless.
           </s-paragraph>
           <s-banner tone="info">
-            <code>GET /apps/saitriq-wishlist?api=check&amp;productId=123456789</code>
+            <code>GET /apps/silverclouding-wishlist?api=check&amp;productId=123456789</code>
           </s-banner>
           <s-paragraph>Response:</s-paragraph>
           <s-banner tone="info">
@@ -66,7 +66,7 @@ export default function ApiDocsPage() {
         <s-section heading="GET ?api=settings — Display settings">
           <s-paragraph>Returns the merchant's wishlist page and toast notification settings.</s-paragraph>
           <s-banner tone="info">
-            <code>GET /apps/saitriq-wishlist?api=settings</code>
+            <code>GET /apps/silverclouding-wishlist?api=settings</code>
           </s-banner>
           <s-paragraph>Response:</s-paragraph>
           <s-banner tone="info">
@@ -92,9 +92,9 @@ export default function ApiDocsPage() {
             Returns add/remove totals and daily history for the current or specified month.
           </s-paragraph>
           <s-banner tone="info">
-            <code>GET /apps/saitriq-wishlist?api=analytics</code>
+            <code>GET /apps/silverclouding-wishlist?api=analytics</code>
             <br />
-            <code>GET /apps/saitriq-wishlist?api=analytics&amp;month=2026-09</code>
+            <code>GET /apps/silverclouding-wishlist?api=analytics&amp;month=2026-09</code>
           </s-banner>
           <s-paragraph>Response:</s-paragraph>
           <s-banner tone="info">
@@ -114,7 +114,7 @@ export default function ApiDocsPage() {
         <s-section heading="GET ?api=usage — Monthly usage">
           <s-paragraph>Returns used, limit, and remaining saves for the current month.</s-paragraph>
           <s-banner tone="info">
-            <code>GET /apps/saitriq-wishlist?api=usage</code>
+            <code>GET /apps/silverclouding-wishlist?api=usage</code>
           </s-banner>
           <s-paragraph>Response:</s-paragraph>
           <s-banner tone="info">
@@ -129,7 +129,7 @@ export default function ApiDocsPage() {
 
           <s-section heading="Add a product">
             <s-banner tone="info">
-              <code>{`POST /apps/saitriq-wishlist
+              <code>{`POST /apps/silverclouding-wishlist
 Content-Type: application/json
 
 {
@@ -146,7 +146,7 @@ Content-Type: application/json
 
           <s-section heading="Remove a product">
             <s-banner tone="info">
-              <code>{`POST /apps/saitriq-wishlist
+              <code>{`POST /apps/silverclouding-wishlist
 Content-Type: application/json
 
 {
@@ -161,7 +161,7 @@ Content-Type: application/json
 
           <s-section heading="Clear all items">
             <s-banner tone="info">
-              <code>{`POST /apps/saitriq-wishlist
+              <code>{`POST /apps/silverclouding-wishlist
 Content-Type: application/json
 
 { "operation": "clear", "visitorId": "abc123" }`}</code>
@@ -190,7 +190,7 @@ Content-Type: application/json
           or via Shopify's token exchange for server-side apps).
         </s-paragraph>
         <s-banner tone="info">
-          <code>Base URL: https://saitriq-wishlist.vercel.app/app/api</code>
+          <code>Base URL: https://silverclouding-wishlist.vercel.app/app/api</code>
         </s-banner>
 
         <s-section heading="GET ?resource=items — Customer items">
@@ -294,7 +294,7 @@ Content-Type: application/json
           Fetch the customer's wishlist from any storefront page:
         </s-paragraph>
         <s-banner tone="info">
-          <code>{`const res = await fetch('/apps/saitriq-wishlist?api=items', {
+          <code>{`const res = await fetch('/apps/silverclouding-wishlist?api=items', {
   credentials: 'same-origin'
 });
 const { items } = await res.json();
@@ -305,7 +305,7 @@ console.log(items); // array of wishlist items`}</code>
         </s-paragraph>
         <s-banner tone="info">
           <code>{`const res = await fetch(
-  '/apps/saitriq-wishlist?api=check&productId=' + productId,
+  '/apps/silverclouding-wishlist?api=check&productId=' + productId,
   { credentials: 'same-origin' }
 );
 const { saved } = await res.json();
@@ -325,17 +325,17 @@ button.classList.toggle('is-saved', saved);`}</code>
         <s-section heading="1 — Core wishlist client (copy once into your theme JS)">
           <s-paragraph>
             Drop this once into your theme JavaScript. It exposes a
-            {" "}<code>window.SaitriqWishlist</code> object all other modules use.
+            {" "}<code>window.SilvercloudingWishlist</code> object all other modules use.
           </s-paragraph>
           <s-banner tone="info">
-            <code>{`// saitriq-wishlist.js
+            <code>{`// silverclouding-wishlist.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Core wishlist client — add once to your theme JS bundle
 // ─────────────────────────────────────────────────────────────────────────────
-window.SaitriqWishlist = (() => {
-  const STORAGE_KEY  = 'saitriq_wishlist';
-  const VISITOR_KEY  = 'saitriq_wishlist_visitor';
-  const ENDPOINT     = '/apps/saitriq-wishlist';
+window.SilvercloudingWishlist = (() => {
+  const STORAGE_KEY  = 'silverclouding_wishlist';
+  const VISITOR_KEY  = 'silverclouding_wishlist_visitor';
+  const ENDPOINT     = '/apps/silverclouding-wishlist';
 
   // ── localStorage ──────────────────────────────────────────────────────────
   const getItems = () => {
@@ -347,7 +347,7 @@ window.SaitriqWishlist = (() => {
 
   const setItems = (items) => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch {}
-    window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+    window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
   };
 
   const getVisitorId = () => {
@@ -462,8 +462,8 @@ window.SaitriqWishlist = (() => {
   const getSettings = () => _settings;
 
   /** Listen for wishlist changes */
-  const onChange = (fn) => window.addEventListener('saitriq:wishlist-updated', fn);
-  const offChange = (fn) => window.removeEventListener('saitriq:wishlist-updated', fn);
+  const onChange = (fn) => window.addEventListener('silverclouding:wishlist-updated', fn);
+  const offChange = (fn) => window.removeEventListener('silverclouding:wishlist-updated', fn);
 
   // Auto-sync on load
   sync();
@@ -494,7 +494,7 @@ function initWishlistButton(button) {
   const productPrice  = button.dataset.productPrice || '';
 
   const refresh = () => {
-    const saved = SaitriqWishlist.isSaved(productId);
+    const saved = SilvercloudingWishlist.isSaved(productId);
     button.classList.toggle('is-active', saved);
     button.setAttribute('aria-pressed', String(saved));
     button.textContent = saved ? '♥ Saved' : '♡ Save';
@@ -504,7 +504,7 @@ function initWishlistButton(button) {
     if (button.disabled) return;
     button.disabled = true;
     try {
-      await SaitriqWishlist.toggle({ productId, productHandle, productTitle, productImage, productPrice });
+      await SilvercloudingWishlist.toggle({ productId, productHandle, productTitle, productImage, productPrice });
     } catch (err) {
       console.error('Wishlist toggle failed', err);
     } finally {
@@ -512,7 +512,7 @@ function initWishlistButton(button) {
     }
   });
 
-  SaitriqWishlist.onChange(refresh);
+  SilvercloudingWishlist.onChange(refresh);
   refresh();
 }
 
@@ -530,10 +530,10 @@ document.querySelectorAll('[data-wishlist-btn]').forEach(initWishlistButton);`}<
           <s-banner tone="info">
             <code>{`function initWishlistCounter(el) {
   const update = () => {
-    el.textContent = SaitriqWishlist.getAll().length;
-    el.hidden = SaitriqWishlist.getAll().length === 0;
+    el.textContent = SilvercloudingWishlist.getAll().length;
+    el.hidden = SilvercloudingWishlist.getAll().length === 0;
   };
-  SaitriqWishlist.onChange(update);
+  SilvercloudingWishlist.onChange(update);
   update();
 }
 
@@ -556,8 +556,8 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
   };
 
   const render = () => {
-    const items    = SaitriqWishlist.getAll();
-    const settings = SaitriqWishlist.getSettings();
+    const items    = SilvercloudingWishlist.getAll();
+    const settings = SilvercloudingWishlist.getSettings();
     const heading       = settings.heading      || 'My wishlist';
     const emptyMessage  = settings.emptyMessage || 'No saved items yet.';
     const showPrices    = settings.showPrices   !== false;
@@ -588,7 +588,7 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
         </div>
       \`;
       li.querySelector('.sai-wishlist-page__remove')?.addEventListener('click', async () => {
-        await SaitriqWishlist.remove({ productId: item.id, productHandle: item.handle, productTitle: item.title });
+        await SilvercloudingWishlist.remove({ productId: item.id, productHandle: item.handle, productTitle: item.title });
       });
       grid.append(li);
     });
@@ -599,14 +599,14 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
       <button type="button" class="sai-wishlist-page__clear button">Clear all</button>
     \`;
     header.querySelector('.sai-wishlist-page__clear button').addEventListener('click', () => {
-      SaitriqWishlist.clear();
+      SilvercloudingWishlist.clear();
     });
 
     container.replaceChildren(header, grid);
   };
 
-  SaitriqWishlist.onChange(render);
-  SaitriqWishlist.sync().then(render);
+  SilvercloudingWishlist.onChange(render);
+  SilvercloudingWishlist.sync().then(render);
 }
 
 const wishlistPage = document.querySelector('[data-wishlist-page]');
@@ -648,7 +648,7 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
   const attach = async (link) => {
     const handle = handleFromLink(link);
     if (!handle) return;
-    const card = link.closest('li, article, .card, .product-card, .grid__item, [class*="product-item"]');
+    const card = link.closest('li, article, .card-wrapper, .product-card-wrapper, .card, .product-card, .grid__item, [class*="product-card"], [class*="product-item"], [class*="card--product"]');
     if (!card || card.querySelector('[data-sai-col-btn]')) return;
 
     const btn = document.createElement('button');
@@ -668,7 +668,7 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
     }
 
     const refresh = () => {
-      const saved = SaitriqWishlist.isSaved(item.productId);
+      const saved = SilvercloudingWishlist.isSaved(item.productId);
       btn.textContent = saved ? '♥' : '♡';
       btn.classList.toggle('is-active', saved);
       btn.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
@@ -679,18 +679,18 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
       e.stopPropagation();
       if (btn.disabled) return;
       btn.disabled = true;
-      try { await SaitriqWishlist.toggle(item); }
+      try { await SilvercloudingWishlist.toggle(item); }
       catch (err) { console.error('Collection wishlist failed', err); }
       finally { btn.disabled = false; }
     });
 
-    SaitriqWishlist.onChange(refresh);
+    SilvercloudingWishlist.onChange(refresh);
     refresh();
   };
 
   const scan = () => {
     [...document.querySelectorAll('a[href*="/products/"]')]
-      .filter((l, i, arr) => arr.findIndex((x) => handleFromLink(x) === handleFromLink(l)) === i)
+      .filter((l) => handleFromLink(l))
       .forEach(attach);
   };
 
@@ -710,20 +710,20 @@ document.addEventListener('DOMContentLoaded', initCollectionWishlist);`}</code>
           </s-paragraph>
           <s-banner tone="info">
             <code>{`// Fired whenever the wishlist changes (add, remove, clear, sync)
-window.addEventListener('saitriq:wishlist-updated', () => {
-  const items = SaitriqWishlist.getAll();
+window.addEventListener('silverclouding:wishlist-updated', () => {
+  const items = SilvercloudingWishlist.getAll();
   console.log('Wishlist updated, item count:', items.length);
 });
 
 // Fired when a toast notification should be shown
-window.addEventListener('saitriq:wishlist-toast', (event) => {
+window.addEventListener('silverclouding:wishlist-toast', (event) => {
   console.log('Toast message:', event.detail.message);
   // show your own toast / snackbar here
   myToast.show(event.detail.message);
 });
 
 // Dispatch manually to trigger a wishlist re-render from outside
-window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));`}</code>
+window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));`}</code>
           </s-banner>
         </s-section>
 
@@ -753,7 +753,7 @@ window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));`}</code>
 </a>
 
 <!-- At the bottom of theme.liquid, before </body> -->
-<script src="{{ 'saitriq-wishlist.js' | asset_url }}" defer></script>
+<script src="{{ 'silverclouding-wishlist.js' | asset_url }}" defer></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-wishlist-btn]').forEach(initWishlistButton);

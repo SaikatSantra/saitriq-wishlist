@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { currentUsage } from "../db.wishlist.server";
-import { getActivePlan, syncSubscriptionFromShopify, getMonthlyAddonSaves } from "../billing.server";
-import { monthlyLimit, getPlan } from "../plans";
+import { getPlanEntitlement, getMonthlyAddonSaves } from "../billing.server";
+import { getPlan } from "../plans";
 import { checkEmbedEnabled } from "../embed.server";
 
 export const loader = async ({ request }) => {
@@ -11,15 +11,16 @@ export const loader = async ({ request }) => {
   const shop = session.shop;
   const month = new Date().toISOString().slice(0, 7);
 
-  const [planId, used, embed, addonSaves] = await Promise.all([
-    syncSubscriptionFromShopify(admin, shop).catch(() => getActivePlan(shop)),
+  const [entitlement, used, embed, addonSaves] = await Promise.all([
+    getPlanEntitlement(shop, month, admin),
     currentUsage(shop, month),
     checkEmbedEnabled(admin),
     getMonthlyAddonSaves(shop, month),
   ]);
 
+  const planId = entitlement.planId;
   const plan = getPlan(planId);
-  const limit = monthlyLimit(planId);
+  const limit = entitlement.planLimit;
   const effLimit = Number.isFinite(limit) ? limit + addonSaves : Infinity;
 
   return {
@@ -49,11 +50,11 @@ export const shouldRevalidate = () => true;
 const FAQ_ITEMS = [
   {
     q: "Will this app slow down my site or break my theme?",
-    a: "No. Saitriq Wishlist loads asynchronously — the heart buttons and wishlist page render after your theme and product images. The app uses localStorage for instant UI updates with no blocking network calls on page load. It has been tested with Dawn, Sense, Debut, Brooklyn, Craft, and other popular themes.",
+    a: "No. Silverclouding Wishlist loads asynchronously — the heart buttons and wishlist page render after your theme and product images. The app uses localStorage for instant UI updates with no blocking network calls on page load. It has been tested with Dawn, Sense, Debut, Brooklyn, Craft, and other popular themes.",
   },
   {
     q: "How easy is it to install and customize the button to match my brand?",
-    a: "For OS 2.0 themes (Dawn, Sense, Craft, etc.) installation takes under 2 minutes — open Theme Editor, add the Saitriq Wishlist app block, save. No code required. You can customize the button style (icon only, icon + text, or your own SVG), the remove button label, grid columns, and inject custom CSS — all from the Page design settings page.",
+    a: "For OS 2.0 themes (Dawn, Sense, Craft, etc.) installation takes under 2 minutes — open Theme Editor, add the Silverclouding Wishlist app block, save. No code required. You can customize the button style (icon only, icon + text, or your own SVG), the remove button label, grid columns, and inject custom CSS — all from the Page design settings page.",
   },
   {
     q: "Is a credit card required for the trial, and will I be charged automatically?",
@@ -61,11 +62,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "Will you help my developer with custom code, APIs, or conflicts?",
-    a: "Yes. Saitriq Wishlist ships with a full Developer API accessible from the storefront at /apps/saitriq-wishlist. The Developer API page in this app documents every endpoint with copy-paste JavaScript examples. For custom integrations, conflicts, or theme-specific issues on paid plans, contact us and we will respond within 24 hours.",
+    a: "Yes. Silverclouding Wishlist ships with a full Developer API accessible from the storefront at /apps/silverclouding-wishlist. The Developer API page in this app documents every endpoint with copy-paste JavaScript examples. For custom integrations, conflicts, or theme-specific issues on paid plans, contact us and we will respond within 24 hours.",
   },
   {
-    q: "Does Saitriq Wishlist integrate with marketing apps like Klaviyo or Mailchimp?",
-    a: "Wishlist data is accessible via the API at /apps/saitriq-wishlist?api=items. Any marketing tool that can read a JSON endpoint can pull your customers' saved products. Server-to-server access is available via the Admin API at /app/api — see the Developer API page for full documentation.",
+    q: "Does Silverclouding Wishlist integrate with marketing apps like Klaviyo or Mailchimp?",
+    a: "Wishlist data is accessible via the API at /apps/silverclouding-wishlist?api=items. Any marketing tool that can read a JSON endpoint can pull your customers' saved products. Server-to-server access is available via the Admin API at /app/api — see the Developer API page for full documentation.",
   },
   {
     q: "How do I know the app is actually driving sales?",
@@ -114,7 +115,7 @@ export default function WishlistDashboard() {
     : 0;
 
   return (
-    <s-page heading="Saitriq Wishlist">
+    <s-page heading="Silverclouding Wishlist">
 
       {/* ── Hero callout ── */}
       <s-section>
@@ -217,9 +218,16 @@ export default function WishlistDashboard() {
         )}
         {embed.enabled === true && (
           <s-banner tone="success" heading="App embed is enabled">
-            The Saitriq Wishlist embed is active on{" "}
+            The Silverclouding Wishlist embed is active on{" "}
             <strong>{embed.themeName ?? "your theme"}</strong>.
             Shoppers can see the wishlist buttons on your storefront.
+          </s-banner>
+        )}
+        {embed.enabled === null && (
+          <s-banner tone="warning" heading="App embed status could not be verified">
+            We could not read your theme settings. If you have already enabled the app embed
+            in Theme Editor, your storefront should be working.{" "}
+            <s-link href="javascript:window.location.reload()">Refresh to check again</s-link>
           </s-banner>
         )}
 
@@ -231,7 +239,7 @@ export default function WishlistDashboard() {
                 <s-heading>App embed</s-heading>
                 {embed.enabled === true && <s-badge tone="success">Enabled</s-badge>}
                 {embed.enabled === false && <s-badge tone="critical">Not enabled</s-badge>}
-                {embed.enabled === null && <s-badge tone="neutral">Unknown</s-badge>}
+                {embed.enabled === null && <s-badge tone="attention">Check Theme Editor</s-badge>}
               </s-stack>
               <s-paragraph>
                 The app embed loads the wishlist CSS globally and activates the heart button
@@ -241,9 +249,9 @@ export default function WishlistDashboard() {
               <s-button
                 href={`https://${shop}/admin/themes/current/editor?context=apps`}
                 target="_blank"
-                variant={embed.enabled ? "secondary" : "primary"}
+                variant={embed.enabled === true ? "secondary" : "primary"}
               >
-                {embed.enabled ? "Manage in Theme Editor" : "Enable in Theme Editor"}
+                {embed.enabled === true ? "Manage in Theme Editor" : "Open App Embeds"}
               </s-button>
             </s-grid>
           </s-box>
@@ -345,7 +353,7 @@ export default function WishlistDashboard() {
                 We respond to all support requests within 24 hours.
               </s-paragraph>
               <s-button
-                href="mailto:info@saitriq.com"
+                href="mailto:support@silverclouding.com"
                 variant="secondary"
               >
                 Contact support

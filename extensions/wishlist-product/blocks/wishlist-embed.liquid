@@ -1,65 +1,89 @@
-{% comment %}
-  Saitriq Wishlist — App Embed block
-  ─────────────────────────────────────────────────────────────────────────────
-  Master ON/OFF switch for the entire wishlist app.
-
-  Merchants enable/disable from:
-    Online Store → Themes → Customize → App embeds → Saitriq Wishlist
-
-  When ENABLED:
-    - Loads wishlist.css globally
-    - Fetches merchant settings from the app proxy
-    - Injects CSS custom properties for toast appearance onto :root
-    - Sets window.saitriqEmbedEnabled = true
-    - All wishlist blocks check this flag before activating
-
-  When DISABLED:
-    - Nothing is rendered, no JS runs, no CSS loads
-{% endcomment %}
-
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
 
 <script>
   (() => {
-    const endpoint = '/apps/saitriq-wishlist';
+    const endpoint = '/apps/silverclouding-wishlist';
 
-    // Apply toast CSS custom properties from merchant settings
     const applyToastSettings = (settings) => {
       if (!settings) return;
       const root = document.documentElement;
 
-      // Colors
       if (settings.toastBg)    root.style.setProperty('--sai-toast-bg',    settings.toastBg);
       if (settings.toastColor) root.style.setProperty('--sai-toast-color', settings.toastColor);
 
-      // Position — map to CSS values
       const pos = settings.toastPosition || 'top-left';
       root.style.setProperty('--sai-toast-top',    pos.startsWith('top')    ? '1rem' : 'auto');
       root.style.setProperty('--sai-toast-bottom', pos.startsWith('bottom') ? '1rem' : 'auto');
       root.style.setProperty('--sai-toast-left',   pos.endsWith('left')     ? '1rem' : 'auto');
       root.style.setProperty('--sai-toast-right',  pos.endsWith('right')    ? '1rem' : 'auto');
 
-      // Slide direction — slide from the edge it appears on
       const slideY = pos.startsWith('top') ? '-0.5rem' : '0.5rem';
       root.style.setProperty('--sai-toast-slide', slideY);
     };
 
-    // Fetch settings and apply, then activate embed
+    const initWishlistToast = () => {
+      if (window.silvercloudingWishlistToastReady) return;
+      window.silvercloudingWishlistToastReady = true;
+
+      const showToast = (detail = {}) => {
+        const { message, image, title } = detail;
+        if (!message) return;
+
+        let toast = document.querySelector('[data-sai-wishlist-toast]');
+        if (!toast) {
+          toast = document.createElement('div');
+          toast.dataset.saiWishlistToast = '';
+          toast.className = 'sai-wishlist__toast';
+          toast.setAttribute('role', 'status');
+          toast.setAttribute('aria-live', 'polite');
+          document.body.append(toast);
+        }
+
+        if (image || title) {
+          toast.innerHTML = `
+            <div class="sai-wishlist__toast-inner">
+              ${image ? `<img class="sai-wishlist__toast-img" src="${image}" alt="" aria-hidden="true">` : ''}
+              <div class="sai-wishlist__toast-body">
+                <span class="sai-wishlist__toast-label">${message}</span>
+                ${title ? `<span class="sai-wishlist__toast-title">${title}</span>` : ''}
+              </div>
+            </div>
+          `;
+        } else {
+          toast.textContent = message;
+        }
+
+        toast.classList.add('is-visible');
+        clearTimeout(window.silvercloudingWishlistToastTimer);
+        window.silvercloudingWishlistToastTimer = setTimeout(() => {
+          toast.classList.remove('is-visible');
+        }, 2200);
+      };
+
+      window.silvercloudingWishlistToast = showToast;
+      window.addEventListener('silverclouding:wishlist-toast', (event) => {
+        if (event.detail?.message) {
+          showToast(event.detail);
+        }
+      });
+    };
+
+    initWishlistToast();
+
     fetch(`${endpoint}?api=settings`, { credentials: 'same-origin' })
       .then((r) => r.ok ? r.json() : {})
       .then((data) => applyToastSettings(data.settings))
       .catch(() => {})
       .finally(() => {
-        // Always activate — even if settings fetch fails
-        window.saitriqEmbedEnabled = true;
-        document.dispatchEvent(new CustomEvent('saitriq:embed-ready'));
+        window.silvercloudingEmbedEnabled = true;
+        document.dispatchEvent(new CustomEvent('silverclouding:embed-ready'));
       });
   })();
 </script>
 
 {% schema %}
 {
-  "name": "App Control",
+  "name": "Wishlist Settings",
   "target": "body",
   "settings": []
 }

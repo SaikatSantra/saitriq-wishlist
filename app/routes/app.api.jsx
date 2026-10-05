@@ -32,8 +32,11 @@ import {
   getAnalyticsHistory,
   currentUsage,
 } from "../db.wishlist.server";
-import { getActivePlan } from "../billing.server";
-import { monthlyLimit } from "../plans";
+import {
+  getMonthlyAddonSaves,
+  getPlanEntitlement,
+  monthKey,
+} from "../billing.server";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,7 +50,8 @@ const json = (data, init = {}) =>
     },
   });
 
-const monthKey = () => new Date().toISOString().slice(0, 7);
+const effectiveLimit = (planLimit, addonSaves) =>
+  Number.isFinite(planLimit) ? planLimit + addonSaves : Infinity;
 
 const readPayload = async (request) => {
   try {
@@ -123,13 +127,14 @@ export const loader = async ({ request }) => {
 
     // ── GET analytics for a month ──────────────────────────────────────────
     case "analytics": {
-      const [totals, history, used, planId] = await Promise.all([
+      const [totals, history, used, entitlement, addonSaves] = await Promise.all([
         getAnalytics(shop, month),
         getAnalyticsHistory(shop, month),
         currentUsage(shop, month),
-        getActivePlan(shop),
+        getPlanEntitlement(shop, month),
+        getMonthlyAddonSaves(shop, month),
       ]);
-      const limit = monthlyLimit(planId);
+      const limit = effectiveLimit(entitlement.planLimit, addonSaves);
       return json({
         month,
         adds: totals.adds,
@@ -164,11 +169,12 @@ export const loader = async ({ request }) => {
 
     // ── GET current usage ──────────────────────────────────────────────────
     case "usage": {
-      const [used, planId] = await Promise.all([
+      const [used, entitlement, addonSaves] = await Promise.all([
         currentUsage(shop, month),
-        getActivePlan(shop),
+        getPlanEntitlement(shop, month),
+        getMonthlyAddonSaves(shop, month),
       ]);
-      const limit = monthlyLimit(planId);
+      const limit = effectiveLimit(entitlement.planLimit, addonSaves);
       return json({
         month,
         used,
@@ -194,7 +200,7 @@ export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
   const payload = await readPayload(request);
-  const { resource, operation, customerId, productId, productHandle, productTitle, productImage, productPrice } = payload;
+  const { resource, operation, customerId, productId, variantId, variantTitle, productHandle, productTitle, productImage, productPrice } = payload;
 
   if (resource !== "item") {
     return json({ error: "resource must be 'item'." }, { status: 400 });
@@ -204,7 +210,6 @@ export const action = async ({ request }) => {
   }
 
   const month = monthKey();
-  const limit = monthlyLimit("free");
 
   try {
     // ── clear ──────────────────────────────────────────────────────────────
@@ -219,11 +224,12 @@ export const action = async ({ request }) => {
 
     // ── add ────────────────────────────────────────────────────────────────
     if (operation === "add") {
-      const [used, planId] = await Promise.all([
+      const [used, entitlement, addonSaves] = await Promise.all([
         currentUsage(shop, month),
-        getActivePlan(shop),
+        getPlanEntitlement(shop, month),
+        getMonthlyAddonSaves(shop, month),
       ]);
-      const limit = monthlyLimit(planId);
+      const limit = effectiveLimit(entitlement.planLimit, addonSaves);
       if (Number.isFinite(limit) && used >= limit) {
         return json(
           { error: "Monthly wishlist limit reached.", used, limit },
@@ -232,6 +238,8 @@ export const action = async ({ request }) => {
       }
       const result = await upsertWishlistItem(shop, customerId, {
         productId: String(productId),
+        variantId: String(variantId || ""),
+        variantTitle: variantTitle || null,
         productHandle: String(productHandle || productId),
         productTitle: String(productTitle || productHandle || productId),
         productImage: productImage || null,
@@ -244,7 +252,7 @@ export const action = async ({ request }) => {
 
     // ── remove ─────────────────────────────────────────────────────────────
     if (operation === "remove") {
-      const removed = await deleteWishlistItem(shop, customerId, String(productId));
+      const removed = await deleteWishlistItem(shop, customerId, String(productId), String(variantId || ""));
       if (removed) await recordAnalytics(shop, { removes: 1 }).catch(() => {});
       const items = await listCustomerWishlistItems(shop, customerId);
       return json({ operation: "remove", removed, items });

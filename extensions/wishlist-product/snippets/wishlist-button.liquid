@@ -1,16 +1,7 @@
-{% comment %}
-  Saitriq Wishlist — Product page button (manual install)
-  -------------------------------------------------------
-  Paste this line anywhere inside your product template
-  (e.g. product.liquid, main-product.liquid, product-form.liquid):
-
-    {% render 'wishlist-button' %}
-
-  The snippet auto-reads the `product` object from the template context.
-  Pass a custom product if needed:
-
-    {% render 'wishlist-button', product: product %}
-{% endcomment %}
+{% doc %}
+Renders a wishlist toggle for a product.
+@param {product} [product]
+{% enddoc %}
 
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
 
@@ -26,7 +17,7 @@
     data-product-title="{{ wp.title | escape }}"
     data-product-image="{{ wp.featured_image | image_url: width: 600 | escape }}"
     data-product-price="{{ wp.price | money | escape }}"
-    aria-label="Add to wishlist"
+    aria-label="{{ 'wishlist.add_to_wishlist' | t }}"
   >
     <!-- Outline heart — shown when NOT saved -->
     <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
@@ -41,36 +32,19 @@
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
       </svg>
     </span>
-    <span class="sai-wishlist__label">Add to wishlist</span>
+    <span class="sai-wishlist__label">{{ 'wishlist.add_to_wishlist' | t }}</span>
   </button>
 </div>
 
 <script>
   (() => {
-    const storageKey = 'saitriq_wishlist';
-    const visitorStorageKey = 'saitriq_wishlist_visitor';
-    const syncEndpoint = '/apps/saitriq-wishlist';
+    const storageKey = 'silverclouding_wishlist';
+    const visitorStorageKey = 'silverclouding_wishlist_visitor';
+    const syncEndpoint = '/apps/silverclouding-wishlist';
     const script = document.currentScript;
     const block = script && script.previousElementSibling;
     const button = block && block.querySelector('[data-sai-wishlist-button]');
     if (!button) return;
-
-    // ── Toast ──────────────────────────────────────────────────────────────
-    const announce = (message) => {
-      let toast = document.querySelector('[data-sai-wishlist-toast]');
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.dataset.saiWishlistToast = '';
-        toast.className = 'sai-wishlist__toast';
-        toast.setAttribute('role', 'status');
-        document.body.append(toast);
-      }
-      toast.textContent = message;
-      toast.classList.add('is-visible');
-      clearTimeout(window.saitriqWishlistToastTimer);
-      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
-    };
-    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
 
     // ── State ──────────────────────────────────────────────────────────────
     const productId    = button.dataset.productId;
@@ -88,7 +62,7 @@
     };
     const saveWishlist = (items) => {
       try { localStorage.setItem(storageKey, JSON.stringify(items)); } catch {}
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
     };
     const getVisitorId = () => {
       let id = localStorage.getItem(visitorStorageKey);
@@ -99,8 +73,10 @@
       button.classList.toggle('is-active', isSaved);
       // CSS handles icon via .is-active — just update the label
       const label = button.querySelector('.sai-wishlist__label');
-      if (label) label.textContent = isSaved ? 'Saved' : 'Add to wishlist';
-      button.setAttribute('aria-label', isSaved ? 'Saved' : 'Add to wishlist');
+      const savedLabel = {{ 'wishlist.saved' | t | json }};
+      const addLabel = {{ 'wishlist.add_to_wishlist' | t | json }};
+      if (label) label.textContent = isSaved ? savedLabel : addLabel;
+      button.setAttribute('aria-label', isSaved ? savedLabel : addLabel);
     };
     const refresh = () => updateView(getWishlist().some((i) => String(i.id) === String(productId)));
 
@@ -111,7 +87,11 @@
       if (operation === 'add' && idx < 0) items.push({ id: item.productId, handle: item.productHandle, title: item.productTitle, image: item.productImage || '', price: item.productPrice || '', addedAt: new Date().toISOString() });
       if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
       saveWishlist(items);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
+      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', {
+        detail: {
+          message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }}
+        }
+      }));
       return items;
     };
 
@@ -128,7 +108,7 @@
       if (res.status === 429) {
         const d = await res.json().catch(() => ({}));
         if (operation !== 'add') return getWishlist();
-        announce(d.error || 'Monthly wishlist limit reached. Upgrade your plan.');
+        window.silvercloudingWishlistToast?.({ message: d.error || {{ 'wishlist.limit_reached' | t | json }} });
         return getWishlist();
       }
       if (!res.ok) { customerAuthenticated = false; return persistLocal(operation, item); }
@@ -136,13 +116,17 @@
       if (!Array.isArray(data.items)) { customerAuthenticated = false; return sync(operation, item); }
       const synced = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
       saveWishlist(synced);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist' } }));
+      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', {
+        detail: {
+          message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }}
+        }
+      }));
       return synced;
     };
 
     // ── Initial sync ───────────────────────────────────────────────────────
     const initialSync = (() => {
-      if (window.saitriqWishlistSyncPromise) return window.saitriqWishlistSyncPromise;
+      if (window.silvercloudingWishlistSyncPromise) return window.silvercloudingWishlistSyncPromise;
       const run = (async () => {
         const res = await fetch(syncEndpoint, { credentials: 'same-origin' }).catch(() => null);
         if (!res || !res.ok) { refresh(); return; }
@@ -160,8 +144,8 @@
         saveWishlist(synced);
         refresh();
       })();
-      window.saitriqWishlistSyncPromise = run.finally(() => { window.saitriqWishlistSyncPromise = null; });
-      return window.saitriqWishlistSyncPromise;
+      window.silvercloudingWishlistSyncPromise = run.finally(() => { window.silvercloudingWishlistSyncPromise = null; });
+      return window.silvercloudingWishlistSyncPromise;
     })();
 
     // ── Button click ───────────────────────────────────────────────────────
@@ -176,7 +160,7 @@
         if (synced) updateView(!isSaved);
       } catch (err) {
         console.error('Wishlist request failed', err);
-        announce('Wishlist is temporarily unavailable. Please try again.');
+        window.silvercloudingWishlistToast?.({ message: {{ 'wishlist.temporarily_unavailable' | t | json }} });
       } finally {
         button.disabled = false;
         requestInFlight = false;
@@ -184,7 +168,7 @@
     });
 
     refresh();
-    window.addEventListener('saitriq:wishlist-updated', refresh);
+    window.addEventListener('silverclouding:wishlist-updated', refresh);
     window.addEventListener('storage', (e) => { if (e.key === storageKey) refresh(); });
   })();
 </script>

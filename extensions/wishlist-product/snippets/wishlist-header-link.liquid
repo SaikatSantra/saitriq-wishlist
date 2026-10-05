@@ -15,13 +15,13 @@
     if (!count) return;
     const update = () => {
       try {
-        const items = JSON.parse(localStorage.getItem('saitriq_wishlist') || '[]');
+        const items = JSON.parse(localStorage.getItem('silverclouding_wishlist') || '[]');
         count.textContent = Array.isArray(items) ? items.length : '0';
       } catch { count.textContent = '0'; }
     };
     update();
-    window.addEventListener('storage', (e) => { if (e.key === 'saitriq_wishlist') update(); });
-    window.addEventListener('saitriq:wishlist-updated', update);
+    window.addEventListener('storage', (e) => { if (e.key === 'silverclouding_wishlist') update(); });
+    window.addEventListener('silverclouding:wishlist-updated', update);
   })();
 </script>
 

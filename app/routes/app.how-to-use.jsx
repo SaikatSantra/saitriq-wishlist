@@ -1,6 +1,6 @@
 export default function HowToUsePage() {
   return (
-    <s-page heading="How to use Saitriq Wishlist">
+    <s-page heading="How to use Silverclouding Wishlist">
 
       {/* ── Method 1: App Blocks ── */}
       <s-section heading="Method 1 — App blocks (recommended)">
@@ -9,19 +9,19 @@ export default function HowToUsePage() {
           No code editing required.
         </s-paragraph>
         <s-banner tone="warning" heading="Enable the app embed first">
-          Before adding any blocks, you must enable the Saitriq Wishlist app embed.
+          Before adding any blocks, you must enable the Silverclouding Wishlist app embed.
           Go to <strong>Online Store → Themes → Customize → App embeds</strong> and toggle
-          <strong>Saitriq Wishlist</strong> on. This loads the CSS and activates all blocks.
+          <strong>Silverclouding Wishlist</strong> on. This loads the CSS and activates all blocks.
           Without it, no wishlist buttons will appear.
         </s-banner>
         <s-grid gap="small-200">
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-badge tone="info">1</s-badge>
-            <s-paragraph>Go to <strong>Online Store → Themes → Customize → App embeds</strong>. Enable <strong>Saitriq Wishlist</strong>. Save.</s-paragraph>
+            <s-paragraph>Go to <strong>Online Store → Themes → Customize → App embeds</strong>. Enable <strong>Silverclouding Wishlist</strong>. Save.</s-paragraph>
           </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-badge tone="info">2</s-badge>
-            <s-paragraph>Open the <strong>Product</strong> template → Add block → <strong>Saitriq Wishlist → Wishlist</strong>. Save.</s-paragraph>
+            <s-paragraph>Open the <strong>Product</strong> template → Add block → <strong>Silverclouding Wishlist → Wishlist</strong>. Save.</s-paragraph>
           </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-badge tone="info">3</s-badge>
@@ -73,7 +73,7 @@ export default function HowToUsePage() {
       </svg>
     </span>
     <!-- Filled heart — shown when saved (.is-active) via CSS -->
-    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
       <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
       </svg>
@@ -83,9 +83,9 @@ export default function HowToUsePage() {
 </div>
 <script>
   (() => {
-    const storageKey = 'saitriq_wishlist';
-    const visitorStorageKey = 'saitriq_wishlist_visitor';
-    const syncEndpoint = '/apps/saitriq-wishlist';
+    const storageKey = 'silverclouding_wishlist';
+    const visitorStorageKey = 'silverclouding_wishlist_visitor';
+    const syncEndpoint = '/apps/silverclouding-wishlist';
     const script = document.currentScript;
     const block = script && script.previousElementSibling;
     const button = block && block.querySelector('[data-sai-wishlist-button]');
@@ -111,13 +111,13 @@ export default function HowToUsePage() {
       }
       toast.textContent = message;
       toast.classList.add('is-visible');
-      clearTimeout(window.saitriqWishlistToastTimer);
-      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
+      clearTimeout(window.silvercloudingWishlistToastTimer);
+      window.silvercloudingWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
     };
-    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
+    window.addEventListener('silverclouding:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
 
     const getWishlist = () => { try { const v = JSON.parse(localStorage.getItem(storageKey)||'[]'); return Array.isArray(v)?v:[]; } catch{return[];} };
-    const saveWishlist = (items) => { try{localStorage.setItem(storageKey,JSON.stringify(items));}catch{} window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated')); };
+    const saveWishlist = (items) => { try{localStorage.setItem(storageKey,JSON.stringify(items));}catch{} window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated')); };
     const getVisitorId = () => { let id=localStorage.getItem(visitorStorageKey); if(!id){id=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,14);localStorage.setItem(visitorStorageKey,id);} return id; };
 
     const updateView = (saved) => {
@@ -135,7 +135,7 @@ export default function HowToUsePage() {
       if (operation === 'add' && idx < 0) items.push({ id: item.productId, handle: item.productHandle, title: item.productTitle, image: item.productImage||'', price: item.productPrice||'', addedAt: new Date().toISOString() });
       if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
       saveWishlist(items);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation==='add'?'Added to wishlist':'Removed from wishlist' } }));
+      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', { detail: { message: operation==='add'?'Added to wishlist':'Removed from wishlist' } }));
       return items;
     };
 
@@ -157,13 +157,13 @@ export default function HowToUsePage() {
       if (!Array.isArray(data.items)) { customerAuthenticated = false; return sync(operation, item); }
       const synced = data.items.map(s => ({ id:s.productId, handle:s.productHandle, title:s.productTitle, image:s.productImage||'', price:s.productPrice||'', addedAt:s.createdAt }));
       saveWishlist(synced);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation==='add'?'Added to wishlist':'Removed from wishlist' } }));
+      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', { detail: { message: operation==='add'?'Added to wishlist':'Removed from wishlist' } }));
       return synced;
     };
 
     // Initial sync (single-flight, merges local guest items)
     const initialSync = (() => {
-      if (window.saitriqWishlistSyncPromise) return window.saitriqWishlistSyncPromise;
+      if (window.silvercloudingWishlistSyncPromise) return window.silvercloudingWishlistSyncPromise;
       const run = (async () => {
         const res = await fetch(syncEndpoint, { credentials:'same-origin' }).catch(()=>null);
         if (!res || !res.ok) { refresh(); return; }
@@ -180,8 +180,8 @@ export default function HowToUsePage() {
         saveWishlist(synced);
         refresh();
       })();
-      window.saitriqWishlistSyncPromise = run.finally(() => { window.saitriqWishlistSyncPromise = null; });
-      return window.saitriqWishlistSyncPromise;
+      window.silvercloudingWishlistSyncPromise = run.finally(() => { window.silvercloudingWishlistSyncPromise = null; });
+      return window.silvercloudingWishlistSyncPromise;
     })();
 
     button.addEventListener('click', async () => {
@@ -199,7 +199,7 @@ export default function HowToUsePage() {
     });
 
     refresh();
-    window.addEventListener('saitriq:wishlist-updated', refresh);
+    window.addEventListener('silverclouding:wishlist-updated', refresh);
     window.addEventListener('storage', (e) => { if (e.key === storageKey) refresh(); });
   })();
 </script>`}</code>
@@ -230,7 +230,7 @@ export default function HowToUsePage() {
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </span>
-    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
       <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
       </svg>
@@ -240,19 +240,19 @@ export default function HowToUsePage() {
 
 <script>
   (() => {
-    if (window.saitriqWishlistCollectionLoaded) return;
-    window.saitriqWishlistCollectionLoaded = true;
+    if (window.silvercloudingWishlistCollectionLoaded) return;
+    window.silvercloudingWishlistCollectionLoaded = true;
 
-    const storageKey = 'saitriq_wishlist';
-    const visitorStorageKey = 'saitriq_wishlist_visitor';
-    const endpoint = '/apps/saitriq-wishlist';
+    const storageKey = 'silverclouding_wishlist';
+    const visitorStorageKey = 'silverclouding_wishlist_visitor';
+    const endpoint = '/apps/silverclouding-wishlist';
     const tpl = document.getElementById('sai-collection-btn-tpl');
     if (!tpl) return;
 
     let customerAuthenticated = false;
 
     const readItems = () => { try { const v=JSON.parse(localStorage.getItem(storageKey)||'[]'); return Array.isArray(v)?v:[]; } catch{return[];} };
-    const saveItems = (items) => { localStorage.setItem(storageKey,JSON.stringify(items)); window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated')); };
+    const saveItems = (items) => { localStorage.setItem(storageKey,JSON.stringify(items)); window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated')); };
     const getVisitorId = () => { let id=localStorage.getItem(visitorStorageKey); if(!id){id=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,14);localStorage.setItem(visitorStorageKey,id);} return id; };
 
     // Toast
@@ -261,10 +261,10 @@ export default function HowToUsePage() {
       if (!toast) { toast=document.createElement('div'); toast.dataset.saiWishlistToast=''; toast.className='sai-wishlist__toast'; toast.setAttribute('role','status'); document.body.append(toast); }
       toast.textContent = message;
       toast.classList.add('is-visible');
-      clearTimeout(window.saitriqWishlistToastTimer);
-      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
+      clearTimeout(window.silvercloudingWishlistToastTimer);
+      window.silvercloudingWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
     };
-    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
+    window.addEventListener('silverclouding:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
 
     // View — CSS handles icon, JS only toggles class
     const renderButton = (btn, productId) => {
@@ -333,7 +333,7 @@ export default function HowToUsePage() {
 
     const attach = async (link) => {
       const handle = handleFromLink(link);
-      const card = link.closest('li,article,.card,.product-card,.grid__item,[class*="product-card"],[class*="product-item"],[class*="card--product"]');
+      const card = link.closest('li,article,.card-wrapper,.product-card-wrapper,.card,.product-card,.grid__item,[class*="product-card"],[class*="product-item"],[class*="card--product"]');
       if (!handle||!card||card.dataset.saiWishlistAttaching||card.querySelector('[data-sai-collection-wishlist]')) return;
       card.dataset.saiWishlistAttaching = '1';
       const btn = tpl.content.cloneNode(true).querySelector('[data-sai-collection-wishlist]');
@@ -356,7 +356,6 @@ export default function HowToUsePage() {
 
     const scan = () => [...document.querySelectorAll('a[href*="/products/"]')]
       .filter((a)=>handleFromLink(a))
-      .filter((a,i,arr)=>arr.findIndex((b)=>handleFromLink(b)===handleFromLink(a))===i)
       .forEach(attach);
 
     // Scan immediately, then again after auth resolves
@@ -364,7 +363,7 @@ export default function HowToUsePage() {
     detectAuth().finally(scan);
     new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});
     window.addEventListener('storage',(e)=>{ if(e.key===storageKey) scan(); });
-    window.addEventListener('saitriq:wishlist-updated',()=>{
+    window.addEventListener('silverclouding:wishlist-updated',()=>{
       document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn)=>{
         const link = btn.parentElement?.querySelector('a[href*="/products/"]');
         if (!link) return;
@@ -380,8 +379,8 @@ export default function HowToUsePage() {
         {/* ── Step 3: wishlist page ── */}
         <s-section heading="Step 3 — Create snippets/wishlist-page.liquid">
           <s-paragraph>
-            Create a snippet named <code>wishlist-page</code> and paste the code from the{" "}
-            <s-link href="/app/api-docs">Developer API page</s-link> (Theme JS reference section).
+            Create a snippet named <code>wishlist-page</code>. The full snippet code is available in your theme extension files at{" "}
+            <code>extensions/wishlist-product/snippets/wishlist-page.liquid</code> — copy its contents into your theme snippet.
             Then create <code>templates/page.wishlist.liquid</code> containing:
           </s-paragraph>
           <s-banner tone="info"><code>{"{% render 'wishlist-page' %}"}</code></s-banner>
@@ -550,13 +549,13 @@ export default function HowToUsePage() {
     if (!count) return;
     const update = () => {
       try {
-        const items = JSON.parse(localStorage.getItem('saitriq_wishlist') || '[]');
+        const items = JSON.parse(localStorage.getItem('silverclouding_wishlist') || '[]');
         count.textContent = Array.isArray(items) ? items.length : '0';
       } catch { count.textContent = '0'; }
     };
     update();
-    window.addEventListener('storage', (e) => { if (e.key === 'saitriq_wishlist') update(); });
-    window.addEventListener('saitriq:wishlist-updated', update);
+    window.addEventListener('storage', (e) => { if (e.key === 'silverclouding_wishlist') update(); });
+    window.addEventListener('silverclouding:wishlist-updated', update);
   })();
 </script>
 

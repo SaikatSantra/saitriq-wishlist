@@ -1,33 +1,38 @@
-import { redirect } from "react-router";
 import { useLoaderData, useFetcher } from "react-router";
 import { useEffect } from "react";
+import { Buffer } from "node:buffer";
+import { env } from "node:process";
 import { authenticate } from "../shopify.server";
 import { PLANS } from "../plans";
 import { currentUsage } from "../db.wishlist.server";
+import { PLAN_RANK } from "../plan-entitlements";
 import {
-  getActivePlan,
+  getPlanEntitlement,
+  monthKey,
   createSubscription,
-  downgradeToFree,
+  createPlanAllocationCharge,
+  scheduleFreeDowngrade,
   createAddonCharge,
   getMonthlyAddonSaves,
   ADDON,
 } from "../billing.server";
 
-const monthKey = () => new Date().toISOString().slice(0, 7);
+const formatScheduleDate = (value) =>
+  value ? new Date(value).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC") : null;
 
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
   const month = monthKey();
 
-  const [activePlanId, used, addonSaves] = await Promise.all([
-    getActivePlan(shop, admin),
+  const [entitlement, used, addonSaves] = await Promise.all([
+    getPlanEntitlement(shop, month, admin),
     currentUsage(shop, month),
     getMonthlyAddonSaves(shop, month),
   ]);
 
-  const activePlan = PLANS.find((p) => p.id === activePlanId) ?? PLANS[0];
-  const planLimit = activePlan.limit;
+  const activePlanId = entitlement.planId;
+  const planLimit = entitlement.planLimit;
   const effectiveLimit = Number.isFinite(planLimit) ? planLimit + addonSaves : Infinity;
 
   // read query params for post-purchase feedback
@@ -35,15 +40,25 @@ export const loader = async ({ request }) => {
   const addonStatus = url.searchParams.get("addon"); // activated | declined | error
   const planActivated = url.searchParams.get("activated") === "1";
   const planDeclined = url.searchParams.get("declined") === "1";
+  const planScheduled = url.searchParams.get("scheduled") === "1";
+  const billingError = url.searchParams.get("billingError") === "1";
+  const allocationAdded = url.searchParams.get("allocationAdded") === "1";
 
   return {
     plans: PLANS,
     activePlanId,
+    scheduledPlanId: entitlement.scheduledPlanId,
+    effectiveMonth: entitlement.effectiveMonth,
+    effectiveAt: entitlement.effectiveAt,
+    purchaseCount: entitlement.purchaseCount,
     addonSaves,
     addon: ADDON,
     addonStatus,
     planActivated,
     planDeclined,
+    planScheduled,
+    billingError,
+    allocationAdded,
     usage: {
       used,
       limit: effectiveLimit,
@@ -61,26 +76,126 @@ export const action = async ({ request }) => {
   const formData = await request.formData();
   const intent = formData.get("intent");
   const planId = String(formData.get("planId") || "");
+  const targetPlan = PLANS.find((plan) => plan.id === planId);
+  const currentPlan = await getPlanEntitlement(shop, monthKey(), admin);
+
+  const makeReturnUrl = (changeType) => {
+    const incomingUrl = new URL(request.url);
+    const appUrl = env.SHOPIFY_APP_URL || incomingUrl.origin;
+    const returnUrl = new URL("/app/billing", appUrl);
+    const host = incomingUrl.searchParams.get("host") ||
+      Buffer.from(`${shop}/admin`).toString("base64url");
+    returnUrl.searchParams.set("shop", shop);
+    returnUrl.searchParams.set("host", host);
+    returnUrl.searchParams.set("planId", planId);
+    returnUrl.searchParams.set("changeType", changeType);
+    return returnUrl.toString();
+  };
+
+  if (intent === "cancel-plan") {
+    if (currentPlan.planId === "free") {
+      return { error: "There is no paid plan to cancel." };
+    }
+    if (currentPlan.scheduledPlanId === "free") {
+      const effectiveAt = formatScheduleDate(currentPlan.effectiveAt) ?? currentPlan.effectiveMonth;
+      return {
+        success: true,
+        message: `Your plan is already scheduled to end at ${effectiveAt}.`,
+      };
+    }
+
+    try {
+      const { effectiveAt } = await scheduleFreeDowngrade(admin, shop, currentPlan.planId);
+      return {
+        success: true,
+        message: `Your paid plan is canceled for renewal. Your current plan remains active until ${formatScheduleDate(effectiveAt)}; Free starts then.`,
+      };
+    } catch (err) {
+      console.error("Plan cancellation error:", err);
+      return {
+        error: err instanceof Error
+          ? `Plan cancellation failed: ${err.message}`
+          : "Could not cancel the plan. Please try again.",
+      };
+    }
+  }
 
   if (intent === "downgrade") {
-    await downgradeToFree(admin, shop);
-    return { success: true, message: "You are now on the Free plan." };
+    if (!targetPlan || (PLAN_RANK[planId] ?? 0) >= (PLAN_RANK[currentPlan.planId] ?? 0)) {
+      return { error: "Select a lower plan to schedule a downgrade." };
+    }
+    if (currentPlan.scheduledPlanId === planId) {
+      const effectiveAt = formatScheduleDate(currentPlan.effectiveAt) ?? currentPlan.effectiveMonth;
+      return {
+        success: true,
+        message: `${targetPlan.name} is already scheduled for ${effectiveAt}.`,
+      };
+    }
+
+    if (planId === "free") {
+      try {
+        const { effectiveAt } = await scheduleFreeDowngrade(admin, shop, currentPlan.planId);
+        return {
+          success: true,
+          message: `Free starts at ${formatScheduleDate(effectiveAt)}. Your current plan remains active until then.`,
+        };
+      } catch (err) {
+        console.error("Free downgrade scheduling error:", err);
+        return { error: "Could not schedule the Free plan. Please try again." };
+      }
+    }
+
+    try {
+      const { confirmationUrl } = await createSubscription(
+        admin,
+        planId,
+        makeReturnUrl("downgrade"),
+        "APPLY_ON_NEXT_BILLING_CYCLE",
+        0,
+      );
+      return { confirmationUrl };
+    } catch (err) {
+      console.error("Plan downgrade subscription error:", err);
+      return { error: "Could not start the plan change. Please try again." };
+    }
+  }
+
+  if (intent === "buy-plan") {
+    if (
+      !targetPlan ||
+      targetPlan.id !== currentPlan.planId ||
+      !Number.isFinite(targetPlan.limit)
+    ) {
+      return { error: "Extra allocations are only available for your current finite plan." };
+    }
+
+    try {
+      const { confirmationUrl } = await createPlanAllocationCharge(
+        admin,
+        planId,
+        makeReturnUrl("extra"),
+      );
+      return { confirmationUrl };
+    } catch (err) {
+      console.error("Plan allocation charge error:", err);
+      return { error: "Could not start the extra allocation purchase. Please try again." };
+    }
   }
 
   if (intent === "upgrade") {
-    const plan = PLANS.find((p) => p.id === planId);
-    if (!plan || plan.price === 0) return { error: "Invalid plan selected." };
-
-    // Build return URL from the incoming request origin so it works
-    // in both local dev (Shopify CLI tunnel) and production (Vercel)
-    const origin = new URL(request.url).origin;
-    const appUrl = process.env.SHOPIFY_APP_URL || origin;
-    const returnUrl = `${appUrl}/app/billing?planId=${planId}&shop=${shop}`;
-
-    console.log("[BILLING] Return URL:", returnUrl);
+    if (!targetPlan || targetPlan.price === 0) return { error: "Invalid plan selected." };
+    if ((PLAN_RANK[planId] ?? 0) < (PLAN_RANK[currentPlan.planId] ?? 0)) {
+      return { error: "Choose the downgrade action to schedule a lower plan." };
+    }
 
     try {
-      const { confirmationUrl } = await createSubscription(admin, planId, returnUrl);
+      const { confirmationUrl } = await createSubscription(
+        admin,
+        planId,
+        makeReturnUrl("purchase"),
+        "APPLY_IMMEDIATELY",
+        currentPlan.planId === "free" ? targetPlan.trialDays : 0,
+      );
       // Return the URL to the client — the frontend will open it in the top frame
       // to avoid X-Frame-Options: deny from admin.shopify.com
       return { confirmationUrl };
@@ -92,7 +207,7 @@ export const action = async ({ request }) => {
 
   if (intent === "buy-addon") {
     const origin = new URL(request.url).origin;
-    const appUrl = process.env.SHOPIFY_APP_URL || origin;
+    const appUrl = env.SHOPIFY_APP_URL || origin;
     const returnUrl = `${appUrl}/app/addon?shop=${shop}`;
     try {
       const { confirmationUrl } = await createAddonCharge(admin, returnUrl);
@@ -107,12 +222,29 @@ export const action = async ({ request }) => {
 };
 
 export default function PricingPage() {
-  const { plans, activePlanId, usage, addonSaves, addon, addonStatus } = useLoaderData();
+  const {
+    plans,
+    activePlanId,
+    scheduledPlanId,
+    effectiveMonth,
+    effectiveAt,
+    purchaseCount,
+    allocationAdded,
+    planActivated,
+    planDeclined,
+    planScheduled,
+    billingError,
+    usage,
+    addonSaves,
+    addon,
+    addonStatus,
+  } = useLoaderData();
   const fetcher = useFetcher();
   const actionData = fetcher.data;
   const isSubmitting = fetcher.state !== "idle";
 
   const activePlan = plans.find((p) => p.id === activePlanId);
+  const effectiveAtLabel = formatScheduleDate(effectiveAt) ?? effectiveMonth;
 
   // When server returns a confirmationUrl, break out of the iframe
   // and open it in the top-level window (required by Shopify)
@@ -126,7 +258,12 @@ export default function PricingPage() {
   // Reload once to re-establish App Bridge session.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const isPostBilling = params.get("activated") === "1" || params.get("addon") === "activated";
+    const isPostBilling =
+      params.get("activated") === "1" ||
+      params.get("scheduled") === "1" ||
+      params.get("declined") === "1" ||
+      params.get("billingError") === "1" ||
+      params.get("addon") === "activated";
     const alreadyReloaded = sessionStorage.getItem("billing_reloaded") === "1";
 
     if (isPostBilling && !alreadyReloaded) {
@@ -173,14 +310,25 @@ export default function PricingPage() {
                 )}
               </s-stack>
             </s-grid>
+            <s-text color="subdued">
+              {Number.isFinite(usage.limit)
+                ? `${usage.limit.toLocaleString()} total saves this month`
+                : "Unlimited saves this month"}
+            </s-text>
           </s-box>
         </s-grid>
       </s-section>
 
+      {scheduledPlanId && (
+        <s-banner tone="info" heading={`${plans.find((plan) => plan.id === scheduledPlanId)?.name ?? "New plan"} starts ${effectiveAtLabel}`}>
+          Your current plan remains active until {effectiveAtLabel}; the scheduled plan starts then.
+        </s-banner>
+      )}
+
       {/* ── Feedback banners ── */}
       {addonStatus === "activated" && (
         <s-banner tone="success" heading="Addon activated">
-          +{addon.saves.toLocaleString()} saves have been added to this month's limit.
+          +{addon.saves.toLocaleString()} saves have been added to this month&apos;s limit.
         </s-banner>
       )}
       {addonStatus === "declined" && (
@@ -191,6 +339,31 @@ export default function PricingPage() {
       {addonStatus === "error" && (
         <s-banner tone="critical" heading="Purchase error">
           Something went wrong activating the addon. Please contact support.
+        </s-banner>
+      )}
+      {planActivated && (
+        <s-banner tone="success" heading="Plan activated">
+          Your plan and monthly save limit have been updated.
+        </s-banner>
+      )}
+      {allocationAdded && (
+        <s-banner tone="success" heading="Plan allocation added">
+          You now have {purchaseCount} allocations and {usage.planLimit.toLocaleString()} saves this month.
+        </s-banner>
+      )}
+      {planScheduled && (
+        <s-banner tone="success" heading="Plan change scheduled">
+          Your current plan remains active until {effectiveAtLabel}. The selected plan starts then.
+        </s-banner>
+      )}
+      {planDeclined && (
+        <s-banner tone="warning" heading="Purchase not completed">
+          No plan change was made.
+        </s-banner>
+      )}
+      {billingError && (
+        <s-banner tone="critical" heading="Could not confirm the purchase">
+          You are back on Pricing, but the plan status could not be confirmed. Refresh the page or contact support.
         </s-banner>
       )}
       {actionData?.error && (
@@ -276,6 +449,9 @@ export default function PricingPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <s-heading>{plan.name}</s-heading>
                     {isActive && <s-badge tone="success">Current plan</s-badge>}
+                    {isActive && purchaseCount > 1 && (
+                      <s-badge tone="info">{purchaseCount} allocations</s-badge>
+                    )}
                     {plan.trialDays > 0 && !isActive && (
                       <s-badge tone="info">{plan.trialDays}-day free trial</s-badge>
                     )}
@@ -291,7 +467,9 @@ export default function PricingPage() {
                     )}
                   </div>
                   <s-text color="subdued">
-                    {plan.limit === Infinity
+                    {plan.id === activePlanId && Number.isFinite(usage.planLimit)
+                      ? `${usage.planLimit.toLocaleString()} saves active this month`
+                      : plan.limit === Infinity
                       ? "Unlimited saves / month"
                       : `${plan.limit.toLocaleString()} saves / month`}
                   </s-text>
@@ -314,10 +492,29 @@ export default function PricingPage() {
                 <div style={{ height: "1px", background: "#e1e3e5" }} />
 
                 {/* Button — always at bottom */}
-                {isActive ? (
-                  <s-button variant="secondary" disabled inlineSize="fill">
+                {isActive && plan.id === "free" ? (
+                  <s-button variant="secondary" disabled>
                     Current plan
                   </s-button>
+                ) : isActive && scheduledPlanId === "free" ? (
+                  <s-button variant="secondary" disabled>
+                    Cancellation scheduled
+                  </s-button>
+                ) : isActive ? (
+                  <fetcher.Form
+                    method="post"
+                    style={{ display: "grid", gridTemplateColumns: "1fr" }}
+                  >
+                    <input type="hidden" name="intent" value="cancel-plan" />
+                    <s-button
+                      type="submit"
+                      variant="primary"
+                      tone="critical"
+                      disabled={isSubmitting}
+                    >
+                      Cancel plan
+                    </s-button>
+                  </fetcher.Form>
                 ) : isUpgrade ? (
                   <fetcher.Form method="post">
                     <input type="hidden" name="intent" value="upgrade" />
@@ -331,6 +528,10 @@ export default function PricingPage() {
                       Upgrade to {plan.name}
                     </s-button>
                   </fetcher.Form>
+                ) : plan.id === scheduledPlanId ? (
+                  <s-button variant="secondary" disabled>
+                    Scheduled for {effectiveMonth}
+                  </s-button>
                 ) : isDowngrade ? (
                   <fetcher.Form method="post">
                     <input type="hidden" name="intent" value="downgrade" />
@@ -342,7 +543,7 @@ export default function PricingPage() {
                       disabled={isSubmitting}
                       inlineSize="fill"
                     >
-                      Downgrade to Free
+                      Downgrade to {plan.name}
                     </s-button>
                   </fetcher.Form>
                 ) : null}
@@ -356,8 +557,8 @@ export default function PricingPage() {
       <s-section heading="Billing notes">
         <s-grid gap="small-200">
           <s-paragraph>
-            Paid plans are billed monthly through Shopify. You can cancel at any time and your
-            plan stays active until the end of the billing period.
+            Paid plans are billed through Shopify. Canceling stops renewal; your current
+            calendar-month plan limit stays active through month-end, then the Free limit applies.
           </s-paragraph>
           <s-paragraph>
             Growth and Unlimited plans include a {plans.find((p) => p.id === "growth")?.trialDays}-day
@@ -370,8 +571,10 @@ export default function PricingPage() {
             the next month. If you expect high volume mid-month, upgrade before the limit is hit.
           </s-paragraph>
           <s-paragraph>
-            Downgrading to Free takes effect immediately. Saves above 100/month will be declined
-            until the next calendar month begins.
+            A lower paid plan or Free cancellation takes effect at the end of your current Shopify
+            subscription period, shown above. This may be mid-month. Until then, the current plan
+            remains active. Buying the same finite plan more than once stacks its monthly saves.
+                              Scheduled for {effectiveAtLabel}
           </s-paragraph>
           <s-paragraph>
             Monthly save counts reset on the first day of each calendar month.
