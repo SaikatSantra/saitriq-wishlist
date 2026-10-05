@@ -59,6 +59,7 @@ const defaultSettings = {
   buttonLabel:    "Remove",
   showAddToCart:  false,
   addToCartLabel: "Add to cart",
+  headerSelector: "",
   toastBg:        "#1a1a1a",
   toastColor:     "#ffffff",
   toastPosition:  "top-left",

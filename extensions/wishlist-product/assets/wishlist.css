@@ -12,6 +12,32 @@
   opacity: 0.8;
 }
 
+.sai-wishlist-header__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sai-wishlist-header__icon {
+  position: relative;
+  display: inline-flex;
+}
+
+.sai-wishlist-header__count {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.5rem;
+  min-width: 1rem;
+  border-radius: 999px;
+  background: #d4af37;
+  color: #0b0f19;
+  font-size: 0.65rem;
+  line-height: 1rem;
+  text-align: center;
+}
+
 /* Saved state */
 .sai-wishlist.is-active {
   background: var(--sai-btn-active-color, #1a1a1a);

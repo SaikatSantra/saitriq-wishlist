@@ -73,6 +73,7 @@ model WishlistSettings {
   addToCartLabel  String   @default("Add to cart")
   cardClass       String   @default("sai-wishlist-page__item")
   customCss       String   @default("")
+  headerSelector  String   @default("")
   // Toast notification
   toastBg         String   @default("#1a1a1a")
   toastColor      String   @default("#ffffff")

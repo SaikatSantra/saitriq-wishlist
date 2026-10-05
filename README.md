@@ -11,10 +11,20 @@ settings.
 2. In Theme Editor, add the **Wishlist page** app block to that page.
 3. Add the **Wishlist button** app block to product and/or collection card
    sections.
-4. Add the `wishlist-header-link` snippet to the header only if your theme
-   does not provide a suitable app block location.
-5. In the embedded app, open **Page design settings** to select icon-only,
-   icon-with-text, or custom SVG buttons and configure the wishlist grid.
+4. Enable the **Saitriq Wishlist** app embed in Theme Editor. To add a
+   wishlist link to your header automatically, open the embedded app's
+   **Wishlist settings**, enter a CSS selector for the header container (for
+   example, `.header__icons`), and save. The app appends the link inside the
+   first matching element while the embed is enabled. Leave the selector blank
+   to remove/disable the automatic link. If the selector doesn't match an
+   element in the active theme, no link is added.
+5. In the embedded app, open **Page design settings** to configure the
+   wishlist button appearance and grid.
+
+The automatic header link does not edit theme files. The CSS selector is
+theme-specific; verify it against the storefront's markup. If you change the
+selector or turn off the app embed, the link is removed on the next storefront
+page load.
 
 Logged-out shoppers use browser storage and receive an anonymous visitor ID for
 idempotent usage tracking. Logged-in customers are synchronized through the app

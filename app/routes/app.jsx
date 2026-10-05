@@ -1,4 +1,4 @@
-import { Outlet, useLoaderData, useRouteError } from "react-router";
+import { Outlet, isRouteErrorResponse, useLoaderData, useLocation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
@@ -33,7 +33,46 @@ export default function App() {
 }
 
 export function ErrorBoundary() {
-  return boundary.error(useRouteError());
+  const error = useRouteError();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const hasShopifyLaunchContext = ["shop", "host", "id_token", "embedded"].some((key) =>
+    searchParams.has(key),
+  );
+
+  if (
+    !hasShopifyLaunchContext &&
+    isRouteErrorResponse(error) &&
+    error.status === 200
+  ) {
+    return (
+      <main
+        style={{
+          boxSizing: "border-box",
+          maxWidth: "38rem",
+          margin: "12vh auto",
+          padding: "2rem",
+          color: "#202223",
+          fontFamily: "Inter, sans-serif",
+          lineHeight: 1.5,
+        }}
+      >
+        <h1 style={{ fontSize: "1.75rem", marginBottom: "0.75rem" }}>
+          Open Saitriq Wishlist from Shopify
+        </h1>
+        <p>
+          This app needs Shopify Admin to provide its secure embedded
+          authentication context. Open your Shopify Admin, choose the store,
+          then launch Saitriq Wishlist from <strong>Apps</strong>.
+        </p>
+        <p>
+          <a href="https://admin.shopify.com/">Go to Shopify Admin</a>
+        </p>
+      </main>
+    );
+  }
+
+  return boundary.error(error);
 }
 
 export const headers = (headersArgs) => {

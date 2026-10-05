@@ -13,6 +13,7 @@ const defaults = {
   addToCartLabel: "Add to cart",
   cardClass:      "sai-wishlist-page__item",
   customCss:      "",
+  headerSelector: "",
   toastBg:        "#1a1a1a",
   toastColor:     "#ffffff",
   toastPosition:  "top-left",
@@ -56,6 +57,7 @@ export const action = async ({ request }) => {
         .filter((v) => /^[a-zA-Z0-9_-]+$/.test(v))
         .join(" ") || defaults.cardClass,
     customCss: String(formData.get("customCss") || "").slice(0, 5000),
+    headerSelector: String(formData.get("headerSelector") || "").trim().slice(0, 300),
     toastBg: String(
       formData.get("toastBg") || defaults.toastBg
     ).trim(),
@@ -171,6 +173,25 @@ export default function WishlistSettingsPage() {
 
               
 
+            </s-stack>
+          </s-section>
+
+          <s-section heading="Header wishlist link">
+            <s-stack direction="block" gap="base">
+              <s-text>
+                Optionally add a Wishlist link to your storefront header without editing theme code.
+                The app embed must be enabled for this to appear.
+              </s-text>
+              <s-text-field
+                label="Header CSS selector"
+                name="headerSelector"
+                value={settings.headerSelector}
+                helpText="Enter a CSS selector for the header element to add the link to, for example .header__icons. The link is appended inside the first matching element. Leave blank to disable."
+              />
+              <s-text tone="subdued">
+                The selector must exist on the storefront. Theme markup differs, so test it with your theme.
+                Clearing this field removes the link on the next page load. Disabling the app embed also removes it.
+              </s-text>
             </s-stack>
           </s-section>
 
