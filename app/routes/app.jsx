@@ -1,6 +1,7 @@
 import { Outlet, isRouteErrorResponse, useLoaderData, useLocation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
+import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
@@ -14,19 +15,14 @@ export default function App() {
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-      {/*
-        s-app-nav: App Bridge component for the Shopify admin sidebar nav.
-        rel="home" hides the link from the menu and sets it as the home route.
-        Labels should be 1-2 words, noun-based per Shopify guidelines.
-      */}
-      <s-app-nav>
-        <s-link href="/app" rel="home">Dashboard</s-link>
-        <s-link href="/app/wishlist">Activity</s-link>
-        <s-link href="/app/settings">Design</s-link>
-        <s-link href="/app/pricing">Pricing</s-link>
-        <s-link href="/app/how-to-use">Setup</s-link>
-        <s-link href="/app/api-docs">Developer API</s-link>
-      </s-app-nav>
+      <NavMenu>
+        <a href="/app">Dashboard</a>
+        <a href="/app/wishlist">Activity</a>
+        <a href="/app/settings">Design</a>
+        <a href="/app/pricing">Pricing</a>
+        <a href="/app/how-to-use">Setup</a>
+        <a href="/app/api-docs">Developer API</a>
+      </NavMenu>
       <Outlet />
     </AppProvider>
   );
