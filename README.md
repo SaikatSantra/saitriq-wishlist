@@ -151,6 +151,10 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
 ```
 
 Only use `--applied` when the existing tables match the migration. For a

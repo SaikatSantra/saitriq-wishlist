@@ -1,6 +1,8 @@
-# Replace the production host before deploying.
-client_id = "6011dc02944b02d6c4b8a3233901dffc"
-name = "Saitriq : Wishlist"
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "6633c3eab82ad6fcb3ffc69a5f263b81" #web store
+# client_id = "6011dc02944b02d6c4b8a3233901dffc" #app store
+name = "Saitriq Wishlist"
 application_url = "https://saitriq-wishlist.vercel.app"
 embedded = true
 
