@@ -169,20 +169,7 @@ export default function WishlistSettingsPage() {
                 helpText="Label shown on the add to cart button. Only visible when enabled above."
               />
 
-              <s-text-field
-                label="Card CSS class"
-                name="cardClass"
-                value={settings.cardClass}
-                helpText="Use your theme's product card class to inherit its styling."
-              />
-
-              <s-text-area
-                label="Custom CSS"
-                name="customCss"
-                value={settings.customCss}
-                rows={5}
-                helpText="Add custom styling for the wishlist page. Maximum 5,000 characters."
-              />
+              
 
             </s-stack>
           </s-section>
@@ -210,16 +197,7 @@ export default function WishlistSettingsPage() {
                 helpText="Example: #ffffff"
               />
 
-              <s-select
-                label="Position"
-                name="toastPosition"
-                value={settings.toastPosition}
-              >
-                <s-option value="top-left">Top left</s-option>
-                <s-option value="top-right">Top right</s-option>
-                <s-option value="bottom-left">Bottom left</s-option>
-                <s-option value="bottom-right">Bottom right</s-option>
-              </s-select>
+              
 
             </s-stack>
           </s-section>

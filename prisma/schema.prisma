@@ -1,12 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-
 
 model Session {
   id                  String    @id
@@ -33,6 +33,8 @@ model WishlistItem {
   shop          String
   customerId    String
   productId     String
+  variantId     String   @default("")
+  variantTitle  String?
   productHandle String
   productTitle  String
   productImage  String?
@@ -40,7 +42,7 @@ model WishlistItem {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([shop, customerId, productId])
+  @@unique([shop, customerId, productId, variantId])
   @@index([shop, customerId])
 }
 
@@ -90,6 +92,46 @@ model ActiveSubscription {
   updatedAt            DateTime  @updatedAt
 }
 
+model MonthlyPlanPurchase {
+  id             Int      @id @default(autoincrement())
+  shop           String
+  month          String
+  planId         String
+  billingId      String   @unique @map("subscriptionId")
+  purchaseType   String   @default("base")
+  createdAt      DateTime @default(now())
+
+  @@index([shop, month])
+}
+
+model PlanPurchaseHistory {
+  id               Int      @id @default(autoincrement())
+  shop             String
+  planId           String
+  purchaseType     String
+  amount           Float
+  currencyCode     String   @default("USD")
+  eventKey         String   @unique
+  subscriptionId   String?
+  billingPeriodEnd DateTime?
+  occurredAt       DateTime @default(now())
+
+  @@index([shop, occurredAt])
+  @@index([shop, subscriptionId])
+}
+
+model ScheduledPlanChange {
+  id             Int      @id @default(autoincrement())
+  shop           String   @unique
+  planId         String
+  previousPlanId String
+  effectiveMonth String
+  effectiveAt    DateTime?
+  subscriptionId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 model AddonPurchase {
   id             Int      @id @default(autoincrement())
   shop           String
@@ -101,43 +143,4 @@ model AddonPurchase {
   createdAt      DateTime @default(now())
 
   @@index([shop, month])
-}
-
-model MonthlyPlanPurchase {
-  id           Int      @id @default(autoincrement())
-  shop         String
-  month        String   // "YYYY-MM" — plan purchase applies only to this month
-  planId       String
-  billingId    String   @unique
-  purchaseType String   @default("base")
-  createdAt    DateTime @default(now())
-
-  @@index([shop, month])
-}
-
-model ScheduledPlanChange {
-  id             Int      @id @default(autoincrement())
-  shop           String   @unique
-  planId         String
-  previousPlanId String
-  effectiveMonth String   // "YYYY-MM"
-  effectiveAt    DateTime?
-  subscriptionId String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-}
-
-model PlanPurchaseHistory {
-  id               Int      @id @default(autoincrement())
-  shop             String
-  planId           String
-  purchaseType     String
-  amount           Float
-  eventKey         String   @unique
-  subscriptionId   String?
-  billingPeriodEnd DateTime?
-  occurredAt       DateTime @default(now())
-
-  @@index([shop, occurredAt])
-  @@index([shop, subscriptionId, billingPeriodEnd])
 }
