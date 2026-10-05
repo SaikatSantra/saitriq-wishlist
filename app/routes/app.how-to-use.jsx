@@ -33,9 +33,19 @@ export default function HowToUsePage() {
           </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-badge tone="info">5</s-badge>
-            <s-paragraph>Add a header link to <code>/pages/wishlist</code> in your navigation menu.</s-paragraph>
+            <s-paragraph>
+              To add a Wishlist link to your header automatically, open <s-link href="/app/settings">Wishlist settings</s-link>,
+              enter a CSS selector for your header container (for example <code>.header__icons</code>), and save.
+              The app adds the link inside the first matching element while the app embed is enabled.
+              Leave the selector blank to disable the automatic link. If your selector does not match your theme,
+              no link is added.
+            </s-paragraph>
           </s-stack>
         </s-grid>
+        <s-paragraph>
+          The selector is theme-specific and does not edit theme files. If you change or clear it, or disable the app embed,
+          the automatic link is removed on the next storefront page load. Check the selector against your theme&apos;s header markup.
+        </s-paragraph>
       </s-section>
 
       {/* ── Method 2: Manual (older themes) ── */}
