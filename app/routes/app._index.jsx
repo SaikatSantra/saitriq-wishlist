@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { currentUsage } from "../db.wishlist.server";
-import { getActivePlan, syncSubscriptionFromShopify, getMonthlyAddonSaves } from "../billing.server";
-import { monthlyLimit, getPlan } from "../plans";
+import { getPlanEntitlement, getMonthlyAddonSaves } from "../billing.server";
+import { getPlan } from "../plans";
 import { checkEmbedEnabled } from "../embed.server";
 
 export const loader = async ({ request }) => {
@@ -11,15 +11,16 @@ export const loader = async ({ request }) => {
   const shop = session.shop;
   const month = new Date().toISOString().slice(0, 7);
 
-  const [planId, used, embed, addonSaves] = await Promise.all([
-    syncSubscriptionFromShopify(admin, shop).catch(() => getActivePlan(shop)),
+  const [entitlement, used, embed, addonSaves] = await Promise.all([
+    getPlanEntitlement(shop, month, admin),
     currentUsage(shop, month),
     checkEmbedEnabled(admin),
     getMonthlyAddonSaves(shop, month),
   ]);
 
+  const planId = entitlement.planId;
   const plan = getPlan(planId);
-  const limit = monthlyLimit(planId);
+  const limit = entitlement.planLimit;
   const effLimit = Number.isFinite(limit) ? limit + addonSaves : Infinity;
 
   return {
@@ -222,6 +223,13 @@ export default function WishlistDashboard() {
             Shoppers can see the wishlist buttons on your storefront.
           </s-banner>
         )}
+        {embed.enabled === null && (
+          <s-banner tone="warning" heading="App embed status could not be verified">
+            We could not read your theme settings. If you have already enabled the app embed
+            in Theme Editor, your storefront should be working.{" "}
+            <s-link href="javascript:window.location.reload()">Refresh to check again</s-link>
+          </s-banner>
+        )}
 
         <s-grid gridTemplateColumns="repeat(auto-fit, minmax(260px, 1fr))" gap="base">
           {/* Embed toggle card */}
@@ -231,7 +239,7 @@ export default function WishlistDashboard() {
                 <s-heading>App embed</s-heading>
                 {embed.enabled === true && <s-badge tone="success">Enabled</s-badge>}
                 {embed.enabled === false && <s-badge tone="critical">Not enabled</s-badge>}
-                {embed.enabled === null && <s-badge tone="neutral">Unknown</s-badge>}
+                {embed.enabled === null && <s-badge tone="attention">Check Theme Editor</s-badge>}
               </s-stack>
               <s-paragraph>
                 The app embed loads the wishlist CSS globally and activates the heart button
@@ -241,9 +249,9 @@ export default function WishlistDashboard() {
               <s-button
                 href={`https://${shop}/admin/themes/current/editor?context=apps`}
                 target="_blank"
-                variant={embed.enabled ? "secondary" : "primary"}
+                variant={embed.enabled === true ? "secondary" : "primary"}
               >
-                {embed.enabled ? "Manage in Theme Editor" : "Enable in Theme Editor"}
+                {embed.enabled === true ? "Manage in Theme Editor" : "Open App Embeds"}
               </s-button>
             </s-grid>
           </s-box>
@@ -345,7 +353,7 @@ export default function WishlistDashboard() {
                 We respond to all support requests within 24 hours.
               </s-paragraph>
               <s-button
-                href="mailto:info@saitriq.com"
+                href="mailto:support@saitriq.com"
                 variant="secondary"
               >
                 Contact support

@@ -1,5 +1,3 @@
-{% comment %}CSS loaded globally by the Saitriq Wishlist app embed block{% endcomment %}
-
 {% liquid
   assign block_settings = block.settings
   assign ratio = 1
@@ -73,10 +71,8 @@
 
 <script>
   (() => {
-    // Capture currentScript synchronously — it's null inside async callbacks
     const _script = document.currentScript;
 
-    // Wait for embed block — handles both execution orders
     const whenEmbedReady = (fn) => {
       if (window.saitriqEmbedEnabled) { fn(); return; }
       document.addEventListener('saitriq:embed-ready', fn, { once: true });
@@ -162,6 +158,29 @@
       }
     };
 
+    const applySettings = (data) => {
+      if (!data?.settings) return;
+      settings = { ...settings, ...data.settings };
+      let customStyle = document.querySelector('[data-sai-wishlist-custom-css]');
+      if (!customStyle) {
+        customStyle = document.createElement('style');
+        customStyle.dataset.saiWishlistCustomCss = '';
+        document.head.append(customStyle);
+      }
+      customStyle.textContent = settings.customCss || '';
+      render();
+    };
+
+    let settingsPromise;
+    const loadAppSettings = async () => {
+      if (settingsPromise) return settingsPromise;
+      settingsPromise = (async () => {
+      const response = await fetch(`${syncEndpoint}?api=settings`, { credentials: 'same-origin' }).catch(() => null);
+      if (response?.ok) applySettings(await response.json().catch(() => null));
+      })();
+      return settingsPromise;
+    };
+
     const syncItems = async () => {
       if (window.saitriqWishlistSyncPromise) {
         return window.saitriqWishlistSyncPromise;
@@ -171,26 +190,23 @@
       const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
       if (!response.ok) {
         console.warn('Wishlist proxy unavailable during sync; using local storage fallback.', response.status);
+        await loadAppSettings();
         render();
         return;
       }
       const data = await response.json();
       customerAuthenticated = data.authenticated === true;
+      applySettings(data);
       if (!data.authenticated || !Array.isArray(data.items)) {
+        if (!data.settings) await loadAppSettings();
         render();
         return;
       }
-      if (data.settings) settings = { ...settings, ...data.settings };
-      let customStyle = document.querySelector('[data-sai-wishlist-custom-css]');
-      if (!customStyle) {
-        customStyle = document.createElement('style');
-        customStyle.dataset.saiWishlistCustomCss = '';
-        document.head.append(customStyle);
-      }
-      customStyle.textContent = settings.customCss || '';
 
       let items = data.items.map((saved) => ({
         id: saved.productId,
+        variantId: saved.variantId || '',
+        variantTitle: saved.variantTitle || '',
         handle: saved.productHandle,
         title: saved.productTitle,
         image: saved.productImage || '',
@@ -214,55 +230,133 @@
       return div.innerHTML;
     };
 
-    // ── Custom card template (opt-in) ─────────────────────────────────────
-    // Merchants can place a <template data-sai-wishlist-page> anywhere in
-    // their theme. JS clones it per item and fills data-sai-item-* hooks.
-    // Falls back to the default card if no template is found.
-    //
-    // Supported hooks (add to any element in the template):
-    //   data-sai-item-link        → href="/products/{handle}"
-    //   data-sai-item-image       → src + alt
-    //   data-sai-item-title       → textContent
-    //   data-sai-item-price       → textContent (hidden if showPrices=false)
-    //   data-sai-item-remove      → click removes item (hidden if showRemove=false)
-    //   data-sai-item-product-id  → data-product-id attribute (Shopify product GID numeric)
-    //   data-sai-item-variant-id  → data-variant-id attribute (first available variant ID)
     const customTpl = document.querySelector('[data-sai-wishlist-page]');
 
-    // Product data cache — fetches id + first available variant lazily
     const _productDataCache = new Map();
-    const fetchProductData = async (handle) => {
-      if (_productDataCache.has(handle)) return _productDataCache.get(handle);
+    const fetchProductData = async (handle, savedVariantId = '') => {
+      const resolveVariant = (product) => {
+        const variants = product.variants || [];
+        const savedVariant = variants.find((variant) => String(variant.id) === String(savedVariantId));
+        const variant = savedVariant || variants.find((entry) => entry.available) || variants[0];
+        return {
+          productId: String(product.id),
+          variantId: variant ? String(variant.id) : null,
+          variantTitle: variant?.title || '',
+          variantAvailable: variant?.available === true,
+        };
+      };
+      if (_productDataCache.has(handle)) return resolveVariant(_productDataCache.get(handle));
       try {
         const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
         if (!res.ok) return null;
         const p = await res.json();
-        const firstAvailableVariant = p.variants?.find((v) => v.available) ?? p.variants?.[0];
-        const data = {
-          productId: String(p.id),
-          variantId: firstAvailableVariant ? String(firstAvailableVariant.id) : null,
-        };
-        _productDataCache.set(handle, data);
-        return data;
+        _productDataCache.set(handle, p);
+        return resolveVariant(p);
       } catch { return null; }
     };
 
+    const buildActions = (item, productData, existingRemoveButton = null) => {
+      const actions = document.createElement('div');
+      actions.className = 'sai-wishlist-page__card-actions';
+
+      if (settings.showAddToCart && productData?.variantId) {
+        const form = document.createElement('form');
+        form.className = 'sai-wishlist-page__atc-form';
+        form.action = '/cart/add';
+        form.method = 'post';
+        form.innerHTML = `<input type="hidden" name="id"><input type="hidden" name="quantity" value="1"><button type="submit" name="add" class="sai-wishlist-page__add-to-cart button">${esc(settings.addToCartLabel)}</button>`;
+        form.querySelector('[name="id"]').value = productData.variantId;
+        const addButton = form.querySelector('button');
+        addButton.disabled = !productData.variantAvailable;
+        if (!productData.variantAvailable) addButton.textContent = {{ 'wishlist.sold_out' | t | json }};
+        actions.append(form);
+      }
+
+      if (settings.showRemove) {
+        const removeButton = existingRemoveButton || document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.classList.add('sai-wishlist-page__remove');
+        if (!removeButton.textContent.trim()) removeButton.textContent = settings.buttonLabel;
+        removeButton.addEventListener('click', () => handleRemove(item, removeButton));
+        actions.append(removeButton);
+      } else if (existingRemoveButton) {
+        existingRemoveButton.hidden = true;
+      }
+
+      return actions;
+    };
+
+    const refreshCartUi = (cartData) => {
+      const cartComponent = document.querySelector('cart-drawer, cart-notification');
+      if (cartComponent && typeof cartComponent.renderContents === 'function') {
+        cartComponent.renderContents(cartData);
+      } else {
+        Object.entries(cartData.sections || {}).forEach(([sectionId, markup]) => {
+          if (!markup) return;
+          const rendered = new DOMParser().parseFromString(markup, 'text/html');
+          const current = document.getElementById(`shopify-section-${sectionId}`) || document.getElementById(sectionId);
+          const replacement = current?.id
+            ? rendered.getElementById(current.id)
+            : null;
+          if (current && replacement) current.replaceWith(replacement);
+        });
+      }
+
+      document.dispatchEvent(new CustomEvent('cart:updated', { detail: { cart: cartData } }));
+      document.dispatchEvent(new CustomEvent('cart:refresh', { detail: { cart: cartData } }));
+    };
+
+    itemsContainer.addEventListener('submit', async (event) => {
+      const form = event.target.closest('.sai-wishlist-page__atc-form');
+      if (!form) return;
+      event.preventDefault();
+
+      const button = form.querySelector('button[type="submit"]');
+      const variantId = form.querySelector('[name="id"]')?.value;
+      if (!button || !variantId || button.disabled) return;
+
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      try {
+        const root = window.Shopify?.routes?.root || '/';
+        const response = await fetch(`${root}cart/add.js`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            items: [{ id: variantId, quantity: Number(form.querySelector('[name="quantity"]')?.value) || 1 }],
+            sections: 'cart-drawer,cart-icon-bubble,cart-notification',
+            sections_url: window.location.pathname
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.description || data.message || {{ 'wishlist.add_to_cart_error' | t | json }});
+
+        refreshCartUi(data);
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+          detail: { message: {{ 'wishlist.added_to_cart' | t | json }} }
+        }));
+      } catch (error) {
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+          detail: { message: error.message || {{ 'wishlist.add_to_cart_error' | t | json }} }
+        }));
+      } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+      }
+    });
+
     const buildCard = async (item) => {
-      // Pre-fetch product data for id/variant hooks (non-blocking — card renders first)
-      const productData = await fetchProductData(item.handle);
+      const productData = await fetchProductData(item.handle, item.variantId);
 
       if (customTpl && customTpl.tagName === 'TEMPLATE') {
-        // ── Merchant template ──────────────────────────────────────────────
         const clone = customTpl.content.cloneNode(true);
         const root = document.createElement('div');
         root.appendChild(clone);
 
-        // Fill link hooks
         root.querySelectorAll('[data-sai-item-link]').forEach((el) => {
           el.href = `/products/${encodeURIComponent(item.handle)}`;
         });
 
-        // Fill image hook
         const img = root.querySelector('[data-sai-item-image]');
         if (img) {
           img.src = item.image || '';
@@ -281,11 +375,15 @@
           }, { once: true });
         }
 
-        // Fill title hook
         const title = root.querySelector('[data-sai-item-title]');
         if (title) title.textContent = item.title || '';
 
-        // Fill price hook
+        const variantTitle = root.querySelector('[data-sai-item-variant-title]');
+        if (variantTitle) {
+          variantTitle.textContent = productData?.variantTitle && productData.variantTitle !== 'Default Title' ? productData.variantTitle : '';
+          variantTitle.hidden = !variantTitle.textContent;
+        }
+
         const price = root.querySelector('[data-sai-item-price]');
         if (price) {
           if (settings.showPrices && item.price) {
@@ -295,31 +393,25 @@
           }
         }
 
-        // Fill product ID hook
         const productIdEl = root.querySelector('[data-sai-item-product-id]');
         if (productIdEl && productData?.productId) {
           productIdEl.dataset.productId = productData.productId;
         }
 
-        // Fill variant ID hook (first available variant)
         const variantIdEl = root.querySelector('[data-sai-item-variant-id]');
         if (variantIdEl && productData?.variantId) {
           variantIdEl.dataset.variantId = productData.variantId;
           variantIdEl.value = productData.variantId; // also set value if it's an <input>
         }
 
-        // Fill remove hook
         const removeBtn = root.querySelector('[data-sai-item-remove]');
         if (removeBtn) {
-          if (settings.showRemove) {
-            if (!removeBtn.textContent.trim()) removeBtn.textContent = settings.buttonLabel;
-            removeBtn.addEventListener('click', () => handleRemove(item, removeBtn));
-          } else {
-            removeBtn.hidden = true;
-          }
+          if (!removeBtn.textContent.trim()) removeBtn.textContent = settings.buttonLabel;
         }
 
-        // Unwrap the temporary root div
+        const actionHost = root.querySelector('[data-sai-item-actions]') || root.querySelector('.sai-wishlist-page__info') || root;
+        actionHost.append(buildActions(item, productData, removeBtn));
+
         const fragment = document.createDocumentFragment();
         while (root.firstChild) fragment.appendChild(root.firstChild);
         const wrapper = document.createElement('div');
@@ -328,7 +420,6 @@
         return wrapper;
 
       } else {
-        // ── Default card ───────────────────────────────────────────────────
         const card = document.createElement('div');
         card.className = `sai-wishlist-page__item product-grid__item ${settings.cardClass || ''}`.trim();
         card.innerHTML = `
@@ -337,14 +428,8 @@
           </a>
           <div class="sai-wishlist-page__info">
             <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${esc(item.title) || 'Product'}</a>
+            ${productData?.variantTitle && productData.variantTitle !== 'Default Title' ? `<div class="sai-wishlist-page__variant">${esc(productData.variantTitle)}</div>` : ''}
             ${settings.showPrices && item.price ? `<div class="sai-wishlist-page__price">${esc(item.price)}</div>` : ''}
-            ${settings.showAddToCart ? `
-            <form class="sai-wishlist-page__atc-form" action="/cart/add" method="post">
-              <input type="hidden" name="id" class="sai-wishlist-page__variant-input">
-              <input type="hidden" name="quantity" value="1">
-              <button type="submit" name="add" class="sai-wishlist-page__add-to-cart button">${esc(settings.addToCartLabel)}</button>
-            </form>` : ''}
-            ${settings.showRemove ? `<button type="button" class="sai-wishlist-page__remove">${esc(settings.buttonLabel)}</button>` : ''}
           </div>
         `;
         const image = card.querySelector('[data-sai-wishlist-image]');
@@ -363,18 +448,11 @@
             console.error('Wishlist image fallback failed', error);
           }
         }, { once: true });
-        // Fill variant ID into the add to cart form input
-        if (settings.showAddToCart && productData?.variantId) {
-          const variantInput = card.querySelector('.sai-wishlist-page__variant-input');
-          if (variantInput) variantInput.value = productData.variantId;
-        }
-        const removeButton = card.querySelector('.sai-wishlist-page__remove');
-        if (removeButton) removeButton.addEventListener('click', () => handleRemove(item, removeButton));
+        card.querySelector('.sai-wishlist-page__info').append(buildActions(item, productData));
         return card;
       }
     };
 
-    // ── Remove handler (shared by both card types) ─────────────────────────
     const handleRemove = async (item, removeButton) => {
       removeButton.disabled = true;
       localRevision += 1;
@@ -382,28 +460,27 @@
         if (!customerAuthenticated) {
           await trackGuest('remove', {
             productId: item.id, productHandle: item.handle,
+            variantId: item.variantId || '',
             productTitle: item.title, productImage: item.image
           });
-          localStorage.setItem(storageKey, JSON.stringify(getItems().filter((s) => String(s.id) !== String(item.id))));
+          localStorage.setItem(storageKey, JSON.stringify(getItems().filter((s) => !(String(s.id) === String(item.id) && String(s.variantId || '') === String(item.variantId || '')))));
           window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: 'Removed from wishlist' } }));
-          render();
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: {{ 'wishlist.removed_from_wishlist' | t | json }} } }));
           return;
         }
         const response = await fetch(syncEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, productHandle: item.handle, productTitle: item.title, productImage: item.image })
+          body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, variantId: item.variantId || '', productHandle: item.handle, productTitle: item.title, productImage: item.image })
         });
         if (!response.ok) throw new Error('Wishlist remove request failed');
         const data = await response.json();
         if (!Array.isArray(data.items)) throw new Error('Wishlist remove response was invalid');
-        const serverItems = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
+        const serverItems = data.items.map((s) => ({ id: s.productId, variantId: s.variantId || '', variantTitle: s.variantTitle || '', handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
         localStorage.setItem(storageKey, JSON.stringify(serverItems));
         window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: 'Removed from wishlist' } }));
-        render();
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: {{ 'wishlist.removed_from_wishlist' | t | json }} } }));
       } catch (error) {
         emptyMessage.textContent = error.message;
         emptyMessage.hidden = false;
@@ -413,6 +490,12 @@
     };
 
     const render = async () => {
+      if (render._pending) {
+        render._again = true;
+        return;
+      }
+      render._pending = true;
+      try {
       const items = getItems();
       page.querySelector('h2').textContent = settings.heading;
       emptyMessage.textContent = settings.emptyMessage;
@@ -422,9 +505,15 @@
       clearButton.hidden = items.length === 0;
       if (shareButton) shareButton.hidden = items.length === 0;
 
-      // buildCard is async (fetches variant data) — render all in parallel
       const cards = await Promise.all(items.map((item) => buildCard(item)));
       cards.forEach((card) => itemsContainer.append(card));
+      } finally {
+        render._pending = false;
+        if (render._again) {
+          render._again = false;
+          render();
+        }
+      }
     };
 
     clearButton.addEventListener('click', async () => {
@@ -437,9 +526,8 @@
           localStorage.setItem(storageKey, '[]');
           window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
           window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-            detail: { message: 'Wishlist cleared' }
+            detail: { message: {{ 'wishlist.wishlist_cleared' | t | json }} }
           }));
-          render();
           return;
         }
         const response = await fetch(syncEndpoint, {
@@ -456,9 +544,17 @@
           });
           throw new Error(data.error || 'Wishlist clear request failed');
         }
-        localStorage.setItem(storageKey, JSON.stringify(data.items));
+        localStorage.setItem(storageKey, JSON.stringify(data.items.map((item) => ({
+          id: item.productId,
+          variantId: item.variantId || '',
+          variantTitle: item.variantTitle || '',
+          handle: item.productHandle,
+          title: item.productTitle,
+          image: item.productImage || '',
+          price: item.productPrice || '',
+          addedAt: item.createdAt
+        }))));
         window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-        render();
       } catch (error) {
         emptyMessage.textContent = error.message;
         emptyMessage.hidden = false;
@@ -467,7 +563,6 @@
       }
     });
 
-    // ── Share wishlist ────────────────────────────────────────────────────────
     const buildShareUrl = () => {
       const items = getItems();
       const payload = items.map((item) => ({
@@ -508,7 +603,6 @@
     const isSharedView = sharedItems !== null;
 
     if (isSharedView) {
-      // Render the sharer's list in read-only mode
       localStorage.setItem(storageKey, JSON.stringify(sharedItems));
       settings.showRemove = false;
       settings.heading = 'Shared wishlist';
@@ -525,7 +619,6 @@
             return;
           } catch {}
         }
-        // Clipboard fallback
         try {
           await navigator.clipboard.writeText(shareUrl);
           const original = shareButton.textContent;
@@ -538,6 +631,7 @@
     }
 
     render();
+    loadAppSettings().catch(() => {}).then(render);
     if (!isSharedView) syncItems().catch(() => {});
     window.addEventListener('saitriq:wishlist-updated', render);
     window.addEventListener('storage', (event) => {

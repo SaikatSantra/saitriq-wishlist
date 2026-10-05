@@ -10,8 +10,7 @@ import {
   getAnalytics,
   getAnalyticsHistory,
 } from "../db.wishlist.server";
-import { getActivePlan, getMonthlyAddonSaves } from "../billing.server";
-import { monthlyLimit } from "../plans";
+import { getPlanEntitlement, getMonthlyAddonSaves, monthKey } from "../billing.server";
 
 const effectiveLimit = (planLimit, addonSaves) =>
   Number.isFinite(planLimit) ? planLimit + addonSaves : Infinity;
@@ -44,8 +43,6 @@ const getCustomerId = (request) => {
   const gidMatch = id?.match(/^gid:\/\/shopify\/Customer\/(\d+)$/);
   return gidMatch ? gidMatch[1] : null;
 };
-
-const monthKey = () => new Date().toISOString().slice(0, 7);
 
 const usageFor = (used, limit) => ({
   used,
@@ -92,8 +89,11 @@ const handleApiGet = async (api, url, session, customerId) => {
         getAnalyticsHistory(shop, month),
         currentUsage(shop, month),
       ]);
-      const planId = await getActivePlan(shop);
-      const limit = monthlyLimit(planId);
+      const [entitlement, addonSaves] = await Promise.all([
+        getPlanEntitlement(shop, month),
+        getMonthlyAddonSaves(shop, month),
+      ]);
+      const limit = effectiveLimit(entitlement.planLimit, addonSaves);
       return json({ month, adds: totals.adds, removes: totals.removes, history, usage: usageFor(used, limit) });
     }
     case "settings": {
@@ -101,8 +101,12 @@ const handleApiGet = async (api, url, session, customerId) => {
       return json({ settings: settings || defaultSettings });
     }
     case "usage": {
-      const [used, planId] = await Promise.all([currentUsage(shop, month), getActivePlan(shop)]);
-      return json(usageFor(used, monthlyLimit(planId)));
+      const [used, entitlement, addonSaves] = await Promise.all([
+        currentUsage(shop, month),
+        getPlanEntitlement(shop, month),
+        getMonthlyAddonSaves(shop, month),
+      ]);
+      return json(usageFor(used, effectiveLimit(entitlement.planLimit, addonSaves)));
     }
     default:
       return json({ error: `Unknown api endpoint: ${api}` }, { status: 400 });
@@ -125,14 +129,14 @@ export const loader = async ({ request }) => {
 
   const shop = session.shop;
   const month = monthKey();
-  const [planId, used, items, settings, addonSaves] = await Promise.all([
-    getActivePlan(shop),
+  const [entitlement, used, items, settings, addonSaves] = await Promise.all([
+    getPlanEntitlement(shop, month),
     currentUsage(shop, month),
     listCustomerWishlistItems(shop, customerId),
     prisma.wishlistSettings.findUnique({ where: { shop } }),
     getMonthlyAddonSaves(shop, month),
   ]);
-  const limit = effectiveLimit(monthlyLimit(planId), addonSaves);
+  const limit = effectiveLimit(entitlement.planLimit, addonSaves);
 
   return json({
     authenticated: true,
@@ -164,8 +168,11 @@ export const action = async ({ request }) => {
     }
 
     const month = monthKey();
-    const [planId, addonSaves] = await Promise.all([getActivePlan(shop), getMonthlyAddonSaves(shop, monthKey())]);
-    const limit = effectiveLimit(monthlyLimit(planId), addonSaves);
+    const [entitlement, addonSaves] = await Promise.all([
+      getPlanEntitlement(shop, month),
+      getMonthlyAddonSaves(shop, month),
+    ]);
+    const limit = effectiveLimit(entitlement.planLimit, addonSaves);
 
     // ── clear ─────────────────────────────────────────────────────────────────
     if (operation === "clear") {
@@ -186,6 +193,8 @@ export const action = async ({ request }) => {
 
     // ── add / remove ──────────────────────────────────────────────────────────
     const productId = String(payload?.productId || "").trim();
+    const variantId = String(payload?.variantId || "").trim();
+    const variantTitle = String(payload?.variantTitle || "").trim();
     const productHandle = String(payload?.productHandle || payload?.productId || "product").trim();
     const productTitle = String(payload?.productTitle || payload?.productHandle || "Product").trim();
 
@@ -193,7 +202,7 @@ export const action = async ({ request }) => {
       return json({ error: "A valid wishlist operation and product details are required." }, { status: 400 });
     }
 
-    if (operation === "add" && customerId) {
+    if (operation === "add") {
       const used = await currentUsage(shop, month);
       if (Number.isFinite(limit) && used >= limit) {
         return json({
@@ -206,7 +215,7 @@ export const action = async ({ request }) => {
     if (operation === "add") {
       if (customerId) {
         const result = await upsertWishlistItem(shop, customerId, {
-          productId, productHandle, productTitle,
+          productId, variantId, variantTitle, productHandle, productTitle,
           productImage: payload.productImage,
           productPrice: payload.productPrice,
         });
@@ -220,7 +229,7 @@ export const action = async ({ request }) => {
       }
     } else {
       if (customerId) {
-        const removed = await deleteWishlistItem(shop, customerId, productId);
+        const removed = await deleteWishlistItem(shop, customerId, productId, variantId);
         if (removed) {
           await recordAnalytics(shop, { removes: 1 }).catch((e) =>
             console.error("Analytics update failed on remove", e));

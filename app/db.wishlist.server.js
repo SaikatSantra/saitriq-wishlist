@@ -3,11 +3,13 @@ import prisma from "./db.server";
 // ─── Wishlist items ───────────────────────────────────────────────────────────
 
 export const upsertWishlistItem = async (shop, customerId, item) => {
+  const variantId = item.variantId || "";
   const existing = await prisma.wishlistItem.findUnique({
-    where: { shop_customerId_productId: { shop, customerId, productId: item.productId } },
+    where: { shop_customerId_productId_variantId: { shop, customerId, productId: item.productId, variantId } },
   });
 
   const data = {
+    variantTitle: item.variantTitle || null,
     productHandle: item.productHandle,
     productTitle: item.productTitle,
     productImage: item.productImage || null,
@@ -16,25 +18,25 @@ export const upsertWishlistItem = async (shop, customerId, item) => {
 
   if (existing) {
     await prisma.wishlistItem.update({
-      where: { shop_customerId_productId: { shop, customerId, productId: item.productId } },
+      where: { shop_customerId_productId_variantId: { shop, customerId, productId: item.productId, variantId } },
       data,
     });
     return { created: false };
   }
 
   await prisma.wishlistItem.create({
-    data: { shop, customerId, productId: item.productId, ...data },
+    data: { shop, customerId, productId: item.productId, variantId, ...data },
   });
   return { created: true };
 };
 
-export const deleteWishlistItem = async (shop, customerId, productId) => {
+export const deleteWishlistItem = async (shop, customerId, productId, variantId = "") => {
   const existing = await prisma.wishlistItem.findUnique({
-    where: { shop_customerId_productId: { shop, customerId, productId } },
+    where: { shop_customerId_productId_variantId: { shop, customerId, productId, variantId: variantId || "" } },
   });
   if (!existing) return false;
   await prisma.wishlistItem.delete({
-    where: { shop_customerId_productId: { shop, customerId, productId } },
+    where: { shop_customerId_productId_variantId: { shop, customerId, productId, variantId: variantId || "" } },
   });
   return true;
 };
@@ -66,6 +68,8 @@ export const countWishlistSavesForMonth = async (shop, month) => {
 
 const toItem = (row) => ({
   productId: row.productId,
+  variantId: row.variantId,
+  variantTitle: row.variantTitle || null,
   productHandle: row.productHandle,
   productTitle: row.productTitle,
   productImage: row.productImage || null,

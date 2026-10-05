@@ -1,28 +1,15 @@
-{% comment %}
-  Saitriq Wishlist — Collection page auto-inject (manual install for legacy themes)
-  ---------------------------------------------------------------------------------
-  Paste this line ONCE anywhere that loads on collection/product pages
-  (e.g. theme.liquid just before </body>, or collection.liquid):
-
-    {% render 'wishlist-collection-inject' %}
-
-  The snippet renders a <template> with the heart button HTML.
-  JS clones it onto every product card and toggles .is-active only.
-  No innerHTML injection — icon switching is pure CSS.
-{% endcomment %}
+{% doc %}
+Injects wishlist toggle buttons into collection product cards.
+{% enddoc %}
 
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
 
-{%- comment -%}
-  <template> holds the button markup. JS clones it for each product card.
-  The default heart uses two spans toggled by CSS .is-active.
-{%- endcomment -%}
 <template id="sai-collection-btn-tpl">
   <button
     type="button"
     class="sai-wishlist sai-wishlist--collection"
     data-sai-collection-wishlist
-    aria-label="Add to wishlist"
+    aria-label="{{ 'wishlist.add_to_wishlist' | t }}"
   >
     <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
@@ -66,40 +53,11 @@
       return id;
     };
 
-    // ── Toast ──────────────────────────────────────────────────────────────
-    const announce = (message, image, title) => {
-      let toast = document.querySelector('[data-sai-wishlist-toast]');
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.dataset.saiWishlistToast = '';
-        toast.className = 'sai-wishlist__toast';
-        toast.setAttribute('role', 'status');
-        toast.setAttribute('aria-live', 'polite');
-        document.body.append(toast);
-      }
-      if (image || title) {
-        toast.innerHTML = `
-          <div class="sai-wishlist__toast-inner">
-            ${image ? `<img class="sai-wishlist__toast-img" src="${image}" alt="" aria-hidden="true">` : ''}
-            <div class="sai-wishlist__toast-body">
-              <span class="sai-wishlist__toast-label">${message}</span>
-              ${title ? `<span class="sai-wishlist__toast-title">${title}</span>` : ''}
-            </div>
-          </div>`;
-      } else {
-        toast.textContent = message;
-      }
-      toast.classList.add('is-visible');
-      clearTimeout(window.saitriqWishlistToastTimer);
-      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
-    };
-    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message, e.detail.image, e.detail.title); });
-
     // ── View — class only, no innerHTML ───────────────────────────────────
     const renderButton = (btn, productId) => {
       const saved = readItems().some((i) => String(i.id) === String(productId));
       btn.classList.toggle('is-active', saved);
-      btn.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
+      btn.setAttribute('aria-label', saved ? {{ 'wishlist.remove_from_wishlist' | t | json }} : {{ 'wishlist.add_to_wishlist' | t | json }});
     };
 
     // ── Local fallback ─────────────────────────────────────────────────────
@@ -113,11 +71,11 @@
       if (operation === 'add' && idx < 0) items.push({ ...toLocalItem(item), addedAt: new Date().toISOString() });
       if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
       saveItems(items);
-      announce(
-        operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist',
-        item.productImage || '',
-        item.productTitle || ''
-      );
+      window.saitriqWishlistToast?.({
+        message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }},
+        image: item.productImage || '',
+        title: item.productTitle || ''
+      });
       return items;
     };
 
@@ -133,7 +91,7 @@
       if (res.status === 429) {
         const data = await res.json().catch(() => ({}));
         if (operation === 'remove' || operation === 'clear') return readItems();
-        announce(data.error || 'Monthly wishlist limit reached. Upgrade your plan.');
+        window.saitriqWishlistToast?.({ message: data.error || {{ 'wishlist.limit_reached' | t | json }} });
         return readItems();
       }
 
@@ -147,11 +105,11 @@
         image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt
       }));
       saveItems(synced);
-      announce(
-        operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist',
-        item.productImage || '',
-        item.productTitle || ''
-      );
+      window.saitriqWishlistToast?.({
+        message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }},
+        image: item.productImage || '',
+        title: item.productTitle || ''
+      });
       return synced;
     };
 

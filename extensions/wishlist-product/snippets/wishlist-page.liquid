@@ -1,85 +1,18 @@
-{% comment %}
-  Saitriq Wishlist — Wishlist page (manual install)
-  ─────────────────────────────────────────────────
-  Drop this snippet into any Liquid template to render
-  the full wishlist page: grid, images, prices, remove
-  buttons, and a "Clear all" control.
-
-  ── BASIC USAGE ────────────────────────────────────────
-  Create a page in Online Store → Pages with the handle
-  set to "wishlist", then add to its template:
-
-    {% render 'wishlist-page' %}
-
-  Or paste it directly into any section / template file.
-
-  ── CUSTOMISE WITH VARIABLES ───────────────────────────
-  Override any default by passing variables when rendering:
-
-    {% render 'wishlist-page',
-       heading:      'Saved items',
-       empty_message:'Nothing saved yet.',
-       columns:      3,
-       show_prices:  true,
-       show_remove:  true,
-       button_label: 'Remove',
-       card_class:   'product-card'
-    %}
-
-  Variable reference
-  ──────────────────
-  heading       (string)  — Section heading text.
-                            Default: "My wishlist"
-
-  empty_message (string)  — Text shown when the list is empty.
-                            Default: "You have not saved any products yet."
-
-  columns       (number)  — Grid columns on desktop (2–6).
-                            Default: 4
-
-  show_prices   (boolean) — Show the saved product price.
-                            Default: true
-
-  show_remove   (boolean) — Show the remove button on each card.
-                            Default: true
-
-  button_label  (string)  — Label for the per-card remove button.
-                            Default: "Remove"
-
-  card_class    (string)  — Extra CSS class added to every product card <li>.
-                            Useful to inherit your theme's card styling.
-                            Default: "" (empty — only sai-wishlist-page__item applied)
-
-  ── SETTINGS FROM THE APP DASHBOARD ───────────────────
-  When a logged-in customer opens the page the snippet
-  also fetches live settings from the app proxy and
-  merges them over the Liquid defaults, so changes made
-  in the Saitriq Wishlist → Page design settings screen
-  apply automatically even on manual installs.
-
-  ── CSS CUSTOMISATION ──────────────────────────────────
-  All classes are prefixed with .sai-wishlist-page__
-  Override them in your theme CSS, e.g.:
-
-    .sai-wishlist-page__items { gap: 2rem; }
-    .sai-wishlist-page__title { color: #333; }
-    .sai-wishlist-page__remove { color: red; }
-
-  The grid column count is controlled by the CSS variable
-  --sai-wishlist-columns set on the <ul> element. You can
-  override it per breakpoint in your CSS:
-
-    @media (max-width: 768px) {
-      .sai-wishlist-page__items {
-        --sai-wishlist-columns: 2;
-      }
-    }
-{% endcomment %}
+{% doc %}
+Renders a customizable wishlist grid with app-proxy sync.
+@param {string} [heading]
+@param {string} [empty_message]
+@param {number} [columns]
+@param {boolean} [show_prices]
+@param {boolean} [show_remove]
+@param {string} [button_label]
+@param {string} [card_class]
+{% enddoc %}
 
 {{ 'wishlist.css' | asset_url | stylesheet_tag }}
 
 {% assign wp_heading      = heading       | default: 'My wishlist' %}
-{% assign wp_empty_msg    = empty_message | default: 'You have not saved any products yet.' %}
+{% assign wp_empty_msg    = empty_message | default: 'wishlist.nothing_saved_yet' %}
 {% assign wp_columns      = columns       | default: 4 %}
 {% assign wp_show_prices  = show_prices   | default: true %}
 {% assign wp_show_remove  = show_remove   | default: true %}
@@ -209,7 +142,7 @@
                 try { await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, productHandle: item.handle, productTitle: item.title }) }); } catch {}
                 setItems(getItems().filter((s) => String(s.id) !== String(item.id)));
                 dispatch('saitriq:wishlist-updated');
-                dispatch('saitriq:wishlist-toast', { message: 'Removed from wishlist' });
+                dispatch('saitriq:wishlist-toast', { message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
                 render();
                 return;
               }
@@ -222,7 +155,7 @@
               if (!Array.isArray(data.items)) throw new Error('Invalid response');
               setItems(data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt })));
               dispatch('saitriq:wishlist-updated');
-              dispatch('saitriq:wishlist-toast', { message: 'Removed from wishlist' });
+              dispatch('saitriq:wishlist-toast', { message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
               render();
             } catch (err) {
               emptyEl.textContent = 'Could not remove item. Please try again.';
@@ -246,7 +179,7 @@
           try { await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation: 'clear', visitorId: getVisitorId() }) }); } catch {}
           setItems([]);
           dispatch('saitriq:wishlist-updated');
-          dispatch('saitriq:wishlist-toast', { message: 'Wishlist cleared' });
+          dispatch('saitriq:wishlist-toast', { message: {{ 'wishlist.wishlist_cleared' | t | json }} });
           render();
           return;
         }

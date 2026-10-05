@@ -73,7 +73,7 @@ export default function HowToUsePage() {
       </svg>
     </span>
     <!-- Filled heart — shown when saved (.is-active) via CSS -->
-    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
       <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
       </svg>
@@ -230,7 +230,7 @@ export default function HowToUsePage() {
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </span>
-    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
       <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
       </svg>
@@ -333,7 +333,7 @@ export default function HowToUsePage() {
 
     const attach = async (link) => {
       const handle = handleFromLink(link);
-      const card = link.closest('li,article,.card,.product-card,.grid__item,[class*="product-card"],[class*="product-item"],[class*="card--product"]');
+      const card = link.closest('li,article,.card-wrapper,.product-card-wrapper,.card,.product-card,.grid__item,[class*="product-card"],[class*="product-item"],[class*="card--product"]');
       if (!handle||!card||card.dataset.saiWishlistAttaching||card.querySelector('[data-sai-collection-wishlist]')) return;
       card.dataset.saiWishlistAttaching = '1';
       const btn = tpl.content.cloneNode(true).querySelector('[data-sai-collection-wishlist]');
@@ -356,7 +356,6 @@ export default function HowToUsePage() {
 
     const scan = () => [...document.querySelectorAll('a[href*="/products/"]')]
       .filter((a)=>handleFromLink(a))
-      .filter((a,i,arr)=>arr.findIndex((b)=>handleFromLink(b)===handleFromLink(a))===i)
       .forEach(attach);
 
     // Scan immediately, then again after auth resolves
@@ -380,8 +379,8 @@ export default function HowToUsePage() {
         {/* ── Step 3: wishlist page ── */}
         <s-section heading="Step 3 — Create snippets/wishlist-page.liquid">
           <s-paragraph>
-            Create a snippet named <code>wishlist-page</code> and paste the code from the{" "}
-            <s-link href="/app/api-docs">Developer API page</s-link> (Theme JS reference section).
+            Create a snippet named <code>wishlist-page</code>. The full snippet code is available in your theme extension files at{" "}
+            <code>extensions/wishlist-product/snippets/wishlist-page.liquid</code> — copy its contents into your theme snippet.
             Then create <code>templates/page.wishlist.liquid</code> containing:
           </s-paragraph>
           <s-banner tone="info"><code>{"{% render 'wishlist-page' %}"}</code></s-banner>

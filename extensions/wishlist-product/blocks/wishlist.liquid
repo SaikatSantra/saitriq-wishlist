@@ -1,5 +1,3 @@
-{% comment %} CSS loaded globally by the Saitriq Wishlist app embed block {% endcomment %}
-
 {% assign product_for_wishlist = block.settings.product | default: product %}
 {% assign btn_color = block.settings.button_color | default: '#1a1a1a' %}
 {% assign btn_active_color = block.settings.active_color | default: '#1a1a1a' %}
@@ -16,6 +14,7 @@
   data-product-title="{{ product_for_wishlist.title | escape }}"
   data-product-image="{{ product_for_wishlist.featured_image | image_url: width: 600 | escape }}"
   data-product-price="{{ product_for_wishlist.price | money | escape }}"
+  data-product-variant-id="{{ product_for_wishlist.selected_or_first_available_variant.id }}"
   data-label-add="{{ label_add | escape }}"
   data-label-saved="{{ label_saved | escape }}"
   style="
@@ -34,7 +33,7 @@
       <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
         {{ custom_svg }}
       </span>
-      <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+      <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
         {{ custom_svg }}
       </span>
     {% else %}
@@ -50,7 +49,7 @@
         </svg>
       </span>
 
-      <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
+      <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
         <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>
@@ -58,7 +57,7 @@
     {% endif %}
 
     {% if show_label %}
-      <span class="sai-wishlist__label" data-sai-wishlist-label>{{ label_add }}</span>
+      <span class="sai-wishlist__label" data-sai-wishlist-label>{{ label_add | escape }}</span>
     {% endif %}
   </button>
 </div>
@@ -89,50 +88,15 @@
     const productTitle = container.dataset.productTitle;
     const productImage = container.dataset.productImage;
     const productPrice = container.dataset.productPrice;
-    const labelAdd = container.dataset.labelAdd || 'Add to wishlist';
-    const labelSaved = container.dataset.labelSaved || 'Saved';
+    const productScope = button.closest('product-info, .shopify-section') || document;
+    const getVariantInput = () => productScope.querySelector('form[action*="/cart/add"] [name="id"]') || productScope.querySelector('[name="id"]');
+    const getVariantId = () => String(getVariantInput()?.value || container.dataset.productVariantId || '').trim();
+    const itemKey = (item) => `${String(item.id)}::${String(item.variantId || '')}`;
+    const labelAdd = container.dataset.labelAdd || {{ 'wishlist.add_to_wishlist' | t | json }};
+    const labelSaved = container.dataset.labelSaved || {{ 'wishlist.saved' | t | json }};
 
     let requestInFlight = false;
     let customerAuthenticated = false;
-
-    const announce = (message, image, title) => {
-      let toast = document.querySelector('[data-sai-wishlist-toast]');
-
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.dataset.saiWishlistToast = '';
-        toast.className = 'sai-wishlist__toast';
-        toast.setAttribute('role', 'status');
-        toast.setAttribute('aria-live', 'polite');
-        document.body.append(toast);
-      }
-
-      if (image || title) {
-        toast.innerHTML = `
-          <div class="sai-wishlist__toast-inner">
-            ${image ? `<img class="sai-wishlist__toast-img" src="${image}" alt="" aria-hidden="true">` : ''}
-            <div class="sai-wishlist__toast-body">
-              <span class="sai-wishlist__toast-label">${message}</span>
-              ${title ? `<span class="sai-wishlist__toast-title">${title}</span>` : ''}
-            </div>
-          </div>`;
-      } else {
-        toast.textContent = message;
-      }
-
-      toast.classList.add('is-visible');
-      clearTimeout(window.saitriqWishlistToastTimer);
-
-      window.saitriqWishlistToastTimer = setTimeout(() => {
-        toast.classList.remove('is-visible');
-      }, 2200);
-    };
-
-    window.addEventListener('saitriq:wishlist-toast', (e) => {
-      if (e.detail?.message) {
-        announce(e.detail.message, e.detail.image, e.detail.title);
-      }
-    });
 
     const getWishlist = () => {
       try {
@@ -157,9 +121,8 @@
     };
 
     const refresh = () => {
-      const saved = getWishlist().some(
-        item => String(item.id) === String(productId)
-      );
+      const variantId = getVariantId();
+      const saved = getWishlist().some(item => itemKey(item) === itemKey({ id: productId, variantId }));
       updateView(saved);
     };
 
@@ -177,12 +140,14 @@
     const persistLocalFallback = (operation, item) => {
       const items = getWishlist();
       const index = items.findIndex(
-        saved => String(saved.id) === String(item.productId)
+        saved => itemKey(saved) === itemKey({ id: item.productId, variantId: item.variantId })
       );
 
       if (operation === 'add' && index < 0) {
         items.push({
           id: item.productId,
+          variantId: item.variantId || '',
+          variantTitle: item.variantTitle || '',
           handle: item.productHandle,
           title: item.productTitle,
           image: item.productImage || '',
@@ -197,11 +162,11 @@
 
       saveWishlist(items);
 
-      announce(
-        operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist',
-        item.productImage || '',
-        item.productTitle || ''
-      );
+      window.saitriqWishlistToast?.({
+        message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }},
+        image: item.productImage || '',
+        title: item.productTitle || ''
+      });
 
       return items;
     };
@@ -247,13 +212,11 @@
         const data = await res.json().catch(() => ({}));
 
         if (operation === 'remove' || operation === 'clear') {
-          announce('Removed from wishlist');
+          window.saitriqWishlistToast?.({ message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
           return getWishlist();
         }
 
-        announce(
-          data.error || 'Monthly wishlist limit reached. Upgrade your plan.'
-        );
+        window.saitriqWishlistToast?.({ message: data.error || {{ 'wishlist.limit_reached' | t | json }} });
 
         return getWishlist();
       }
@@ -272,6 +235,8 @@
 
       const synced = data.items.map(item => ({
         id: item.productId,
+        variantId: item.variantId || '',
+        variantTitle: item.variantTitle || '',
         handle: item.productHandle,
         title: item.productTitle,
         image: item.productImage || '',
@@ -281,11 +246,11 @@
 
       saveWishlist(synced);
 
-      announce(
-        operation === 'add' ? 'Added to wishlist' : 'Removed from wishlist',
-        item.productImage || '',
-        item.productTitle || ''
-      );
+      window.saitriqWishlistToast?.({
+        message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }},
+        image: item.productImage || '',
+        title: item.productTitle || ''
+      });
 
       return synced;
     };
@@ -309,6 +274,8 @@
 
         let synced = data.items.map(item => ({
           id: item.productId,
+          variantId: item.variantId || '',
+          variantTitle: item.variantTitle || '',
           handle: item.productHandle,
           title: item.productTitle,
           image: item.productImage || '',
@@ -317,9 +284,11 @@
         }));
 
         for (const item of getWishlist()) {
-          if (!synced.some(saved => String(saved.id) === String(item.id))) {
+          if (!synced.some(saved => itemKey(saved) === itemKey(item))) {
             const merged = await sync('add', {
               productId: item.id,
+              variantId: item.variantId || '',
+              variantTitle: item.variantTitle || '',
               productHandle: item.handle,
               productTitle: item.title,
               productImage: item.image,
@@ -350,6 +319,9 @@
     window.addEventListener('storage', (e) => {
       if (e.key === storageKey) refresh();
     });
+    productScope.addEventListener('change', refresh);
+    productScope.addEventListener('input', refresh);
+    productScope.addEventListener('variant:change', refresh);
 
     button.addEventListener('click', async () => {
       if (requestInFlight) return;
@@ -360,12 +332,13 @@
       try {
         await initialSync;
 
-        const saved = getWishlist().some(
-          item => String(item.id) === String(productId)
-        );
+        const variantId = getVariantId();
+        const variantData = { id: productId, variantId };
+        const saved = getWishlist().some(item => itemKey(item) === itemKey(variantData));
 
         const result = await sync(saved ? 'remove' : 'add', {
           productId,
+          variantId,
           productHandle,
           productTitle,
           productImage,
@@ -375,7 +348,7 @@
         if (result) updateView(!saved);
       } catch (error) {
         console.error('Wishlist request failed', error);
-        announce('Wishlist is temporarily unavailable. Please try again.');
+        window.saitriqWishlistToast?.({ message: {{ 'wishlist.temporarily_unavailable' | t | json }} });
       } finally {
         button.disabled = false;
         requestInFlight = false;
@@ -387,7 +360,7 @@
 
 {% schema %}
 {
-  "name": "Wishlist",
+  "name": "Product Page Button",
   "target": "section",
   "settings": [
     {

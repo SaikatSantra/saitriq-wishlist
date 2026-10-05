@@ -648,7 +648,7 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
   const attach = async (link) => {
     const handle = handleFromLink(link);
     if (!handle) return;
-    const card = link.closest('li, article, .card, .product-card, .grid__item, [class*="product-item"]');
+    const card = link.closest('li, article, .card-wrapper, .product-card-wrapper, .card, .product-card, .grid__item, [class*="product-card"], [class*="product-item"], [class*="card--product"]');
     if (!card || card.querySelector('[data-sai-col-btn]')) return;
 
     const btn = document.createElement('button');
@@ -690,7 +690,7 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
 
   const scan = () => {
     [...document.querySelectorAll('a[href*="/products/"]')]
-      .filter((l, i, arr) => arr.findIndex((x) => handleFromLink(x) === handleFromLink(l)) === i)
+      .filter((l) => handleFromLink(l))
       .forEach(attach);
   };
 
