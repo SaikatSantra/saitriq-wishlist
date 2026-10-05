@@ -44,6 +44,7 @@
     const initButton = (container) => {
       if (container.dataset.initialized === 'true') return;
       container.dataset.initialized = 'true';
+      container.hidden = false;
 
       const button = container.querySelector('[data-sai-wishlist-button]');
       const labelEl = container.querySelector('[data-sai-wishlist-label]');
