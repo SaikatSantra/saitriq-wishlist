@@ -18,7 +18,7 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>Silverclouding Wishlist</h1>
+        <h1 className={styles.heading}>Saitriq Wishlist</h1>
         <p className={styles.text}>
           Give customers a persistent wishlist that works across devices.
         </p>
@@ -35,7 +35,7 @@ export default function App() {
               </button>
             </Form>
             <p className={styles.text}>
-              Install or open Silverclouding Wishlist from Shopify Admin to begin setup.
+              Install or open Saitriq Wishlist from Shopify Admin to begin setup.
             </p>
           </>
         )}

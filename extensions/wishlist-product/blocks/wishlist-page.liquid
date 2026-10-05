@@ -74,14 +74,14 @@
     const _script = document.currentScript;
 
     const whenEmbedReady = (fn) => {
-      if (window.silvercloudingEmbedEnabled) { fn(); return; }
-      document.addEventListener('silverclouding:embed-ready', fn, { once: true });
+      if (window.saitriqEmbedEnabled) { fn(); return; }
+      document.addEventListener('saitriq:embed-ready', fn, { once: true });
     };
 
     whenEmbedReady(() => {
-    const storageKey = 'silverclouding_wishlist';
-    const visitorStorageKey = 'silverclouding_wishlist_visitor';
-    const syncEndpoint = '/apps/silverclouding-wishlist';
+    const storageKey = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
+    const syncEndpoint = '/apps/saitriq-wishlist';
     let localRevision = 0;
     let customerAuthenticated = false;    let settings = {
       heading: '{{ block.settings.heading | escape }}',
@@ -182,8 +182,8 @@
     };
 
     const syncItems = async () => {
-      if (window.silvercloudingWishlistSyncPromise) {
-        return window.silvercloudingWishlistSyncPromise;
+      if (window.saitriqWishlistSyncPromise) {
+        return window.saitriqWishlistSyncPromise;
       }
 
       const syncRun = (async () => {
@@ -218,10 +218,10 @@
       render();
       })();
 
-      window.silvercloudingWishlistSyncPromise = syncRun.finally(() => {
-        window.silvercloudingWishlistSyncPromise = null;
+      window.saitriqWishlistSyncPromise = syncRun.finally(() => {
+        window.saitriqWishlistSyncPromise = null;
       });
-      return window.silvercloudingWishlistSyncPromise;
+      return window.saitriqWishlistSyncPromise;
     };
 
     const esc = (str) => {
@@ -332,11 +332,11 @@
         if (!response.ok) throw new Error(data.description || data.message || {{ 'wishlist.add_to_cart_error' | t | json }});
 
         refreshCartUi(data);
-        window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', {
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
           detail: { message: {{ 'wishlist.added_to_cart' | t | json }} }
         }));
       } catch (error) {
-        window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', {
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
           detail: { message: error.message || {{ 'wishlist.add_to_cart_error' | t | json }} }
         }));
       } finally {
@@ -464,8 +464,8 @@
             productTitle: item.title, productImage: item.image
           });
           localStorage.setItem(storageKey, JSON.stringify(getItems().filter((s) => !(String(s.id) === String(item.id) && String(s.variantId || '') === String(item.variantId || '')))));
-          window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
-          window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', { detail: { message: {{ 'wishlist.removed_from_wishlist' | t | json }} } }));
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: {{ 'wishlist.removed_from_wishlist' | t | json }} } }));
           return;
         }
         const response = await fetch(syncEndpoint, {
@@ -479,8 +479,8 @@
         if (!Array.isArray(data.items)) throw new Error('Wishlist remove response was invalid');
         const serverItems = data.items.map((s) => ({ id: s.productId, variantId: s.variantId || '', variantTitle: s.variantTitle || '', handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
         localStorage.setItem(storageKey, JSON.stringify(serverItems));
-        window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
-        window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', { detail: { message: {{ 'wishlist.removed_from_wishlist' | t | json }} } }));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: {{ 'wishlist.removed_from_wishlist' | t | json }} } }));
       } catch (error) {
         emptyMessage.textContent = error.message;
         emptyMessage.hidden = false;
@@ -524,8 +524,8 @@
         if (!customerAuthenticated) {
           await trackGuest('clear');
           localStorage.setItem(storageKey, '[]');
-          window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
-          window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', {
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
             detail: { message: {{ 'wishlist.wishlist_cleared' | t | json }} }
           }));
           return;
@@ -554,7 +554,7 @@
           price: item.productPrice || '',
           addedAt: item.createdAt
         }))));
-        window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
       } catch (error) {
         emptyMessage.textContent = error.message;
         emptyMessage.hidden = false;
@@ -633,7 +633,7 @@
     render();
     loadAppSettings().catch(() => {}).then(render);
     if (!isSharedView) syncItems().catch(() => {});
-    window.addEventListener('silverclouding:wishlist-updated', render);
+    window.addEventListener('saitriq:wishlist-updated', render);
     window.addEventListener('storage', (event) => {
       if (event.key === storageKey) render();
     });

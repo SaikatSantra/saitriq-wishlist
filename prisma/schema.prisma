@@ -102,3 +102,42 @@ model AddonPurchase {
 
   @@index([shop, month])
 }
+
+model MonthlyPlanPurchase {
+  id           Int      @id @default(autoincrement())
+  shop         String
+  month        String   // "YYYY-MM" — plan purchase applies only to this month
+  planId       String
+  billingId    String   @unique
+  purchaseType String   @default("base")
+  createdAt    DateTime @default(now())
+
+  @@index([shop, month])
+}
+
+model ScheduledPlanChange {
+  id             Int      @id @default(autoincrement())
+  shop           String   @unique
+  planId         String
+  previousPlanId String
+  effectiveMonth String   // "YYYY-MM"
+  effectiveAt    DateTime?
+  subscriptionId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model PlanPurchaseHistory {
+  id               Int      @id @default(autoincrement())
+  shop             String
+  planId           String
+  purchaseType     String
+  amount           Float
+  eventKey         String   @unique
+  subscriptionId   String?
+  billingPeriodEnd DateTime?
+  occurredAt       DateTime @default(now())
+
+  @@index([shop, occurredAt])
+  @@index([shop, subscriptionId, billingPeriodEnd])
+}

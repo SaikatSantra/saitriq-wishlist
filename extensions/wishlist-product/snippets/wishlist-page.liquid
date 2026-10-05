@@ -38,9 +38,9 @@ Renders a customizable wishlist grid with app-proxy sync.
 
 <script>
   (() => {
-    const storageKey     = 'silverclouding_wishlist';
-    const visitorKey     = 'silverclouding_wishlist_visitor';
-    const syncEndpoint   = '/apps/silverclouding-wishlist';
+    const storageKey     = 'saitriq_wishlist';
+    const visitorKey     = 'saitriq_wishlist_visitor';
+    const syncEndpoint   = '/apps/saitriq-wishlist';
 
     // Default settings from Liquid — overridden by proxy response for logged-in customers
     let settings = {
@@ -141,8 +141,8 @@ Renders a customizable wishlist grid with app-proxy sync.
                 // Guest: local remove + analytics tracking
                 try { await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, productHandle: item.handle, productTitle: item.title }) }); } catch {}
                 setItems(getItems().filter((s) => String(s.id) !== String(item.id)));
-                dispatch('silverclouding:wishlist-updated');
-                dispatch('silverclouding:wishlist-toast', { message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
+                dispatch('saitriq:wishlist-updated');
+                dispatch('saitriq:wishlist-toast', { message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
                 render();
                 return;
               }
@@ -154,8 +154,8 @@ Renders a customizable wishlist grid with app-proxy sync.
               const data = await res.json();
               if (!Array.isArray(data.items)) throw new Error('Invalid response');
               setItems(data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt })));
-              dispatch('silverclouding:wishlist-updated');
-              dispatch('silverclouding:wishlist-toast', { message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
+              dispatch('saitriq:wishlist-updated');
+              dispatch('saitriq:wishlist-toast', { message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
               render();
             } catch (err) {
               emptyEl.textContent = 'Could not remove item. Please try again.';
@@ -178,8 +178,8 @@ Renders a customizable wishlist grid with app-proxy sync.
         if (!customerAuthenticated) {
           try { await fetch(syncEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ operation: 'clear', visitorId: getVisitorId() }) }); } catch {}
           setItems([]);
-          dispatch('silverclouding:wishlist-updated');
-          dispatch('silverclouding:wishlist-toast', { message: {{ 'wishlist.wishlist_cleared' | t | json }} });
+          dispatch('saitriq:wishlist-updated');
+          dispatch('saitriq:wishlist-toast', { message: {{ 'wishlist.wishlist_cleared' | t | json }} });
           render();
           return;
         }
@@ -190,7 +190,7 @@ Renders a customizable wishlist grid with app-proxy sync.
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Clear failed');
         setItems(Array.isArray(data.items) ? data.items : []);
-        dispatch('silverclouding:wishlist-updated');
+        dispatch('saitriq:wishlist-updated');
         render();
       } catch (err) {
         emptyEl.textContent = 'Could not clear wishlist. Please try again.';
@@ -202,7 +202,7 @@ Renders a customizable wishlist grid with app-proxy sync.
 
     // ── Initial sync ──────────────────────────────────────────────────────
     const syncItems = async () => {
-      if (window.silvercloudingWishlistSyncPromise) return window.silvercloudingWishlistSyncPromise;
+      if (window.saitriqWishlistSyncPromise) return window.saitriqWishlistSyncPromise;
       const run = (async () => {
         const res = await fetch(syncEndpoint, { credentials: 'same-origin' }).catch(() => null);
         if (!res || !res.ok) { render(); return; }
@@ -216,7 +216,7 @@ Renders a customizable wishlist grid with app-proxy sync.
         setItems(data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt })));
         render();
       })();
-      window.silvercloudingWishlistSyncPromise = run.finally(() => { window.silvercloudingWishlistSyncPromise = null; });
+      window.saitriqWishlistSyncPromise = run.finally(() => { window.saitriqWishlistSyncPromise = null; });
       return run;
     };
 
@@ -277,7 +277,7 @@ Renders a customizable wishlist grid with app-proxy sync.
     // ── Boot ──────────────────────────────────────────────────────────────
     render();
     if (!isSharedView) syncItems().catch(() => {});
-    window.addEventListener('silverclouding:wishlist-updated', render);
+    window.addEventListener('saitriq:wishlist-updated', render);
     window.addEventListener('storage', (e) => { if (e.key === storageKey) render(); });
   })();
 </script>

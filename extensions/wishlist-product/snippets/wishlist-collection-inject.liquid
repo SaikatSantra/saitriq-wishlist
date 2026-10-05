@@ -27,12 +27,12 @@ Injects wishlist toggle buttons into collection product cards.
 
 <script>
   (() => {
-    if (window.silvercloudingWishlistCollectionLoaded) return;
-    window.silvercloudingWishlistCollectionLoaded = true;
+    if (window.saitriqWishlistCollectionLoaded) return;
+    window.saitriqWishlistCollectionLoaded = true;
 
-    const storageKey       = 'silverclouding_wishlist';
-    const visitorStorageKey = 'silverclouding_wishlist_visitor';
-    const endpoint         = '/apps/silverclouding-wishlist';
+    const storageKey       = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
+    const endpoint         = '/apps/saitriq-wishlist';
     const tpl              = document.getElementById('sai-collection-btn-tpl');
     if (!tpl) return;
 
@@ -45,7 +45,7 @@ Injects wishlist toggle buttons into collection product cards.
     };
     const saveItems = (items) => {
       localStorage.setItem(storageKey, JSON.stringify(items));
-      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
     };
     const getVisitorId = () => {
       let id = localStorage.getItem(visitorStorageKey);
@@ -71,7 +71,7 @@ Injects wishlist toggle buttons into collection product cards.
       if (operation === 'add' && idx < 0) items.push({ ...toLocalItem(item), addedAt: new Date().toISOString() });
       if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
       saveItems(items);
-      window.silvercloudingWishlistToast?.({
+      window.saitriqWishlistToast?.({
         message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }},
         image: item.productImage || '',
         title: item.productTitle || ''
@@ -91,7 +91,7 @@ Injects wishlist toggle buttons into collection product cards.
       if (res.status === 429) {
         const data = await res.json().catch(() => ({}));
         if (operation === 'remove' || operation === 'clear') return readItems();
-        window.silvercloudingWishlistToast?.({ message: data.error || {{ 'wishlist.limit_reached' | t | json }} });
+        window.saitriqWishlistToast?.({ message: data.error || {{ 'wishlist.limit_reached' | t | json }} });
         return readItems();
       }
 
@@ -105,7 +105,7 @@ Injects wishlist toggle buttons into collection product cards.
         image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt
       }));
       saveItems(synced);
-      window.silvercloudingWishlistToast?.({
+      window.saitriqWishlistToast?.({
         message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }},
         image: item.productImage || '',
         title: item.productTitle || ''
@@ -215,7 +215,7 @@ Injects wishlist toggle buttons into collection product cards.
     window.addEventListener('storage', (e) => { if (e.key === storageKey) scan(); });
 
     // Re-render all buttons when wishlist changes
-    window.addEventListener('silverclouding:wishlist-updated', () => {
+    window.addEventListener('saitriq:wishlist-updated', () => {
       document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn) => {
         const card = btn.parentElement;
         const link = card && card.querySelector('a[href*="/products/"]');

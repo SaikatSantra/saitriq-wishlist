@@ -38,9 +38,9 @@ Renders a wishlist toggle for a product.
 
 <script>
   (() => {
-    const storageKey = 'silverclouding_wishlist';
-    const visitorStorageKey = 'silverclouding_wishlist_visitor';
-    const syncEndpoint = '/apps/silverclouding-wishlist';
+    const storageKey = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
+    const syncEndpoint = '/apps/saitriq-wishlist';
     const script = document.currentScript;
     const block = script && script.previousElementSibling;
     const button = block && block.querySelector('[data-sai-wishlist-button]');
@@ -62,7 +62,7 @@ Renders a wishlist toggle for a product.
     };
     const saveWishlist = (items) => {
       try { localStorage.setItem(storageKey, JSON.stringify(items)); } catch {}
-      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
     };
     const getVisitorId = () => {
       let id = localStorage.getItem(visitorStorageKey);
@@ -87,7 +87,7 @@ Renders a wishlist toggle for a product.
       if (operation === 'add' && idx < 0) items.push({ id: item.productId, handle: item.productHandle, title: item.productTitle, image: item.productImage || '', price: item.productPrice || '', addedAt: new Date().toISOString() });
       if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
       saveWishlist(items);
-      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', {
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
         detail: {
           message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }}
         }
@@ -108,7 +108,7 @@ Renders a wishlist toggle for a product.
       if (res.status === 429) {
         const d = await res.json().catch(() => ({}));
         if (operation !== 'add') return getWishlist();
-        window.silvercloudingWishlistToast?.({ message: d.error || {{ 'wishlist.limit_reached' | t | json }} });
+        window.saitriqWishlistToast?.({ message: d.error || {{ 'wishlist.limit_reached' | t | json }} });
         return getWishlist();
       }
       if (!res.ok) { customerAuthenticated = false; return persistLocal(operation, item); }
@@ -116,7 +116,7 @@ Renders a wishlist toggle for a product.
       if (!Array.isArray(data.items)) { customerAuthenticated = false; return sync(operation, item); }
       const synced = data.items.map((s) => ({ id: s.productId, handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
       saveWishlist(synced);
-      window.dispatchEvent(new CustomEvent('silverclouding:wishlist-toast', {
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
         detail: {
           message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }}
         }
@@ -126,7 +126,7 @@ Renders a wishlist toggle for a product.
 
     // ── Initial sync ───────────────────────────────────────────────────────
     const initialSync = (() => {
-      if (window.silvercloudingWishlistSyncPromise) return window.silvercloudingWishlistSyncPromise;
+      if (window.saitriqWishlistSyncPromise) return window.saitriqWishlistSyncPromise;
       const run = (async () => {
         const res = await fetch(syncEndpoint, { credentials: 'same-origin' }).catch(() => null);
         if (!res || !res.ok) { refresh(); return; }
@@ -144,8 +144,8 @@ Renders a wishlist toggle for a product.
         saveWishlist(synced);
         refresh();
       })();
-      window.silvercloudingWishlistSyncPromise = run.finally(() => { window.silvercloudingWishlistSyncPromise = null; });
-      return window.silvercloudingWishlistSyncPromise;
+      window.saitriqWishlistSyncPromise = run.finally(() => { window.saitriqWishlistSyncPromise = null; });
+      return window.saitriqWishlistSyncPromise;
     })();
 
     // ── Button click ───────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ Renders a wishlist toggle for a product.
         if (synced) updateView(!isSaved);
       } catch (err) {
         console.error('Wishlist request failed', err);
-        window.silvercloudingWishlistToast?.({ message: {{ 'wishlist.temporarily_unavailable' | t | json }} });
+        window.saitriqWishlistToast?.({ message: {{ 'wishlist.temporarily_unavailable' | t | json }} });
       } finally {
         button.disabled = false;
         requestInFlight = false;
@@ -168,7 +168,7 @@ Renders a wishlist toggle for a product.
     });
 
     refresh();
-    window.addEventListener('silverclouding:wishlist-updated', refresh);
+    window.addEventListener('saitriq:wishlist-updated', refresh);
     window.addEventListener('storage', (e) => { if (e.key === storageKey) refresh(); });
   })();
 </script>

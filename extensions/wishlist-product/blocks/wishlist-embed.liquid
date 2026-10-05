@@ -2,7 +2,7 @@
 
 <script>
   (() => {
-    const endpoint = '/apps/silverclouding-wishlist';
+    const endpoint = '/apps/saitriq-wishlist';
 
     const applyToastSettings = (settings) => {
       if (!settings) return;
@@ -22,8 +22,8 @@
     };
 
     const initWishlistToast = () => {
-      if (window.silvercloudingWishlistToastReady) return;
-      window.silvercloudingWishlistToastReady = true;
+      if (window.saitriqWishlistToastReady) return;
+      window.saitriqWishlistToastReady = true;
 
       const showToast = (detail = {}) => {
         const { message, image, title } = detail;
@@ -54,14 +54,14 @@
         }
 
         toast.classList.add('is-visible');
-        clearTimeout(window.silvercloudingWishlistToastTimer);
-        window.silvercloudingWishlistToastTimer = setTimeout(() => {
+        clearTimeout(window.saitriqWishlistToastTimer);
+        window.saitriqWishlistToastTimer = setTimeout(() => {
           toast.classList.remove('is-visible');
         }, 2200);
       };
 
-      window.silvercloudingWishlistToast = showToast;
-      window.addEventListener('silverclouding:wishlist-toast', (event) => {
+      window.saitriqWishlistToast = showToast;
+      window.addEventListener('saitriq:wishlist-toast', (event) => {
         if (event.detail?.message) {
           showToast(event.detail);
         }
@@ -75,8 +75,8 @@
       .then((data) => applyToastSettings(data.settings))
       .catch(() => {})
       .finally(() => {
-        window.silvercloudingEmbedEnabled = true;
-        document.dispatchEvent(new CustomEvent('silverclouding:embed-ready'));
+        window.saitriqEmbedEnabled = true;
+        document.dispatchEvent(new CustomEvent('saitriq:embed-ready'));
       });
   })();
 </script>

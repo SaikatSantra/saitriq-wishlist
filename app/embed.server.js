@@ -1,5 +1,5 @@
 /**
- * Check whether the Silverclouding Wishlist app embed block is enabled
+ * Check whether the Saitriq Wishlist app embed block is enabled
  * in the merchant's currently published theme.
  *
  * Strategy (in order):
@@ -7,14 +7,14 @@
  *     extension UID or app handle in a "type" field.
  *     A block is ENABLED when found AND disabled !== true.
  *  2. If the block is absent from settings_data.json entirely, check
- *     snippets/silverclouding-wishlist.liquid existence (Shopify writes
+ *     snippets/saitriq-wishlist.liquid existence (Shopify writes
  *     this file when an app embed is first saved in some theme versions).
  *  3. Fall back to null (unknown) so the dashboard shows a neutral state
  *     instead of a false "not enabled" error.
  */
 
-const EXTENSION_UID = "01a0ecbd-948b-75d1-8ec8-38f3d977d0f5";
-const APP_HANDLE = "whislist-by-silverclouding";
+const EXTENSION_UID = "65da582c-8dde-54ca-43f2-ee621799e5d650865d87";
+const APP_HANDLE = "saitriq-wishlist";
 
 const GET_MAIN_THEME = `#graphql
   query GetMainTheme {

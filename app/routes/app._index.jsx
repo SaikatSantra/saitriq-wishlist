@@ -50,11 +50,11 @@ export const shouldRevalidate = () => true;
 const FAQ_ITEMS = [
   {
     q: "Will this app slow down my site or break my theme?",
-    a: "No. Silverclouding Wishlist loads asynchronously — the heart buttons and wishlist page render after your theme and product images. The app uses localStorage for instant UI updates with no blocking network calls on page load. It has been tested with Dawn, Sense, Debut, Brooklyn, Craft, and other popular themes.",
+    a: "No. Saitriq Wishlist loads asynchronously — the heart buttons and wishlist page render after your theme and product images. The app uses localStorage for instant UI updates with no blocking network calls on page load. It has been tested with Dawn, Sense, Debut, Brooklyn, Craft, and other popular themes.",
   },
   {
     q: "How easy is it to install and customize the button to match my brand?",
-    a: "For OS 2.0 themes (Dawn, Sense, Craft, etc.) installation takes under 2 minutes — open Theme Editor, add the Silverclouding Wishlist app block, save. No code required. You can customize the button style (icon only, icon + text, or your own SVG), the remove button label, grid columns, and inject custom CSS — all from the Page design settings page.",
+    a: "For OS 2.0 themes (Dawn, Sense, Craft, etc.) installation takes under 2 minutes — open Theme Editor, add the Saitriq Wishlist app block, save. No code required. You can customize the button style (icon only, icon + text, or your own SVG), the remove button label, grid columns, and inject custom CSS — all from the Page design settings page.",
   },
   {
     q: "Is a credit card required for the trial, and will I be charged automatically?",
@@ -62,11 +62,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "Will you help my developer with custom code, APIs, or conflicts?",
-    a: "Yes. Silverclouding Wishlist ships with a full Developer API accessible from the storefront at /apps/silverclouding-wishlist. The Developer API page in this app documents every endpoint with copy-paste JavaScript examples. For custom integrations, conflicts, or theme-specific issues on paid plans, contact us and we will respond within 24 hours.",
+    a: "Yes. Saitriq Wishlist ships with a full Developer API accessible from the storefront at /apps/saitriq-wishlist. The Developer API page in this app documents every endpoint with copy-paste JavaScript examples. For custom integrations, conflicts, or theme-specific issues on paid plans, contact us and we will respond within 24 hours.",
   },
   {
-    q: "Does Silverclouding Wishlist integrate with marketing apps like Klaviyo or Mailchimp?",
-    a: "Wishlist data is accessible via the API at /apps/silverclouding-wishlist?api=items. Any marketing tool that can read a JSON endpoint can pull your customers' saved products. Server-to-server access is available via the Admin API at /app/api — see the Developer API page for full documentation.",
+    q: "Does Saitriq Wishlist integrate with marketing apps like Klaviyo or Mailchimp?",
+    a: "Wishlist data is accessible via the API at /apps/saitriq-wishlist?api=items. Any marketing tool that can read a JSON endpoint can pull your customers' saved products. Server-to-server access is available via the Admin API at /app/api — see the Developer API page for full documentation.",
   },
   {
     q: "How do I know the app is actually driving sales?",
@@ -115,7 +115,7 @@ export default function WishlistDashboard() {
     : 0;
 
   return (
-    <s-page heading="Silverclouding Wishlist">
+    <s-page heading="Saitriq Wishlist">
 
       {/* ── Hero callout ── */}
       <s-section>
@@ -218,7 +218,7 @@ export default function WishlistDashboard() {
         )}
         {embed.enabled === true && (
           <s-banner tone="success" heading="App embed is enabled">
-            The Silverclouding Wishlist embed is active on{" "}
+            The Saitriq Wishlist embed is active on{" "}
             <strong>{embed.themeName ?? "your theme"}</strong>.
             Shoppers can see the wishlist buttons on your storefront.
           </s-banner>
@@ -353,7 +353,7 @@ export default function WishlistDashboard() {
                 We respond to all support requests within 24 hours.
               </s-paragraph>
               <s-button
-                href="mailto:support@silverclouding.com"
+                href="mailto:support@saitriq.com"
                 variant="secondary"
               >
                 Contact support

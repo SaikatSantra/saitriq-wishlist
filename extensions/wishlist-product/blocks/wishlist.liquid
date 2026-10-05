@@ -67,14 +67,14 @@
   const script = document.currentScript;
 
   const whenEmbedReady = (fn) => {
-    if (window.silvercloudingEmbedEnabled) fn();
-    else document.addEventListener('silverclouding:embed-ready', fn, { once: true });
+    if (window.saitriqEmbedEnabled) fn();
+    else document.addEventListener('saitriq:embed-ready', fn, { once: true });
   };
 
   whenEmbedReady(() => {
-    const storageKey = 'silverclouding_wishlist';
-    const visitorStorageKey = 'silverclouding_wishlist_visitor';
-    const syncEndpoint = '/apps/silverclouding-wishlist';
+    const storageKey = 'saitriq_wishlist';
+    const visitorStorageKey = 'saitriq_wishlist_visitor';
+    const syncEndpoint = '/apps/saitriq-wishlist';
 
     const container = script?.previousElementSibling;
     if (!container?.hasAttribute('data-sai-wishlist')) return;
@@ -110,7 +110,7 @@
     const saveWishlist = (items) => {
       try {
         localStorage.setItem(storageKey, JSON.stringify(items));
-        window.dispatchEvent(new CustomEvent('silverclouding:wishlist-updated'));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
       } catch {}
     };
 
@@ -162,7 +162,7 @@
 
       saveWishlist(items);
 
-      window.silvercloudingWishlistToast?.({
+      window.saitriqWishlistToast?.({
         message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }},
         image: item.productImage || '',
         title: item.productTitle || ''
@@ -212,11 +212,11 @@
         const data = await res.json().catch(() => ({}));
 
         if (operation === 'remove' || operation === 'clear') {
-          window.silvercloudingWishlistToast?.({ message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
+          window.saitriqWishlistToast?.({ message: {{ 'wishlist.removed_from_wishlist' | t | json }} });
           return getWishlist();
         }
 
-        window.silvercloudingWishlistToast?.({ message: data.error || {{ 'wishlist.limit_reached' | t | json }} });
+        window.saitriqWishlistToast?.({ message: data.error || {{ 'wishlist.limit_reached' | t | json }} });
 
         return getWishlist();
       }
@@ -246,7 +246,7 @@
 
       saveWishlist(synced);
 
-      window.silvercloudingWishlistToast?.({
+      window.saitriqWishlistToast?.({
         message: operation === 'add' ? {{ 'wishlist.added_to_wishlist' | t | json }} : {{ 'wishlist.removed_from_wishlist' | t | json }},
         image: item.productImage || '',
         title: item.productTitle || ''
@@ -256,8 +256,8 @@
     };
 
     const syncExistingItems = async () => {
-      if (window.silvercloudingWishlistSyncPromise) {
-        return window.silvercloudingWishlistSyncPromise;
+      if (window.saitriqWishlistSyncPromise) {
+        return window.saitriqWishlistSyncPromise;
       }
 
       const run = (async () => {
@@ -303,18 +303,18 @@
         refresh();
       })();
 
-      window.silvercloudingWishlistSyncPromise = run.finally(() => {
-        window.silvercloudingWishlistSyncPromise = null;
+      window.saitriqWishlistSyncPromise = run.finally(() => {
+        window.saitriqWishlistSyncPromise = null;
       });
 
-      return window.silvercloudingWishlistSyncPromise;
+      return window.saitriqWishlistSyncPromise;
     };
 
     refresh();
 
     const initialSync = syncExistingItems().catch(() => {});
 
-    window.addEventListener('silverclouding:wishlist-updated', refresh);
+    window.addEventListener('saitriq:wishlist-updated', refresh);
 
     window.addEventListener('storage', (e) => {
       if (e.key === storageKey) refresh();
@@ -348,7 +348,7 @@
         if (result) updateView(!saved);
       } catch (error) {
         console.error('Wishlist request failed', error);
-        window.silvercloudingWishlistToast?.({ message: {{ 'wishlist.temporarily_unavailable' | t | json }} });
+        window.saitriqWishlistToast?.({ message: {{ 'wishlist.temporarily_unavailable' | t | json }} });
       } finally {
         button.disabled = false;
         requestInFlight = false;

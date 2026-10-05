@@ -559,7 +559,7 @@ export const scheduleFreeDowngrade = async (admin, shop, previousPlanId) => {
 export const ADDON = {
   saves: 5000,   // extra saves granted per purchase
   price: 5,      // price in USD (e.g. 5 = $5.00)
-  name: "Silverclouding Wishlist: +5,000 saves", // shown on Shopify billing page
+  name: "Saitriq Wishlist: +5,000 saves", // shown on Shopify billing page
 };
 
 const APP_PURCHASE_ONE_TIME_CREATE = `#graphql
@@ -587,7 +587,7 @@ export const planAllocationName = (planId) => {
   if (!plan || plan.price === 0 || !Number.isFinite(plan.limit)) {
     throw new Error(`Plan does not support extra allocations: ${planId}`);
   }
-  return `Silverclouding Wishlist: ${plan.name} allocation (${plan.limit.toLocaleString()} saves)`;
+  return `Saitriq Wishlist: ${plan.name} allocation (${plan.limit.toLocaleString()} saves)`;
 };
 
 const createOneTimeCharge = async (admin, name, amount, returnUrl) => {
