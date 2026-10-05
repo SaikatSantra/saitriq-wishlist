@@ -22,6 +22,21 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const settings = await prisma.wishlistSettings.findUnique({
     where: { shop: session.shop },
+    select: {
+      heading: true,
+      emptyMessage: true,
+      showPrices: true,
+      showRemove: true,
+      buttonLabel: true,
+      showAddToCart: true,
+      addToCartLabel: true,
+      cardClass: true,
+      customCss: true,
+      headerSelector: true,
+      toastBg: true,
+      toastColor: true,
+      toastPosition: true,
+    },
   });
 
   return { settings: settings || defaults };
@@ -95,8 +110,9 @@ export default function WishlistSettingsPage() {
 
               <s-text>
                 Configure how your wishlist page looks and behaves for
-                customers. You can customize the page content, product
-                grid, remove button, and notification messages.
+                customers. You can customize the page content, remove button,
+                and notification messages. Set the wishlist grid columns on
+                the Wishlist page app block in Theme Editor.
               </s-text>
 
               <s-text tone="subdued">
