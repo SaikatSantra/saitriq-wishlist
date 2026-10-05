@@ -150,7 +150,22 @@ export const loader = async ({ request }) => {
 
     // ── GET merchant display settings ──────────────────────────────────────
     case "settings": {
-      const settings = await prisma.wishlistSettings.findUnique({ where: { shop } });
+      const settings = await prisma.wishlistSettings.findUnique({
+        where: { shop },
+        select: {
+          heading: true,
+          emptyMessage: true,
+          showPrices: true,
+          showRemove: true,
+          buttonLabel: true,
+          cardClass: true,
+          customCss: true,
+          headerSelector: true,
+          toastBg: true,
+          toastColor: true,
+          toastPosition: true,
+        },
+      });
       return json({
         settings: settings || {
           heading: "My wishlist",

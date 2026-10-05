@@ -64,6 +64,22 @@ const defaultSettings = {
   toastPosition:  "top-left",
 };
 
+const storefrontSettingsSelect = {
+  heading: true,
+  emptyMessage: true,
+  showPrices: true,
+  showRemove: true,
+  buttonLabel: true,
+  showAddToCart: true,
+  addToCartLabel: true,
+  cardClass: true,
+  customCss: true,
+  headerSelector: true,
+  toastBg: true,
+  toastColor: true,
+  toastPosition: true,
+};
+
 // ─── ?api= routes ─────────────────────────────────────────────────────────────
 
 const handleApiGet = async (api, url, session, customerId) => {
@@ -97,7 +113,10 @@ const handleApiGet = async (api, url, session, customerId) => {
       return json({ month, adds: totals.adds, removes: totals.removes, history, usage: usageFor(used, limit) });
     }
     case "settings": {
-      const settings = await prisma.wishlistSettings.findUnique({ where: { shop } });
+      const settings = await prisma.wishlistSettings.findUnique({
+        where: { shop },
+        select: storefrontSettingsSelect,
+      });
       return json({ settings: settings || defaultSettings });
     }
     case "usage": {
@@ -133,7 +152,10 @@ export const loader = async ({ request }) => {
     getPlanEntitlement(shop, month),
     currentUsage(shop, month),
     listCustomerWishlistItems(shop, customerId),
-    prisma.wishlistSettings.findUnique({ where: { shop } }),
+    prisma.wishlistSettings.findUnique({
+      where: { shop },
+      select: storefrontSettingsSelect,
+    }),
     getMonthlyAddonSaves(shop, month),
   ]);
   const limit = effectiveLimit(entitlement.planLimit, addonSaves);

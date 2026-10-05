@@ -54,7 +54,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "How easy is it to install and customize the button to match my brand?",
-    a: "For OS 2.0 themes (Dawn, Sense, Craft, etc.) installation takes under 2 minutes — open Theme Editor, add the Saitriq Wishlist app block, save. No code required. You can customize the button style (icon only, icon + text, or your own SVG), the remove button label, grid columns, and inject custom CSS — all from the Page design settings page.",
+    a: "For compatible Online Store 2.0 themes, add the Saitriq Wishlist app block in Theme Editor. Configure wishlist-page columns on that block; use Wishlist settings in the app for the page content and remove button.",
   },
   {
     q: "Is a credit card required for the trial, and will I be charged automatically?",
