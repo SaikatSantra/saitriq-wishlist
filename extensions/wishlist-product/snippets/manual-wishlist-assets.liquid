@@ -1,0 +1,11 @@
+{% doc %}
+Loads the theme assets used by the manual wishlist installation.
+Render once in the theme layout head.
+{% enddoc %}
+
+{{ 'wishlist.css' | asset_url | stylesheet_tag }}
+{{ 'wishlist-page.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'wishlist-product.js' | asset_url }}" defer></script>
+<script src="{{ 'wishlist-collection.js' | asset_url }}" defer></script>
+<script src="{{ 'wishlist-page.js' | asset_url }}" defer></script>
+<script src="{{ 'wishlist.js' | asset_url }}" defer></script>

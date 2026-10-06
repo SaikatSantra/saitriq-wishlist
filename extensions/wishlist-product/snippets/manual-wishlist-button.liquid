@@ -1,0 +1,37 @@
+{% doc %}
+Renders the product wishlist button for a theme without app-block support.
+{% enddoc %}
+
+{% assign wishlist_product = product %}
+{% if wishlist_product %}
+  <div
+    data-sai-wishlist
+    hidden
+    data-product-id="{{ wishlist_product.id }}"
+    data-product-handle="{{ wishlist_product.handle }}"
+    data-product-title="{{ wishlist_product.title | escape }}"
+    data-product-image="{{ wishlist_product.featured_image | image_url: width: 600 | escape }}"
+    data-product-price="{{ wishlist_product.price | money | escape }}"
+    data-product-variant-id="{{ wishlist_product.selected_or_first_available_variant.id }}"
+    data-label-add="Add to wishlist"
+    data-label-saved="Saved"
+    data-loc-added="Added to wishlist"
+    data-loc-removed="Removed from wishlist"
+    data-loc-limit="Wishlist limit reached"
+    data-loc-error="Wishlist is temporarily unavailable"
+  >
+    <button type="button" class="sai-wishlist button" data-sai-wishlist-button aria-label="Add to wishlist">
+      <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      </span>
+      <span class="sai-wishlist__label" data-sai-wishlist-label>Add to wishlist</span>
+    </button>
+  </div>
+{% endif %}
