@@ -1,23 +1,7 @@
 /**
- * Server-to-server REST API for developers / headless integrations.
- *
- * All endpoints require a Bearer token in the Authorization header.
- * The token is the shop's Shopify access token stored in the session.
- *
- * Base URL:  https://<your-app-url>/app/api
- *
- * Auth header:
- *   Authorization: Bearer <access_token>
- *   X-Shopify-Shop-Domain: mystore.myshopify.com
- *
- * Endpoints
- * ─────────────────────────────────────────────────────────────────────────────
- *  GET    /app/api?resource=items&customerId=<id>     All wishlist items for a customer
- *  GET    /app/api?resource=check&customerId=<id>&productId=<id>  Is product wishlisted?
- *  GET    /app/api?resource=all                       All items for the shop (paginated)
- *  GET    /app/api?resource=analytics&month=YYYY-MM   Analytics for a month
- *  GET    /app/api?resource=settings                  Merchant display settings
- *  POST   /app/api  { resource:"item", operation:"add"|"remove"|"clear", customerId, productId, ... }
+ * Authenticated embedded-app API for merchant-side wishlist data access.
+ * Requests must pass Shopify Admin session authentication; this is not a
+ * public bearer-token or server-to-server integration endpoint.
  */
 
 import { authenticate } from "../shopify.server";
