@@ -43,24 +43,28 @@ the app does not upgrade a vintage theme to Online Store 2.0. Keep the current
 theme if you need to. Instead:
 
 1. Duplicate the theme first: **Online Store → Themes → … → Duplicate**.
-2. In the app, open **How to use → Manual install**. Follow its three snippet
-   steps and optional header-link step. The instructions use the storefront app
-   proxy and do not require an API key in theme code.
-3. Follow the manual guide's Step 0 to create the `wishlist.css` asset in the
-   theme's **Assets** directory. The snippets load it with `asset_url`; Shopify
-   does not copy extension assets into a theme automatically.
-4. Add the product snippet inside the product template/section where the
-   button should appear. Add the collection injection snippet before
-   `</body>` in `layout/theme.liquid`. Create the wishlist page with handle
-   `wishlist` and render the wishlist-page snippet from its Liquid template.
-5. Save and preview the duplicated theme on desktop and mobile before
+2. In the app, open **How to use → Older or custom theme without app blocks**.
+   That page contains the exact current JS, CSS, and Liquid source files to copy.
+   The extension assets do not get copied into theme Assets automatically.
+3. Create the six named theme assets (`wishlist.css`, `wishlist-page.css`,
+   `wishlist.js`, `wishlist-product.js`, `wishlist-collection.js`, and
+   `wishlist-page.js`) by copying their current source from the manual guide.
+   Create the four `manual-wishlist-*.liquid` snippets from that guide.
+4. Turn off the Saitriq Wishlist app embed on the manually configured theme,
+   render `manual-wishlist-assets` once in the layout `<head>`, and render
+   `manual-wishlist-collection` once before `</body>`.
+5. Render `manual-wishlist-button` in the product template after its product
+   form. Create the wishlist page with handle `wishlist` and render
+   `manual-wishlist-page` from its page template. Optionally copy and render
+   `wishlist-header-link` in the theme header.
+6. Save and preview the duplicated theme on desktop and mobile before
    publishing it.
 
-For manual setup, copy the files from the app's **Manual install** instructions
-or their corresponding source snippets. Do not copy `blocks/*.liquid` directly
-into a theme snippet: app-block files rely on Shopify's `block` object and
-block settings. If a theme's code editor does not allow Liquid template
-changes, ask a theme developer to place the snippets in the relevant template.
+The manual source snippets are separate from `blocks/*.liquid`; app-block files
+depend on Shopify's `block` object and block settings and are not theme snippets.
+The collection script searches common product-card structures; a custom theme
+may need its card selector adjusted by a theme developer. Recopy the manual
+assets/snippets when updating a theme-copied installation after an app release.
 
 ## Local developer setup
 
