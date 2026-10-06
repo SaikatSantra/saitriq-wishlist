@@ -66,7 +66,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Does Saitriq Wishlist integrate with marketing apps like Klaviyo or Mailchimp?",
-    a: "Wishlist data is accessible via the API at /apps/saitriq-wishlist?api=items. Any marketing tool that can read a JSON endpoint can pull your customers' saved products. Server-to-server access is available via the Admin API at /app/api — see the Developer API page for full documentation.",
+    a: "The storefront app proxy can return a logged-in shopper's wishlist to the shop storefront. The /app/api routes require an authenticated embedded-app session and are not a public server-to-server marketing integration. A separate authenticated integration is required for external marketing services.",
   },
   {
     q: "How do I know the app is actually driving sales?",

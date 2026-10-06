@@ -1,0 +1,56 @@
+{% doc %}
+Renders the wishlist page container for the shared wishlist page script.
+@param {string} [heading] - Wishlist heading
+@param {string} [empty_message] - Message shown when the wishlist is empty
+@param {number} [columns] - Number of desktop grid columns
+@param {boolean} [show_prices] - Whether to show saved item prices
+@param {boolean} [show_remove] - Whether to show remove buttons
+@param {string} [button_label] - Remove button label
+@param {boolean} [show_add_to_cart] - Whether to show add-to-cart buttons
+@param {string} [add_to_cart_label] - Add-to-cart button label
+{% enddoc %}
+
+{% liquid
+  assign wishlist_heading = heading | default: 'My wishlist'
+  assign wishlist_empty_message = empty_message | default: 'You have not saved any products yet.'
+  assign wishlist_columns = columns | default: 4
+  assign wishlist_show_prices = show_prices | default: true, allow_false: true
+  assign wishlist_show_remove = show_remove | default: true, allow_false: true
+  assign wishlist_button_label = button_label | default: 'Remove'
+  assign wishlist_show_add_to_cart = show_add_to_cart | default: false
+  assign wishlist_add_to_cart_label = add_to_cart_label | default: 'Add to cart'
+%}
+
+<section
+  class="sai-wishlist-page"
+  data-sai-wishlist-page
+  hidden
+  style="--padding-block-start: 0px; --padding-block-end: 0px; --sai-image-ratio: 4 / 5;"
+  data-setting-heading="{{ wishlist_heading | escape }}"
+  data-setting-empty-msg="{{ wishlist_empty_message | escape }}"
+  data-setting-columns="{{ wishlist_columns }}"
+  data-setting-show-prices="{{ wishlist_show_prices }}"
+  data-setting-show-remove="{{ wishlist_show_remove }}"
+  data-setting-btn-label="{{ wishlist_button_label | escape }}"
+  data-setting-show-atc="{{ wishlist_show_add_to_cart }}"
+  data-setting-atc-label="{{ wishlist_add_to_cart_label | escape }}"
+  data-loc-sold-out="Sold out"
+  data-loc-atc-error="Could not add this item to the cart"
+  data-loc-added-cart="Added to cart"
+  data-loc-removed="Removed from wishlist"
+  data-loc-cleared="Wishlist cleared"
+>
+  <div class="sai-wishlist-page__header">
+    <h2 class="wislist-page-title h2">{{ wishlist_heading | escape }}</h2>
+    <div class="sai-wishlist-page__actions">
+      <button type="button" class="sai-wishlist-page__share button" data-sai-wishlist-share hidden>
+        Share wishlist
+      </button>
+      <button type="button" class="sai-wishlist-page__clear button" data-sai-wishlist-clear hidden>
+        Clear all
+      </button>
+    </div>
+  </div>
+  <p data-sai-wishlist-empty hidden>{{ wishlist_empty_message | escape }}</p>
+  <div class="sai-wishlist-page__items" data-sai-wishlist-items></div>
+</section>
