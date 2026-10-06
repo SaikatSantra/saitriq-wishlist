@@ -1,696 +1,183 @@
-import wishlistPageSnippet from "../../extensions/wishlist-product/snippets/wishlist-page.liquid?raw";
 import wishlistStyles from "../../extensions/wishlist-product/assets/wishlist.css?raw";
+import wishlistPageStyles from "../../extensions/wishlist-product/assets/wishlist-page.css?raw";
+import wishlistEmbedScript from "../../extensions/wishlist-product/assets/wishlist.js?raw";
+import wishlistProductScript from "../../extensions/wishlist-product/assets/wishlist-product.js?raw";
+import wishlistCollectionScript from "../../extensions/wishlist-product/assets/wishlist-collection.js?raw";
+import wishlistPageScript from "../../extensions/wishlist-product/assets/wishlist-page.js?raw";
+import manualAssetsSnippet from "../../extensions/wishlist-product/snippets/manual-wishlist-assets.liquid?raw";
+import manualButtonSnippet from "../../extensions/wishlist-product/snippets/manual-wishlist-button.liquid?raw";
+import manualCollectionSnippet from "../../extensions/wishlist-product/snippets/manual-wishlist-collection.liquid?raw";
+import manualPageSnippet from "../../extensions/wishlist-product/snippets/manual-wishlist-page.liquid?raw";
+import headerLinkSnippet from "../../extensions/wishlist-product/snippets/wishlist-header-link.liquid?raw";
+
+const codeStyle = { fontSize: "0.8rem", whiteSpace: "pre-wrap" };
+
+const renderCopySource = (heading, source) => {
+  return (
+    <s-section heading={heading}>
+      <pre style={codeStyle}>{source}</pre>
+    </s-section>
+  );
+};
 
 export default function HowToUsePage() {
   return (
     <s-page heading="How to use Saitriq Wishlist">
-
-      {/* ── Method 1: App Blocks ── */}
-      <s-section heading="Method 1 — App blocks (recommended)">
+      <s-section heading="Online Store 2.0 theme (recommended)">
         <s-paragraph>
-          Use this method with an Online Store 2.0 theme that supports app blocks
-          (including Dawn, Sense, Craft, and Refresh). No theme code editing is required.
+          App blocks work on themes that support Shopify app blocks. Updating the
+          app does not upgrade the theme or place blocks into its templates.
         </s-paragraph>
-        <s-banner tone="warning" heading="Enable the app embed first">
-          Before adding any blocks, you must enable the Saitriq Wishlist app embed.
-          Go to <strong>Online Store → Themes → Customize → App embeds</strong> and toggle
-          <strong>Saitriq Wishlist</strong> on. This loads the CSS and activates all blocks.
-          Without it, no wishlist buttons will appear.
+        <s-ordered-list>
+          <s-list-item>
+            In <strong>Online Store → Themes → Customize</strong>, select the theme
+            you plan to publish.
+          </s-list-item>
+          <s-list-item>
+            Open <strong>App embeds</strong>, enable <strong>Saitriq Wishlist</strong>,
+            and save.
+          </s-list-item>
+          <s-list-item>
+            On the Product template, add the <strong>Product Page Button</strong>
+            app block.
+          </s-list-item>
+          <s-list-item>
+            On the Collection template, add <strong>Collection wishlist icons</strong>
+            inside the product-card section when the theme allows it.
+          </s-list-item>
+          <s-list-item>
+            Create a page with handle <code>wishlist</code>, assign it the
+            wishlist template, add the <strong>Wishlist page</strong> app block,
+            and save.
+          </s-list-item>
+          <s-list-item>
+            Preview and test the theme. App updates do not auto-insert blocks;
+            add blocks separately to each theme you use.
+          </s-list-item>
+        </s-ordered-list>
+        <s-paragraph>
+          To add a header link automatically, set a matching CSS selector in
+          <s-link href="/app/settings">Wishlist settings</s-link>. The app embed
+          must be enabled for automatic insertion.
+        </s-paragraph>
+      </s-section>
+
+      <s-section heading="Older or custom theme without app blocks">
+        <s-banner tone="warning" heading="Manual setup is a separate installation">
+          These steps copy the current extension runtime into the theme. Use
+          either the manual setup below or the theme app embed plus app blocks;
+          do not run both on the same theme. Manual setup does not convert the
+          theme to Online Store 2.0, and theme-copied files do not update when
+          the app is deployed.
         </s-banner>
-        <s-grid gap="small-200">
-          <s-stack direction="inline" gap="small-200" alignItems="center">
-            <s-badge tone="info">1</s-badge>
-            <s-paragraph>Go to <strong>Online Store → Themes → Customize → App embeds</strong>. Enable <strong>Saitriq Wishlist</strong>. Save.</s-paragraph>
-          </s-stack>
-          <s-stack direction="inline" gap="small-200" alignItems="center">
-            <s-badge tone="info">2</s-badge>
-            <s-paragraph>Open the <strong>Product</strong> template → Add block → <strong>Product Page Button</strong>. Save.</s-paragraph>
-          </s-stack>
-          <s-stack direction="inline" gap="small-200" alignItems="center">
-            <s-badge tone="info">3</s-badge>
-            <s-paragraph>Open the <strong>Collection</strong> template → Add the <strong>Collection wishlist icons</strong> block. Save.</s-paragraph>
-          </s-stack>
-          <s-stack direction="inline" gap="small-200" alignItems="center">
-            <s-badge tone="info">4</s-badge>
-            <s-paragraph>Create a page with handle <code>wishlist</code>. Add the <strong>Wishlist page</strong> block in the theme editor. Save.</s-paragraph>
-          </s-stack>
-          <s-stack direction="inline" gap="small-200" alignItems="center">
-            <s-badge tone="info">5</s-badge>
-            <s-paragraph>To add a Wishlist link to your header automatically, open <s-link href="/app/settings">Wishlist settings</s-link>, enter a CSS selector for your header container (for example <code>.header__icons</code>), and save. The app adds the link inside the first matching element while the app embed is enabled. Leave the selector blank to disable the automatic link. If your selector does not match your theme, no link is added. </s-paragraph>
-          </s-stack>
-        </s-grid>
+        <s-ordered-list>
+          <s-list-item>
+            Duplicate the theme first. In Theme Editor, turn off the Saitriq
+            Wishlist app embed on this theme to avoid loading the shared runtime
+            twice.
+          </s-list-item>
+          <s-list-item>
+            In <strong>Edit code → Assets</strong>, create the files with the exact
+            names shown below and paste their matching source. These are the same
+            JS and CSS files used by the app extension.
+          </s-list-item>
+          <s-list-item>
+            Create the four theme snippets shown below in{" "}
+            <strong>Edit code → Snippets</strong>.
+          </s-list-item>
+          <s-list-item>
+            Add the asset-loader render once inside <code>layout/theme.liquid</code>
+            in the <code>&lt;head&gt;</code>, before <code>&lt;/head&gt;</code>.
+            Add the collection-template render once before <code>&lt;/body&gt;</code>.
+          </s-list-item>
+          <s-list-item>
+            Render the product button snippet in the product template, after the
+            product form. Create and publish a page using
+            <code>templates/page.wishlist.liquid</code> with the wishlist-page
+            render tag below.
+          </s-list-item>
+          <s-list-item>
+            Preview the duplicated theme and test product saves, collection
+            buttons, guest and logged-in wishlists, removals, clear-all, and
+            monthly limit behavior before publishing.
+          </s-list-item>
+        </s-ordered-list>
+
+        <s-section heading="Theme asset source files">
+          <s-paragraph>
+            Create each file in the theme Assets folder. Copy only the content
+            shown for that file; do not rename the files.
+          </s-paragraph>
+          {renderCopySource("assets/wishlist.css", wishlistStyles)}
+          {renderCopySource("assets/wishlist-page.css", wishlistPageStyles)}
+          {renderCopySource("assets/wishlist-product.js", wishlistProductScript)}
+          {renderCopySource("assets/wishlist-collection.js", wishlistCollectionScript)}
+          {renderCopySource("assets/wishlist-page.js", wishlistPageScript)}
+          {renderCopySource("assets/wishlist.js", wishlistEmbedScript)}
+        </s-section>
+
+        <s-section heading="Theme snippets">
+          {renderCopySource("snippets/manual-wishlist-assets.liquid", manualAssetsSnippet)}
+          <s-paragraph>
+            In <code>layout/theme.liquid</code>, render the shared assets in the
+            head:
+          </s-paragraph>
+          <pre style={codeStyle}>{"{% render 'manual-wishlist-assets' %}"}</pre>
+
+          {renderCopySource("snippets/manual-wishlist-button.liquid", manualButtonSnippet)}
+          <s-paragraph>
+            In the product Liquid template, render this after the product form:
+          </s-paragraph>
+          <pre style={codeStyle}>{"{% render 'manual-wishlist-button' %}"}</pre>
+
+          {renderCopySource("snippets/manual-wishlist-collection.liquid", manualCollectionSnippet)}
+          <s-paragraph>
+            In <code>layout/theme.liquid</code>, render the collection template
+            before <code>&lt;/body&gt;</code>. The collection script uses the
+            theme&apos;s product-card markup to find products. Test the target
+            theme and have a developer adjust its product-card selector if
+            required.
+          </s-paragraph>
+          <pre style={codeStyle}>{"{% render 'manual-wishlist-collection' %}"}</pre>
+
+          {renderCopySource("snippets/manual-wishlist-page.liquid", manualPageSnippet)}
+          <s-paragraph>
+            Create <code>templates/page.wishlist.liquid</code> containing this
+            render tag, then assign the template to the page whose handle is
+            <code>wishlist</code>:
+          </s-paragraph>
+          <pre style={codeStyle}>{"{% render 'manual-wishlist-page' %}"}</pre>
+        </s-section>
+
+        <s-section heading="Optional header link">
+          <s-paragraph>
+            Copy this snippet into the theme as
+            <code>snippets/wishlist-header-link.liquid</code>, then render it
+            where the link should appear in <code>sections/header.liquid</code>.
+            The count reflects the visitor&apos;s local wishlist.
+          </s-paragraph>
+          {renderCopySource("snippets/wishlist-header-link.liquid", headerLinkSnippet)}
+          <pre style={codeStyle}>{"{% render 'wishlist-header-link' %}"}</pre>
+        </s-section>
+      </s-section>
+
+      <s-section heading="Manual setup notes">
         <s-paragraph>
-          The selector is theme-specific and does not edit theme files. If you change or clear it, or disable the app embed,
-          the automatic link is removed on the next storefront page load. Check the selector against your theme&apos;s header markup.
+          The copied assets use the same authenticated Shopify app proxy as the
+          app blocks; do not add an API key or access token to theme code. Guest
+          wishlist items remain in that browser&apos;s local storage, while
+          logged-in customer wishlists sync through the app. To pick up future
+          app changes, recopy the corresponding extension assets and snippets
+          into each manually configured theme.
+        </s-paragraph>
+        <s-paragraph>
+          For API routes and response examples, see the{" "}
+          <s-link href="/app/api-docs">Developer API</s-link> page. The
+          <code>/app/api</code> routes require an authenticated embedded-app
+          session; the storefront uses the app proxy at
+          <code>/apps/saitriq-wishlist</code>.
         </s-paragraph>
       </s-section>
-
-      <s-section heading="If the app block or embed is missing">
-        <s-paragraph>
-          Deploying an app or extension update does not upgrade your theme or
-          automatically insert blocks into its templates. In Theme Editor, select
-          the exact theme you are previewing, turn on the Saitriq Wishlist app
-          embed, save, and add each app block to its template. Refresh Theme Editor
-          after an extension update. If the theme has no app-block picker, use the
-          manual method below; app blocks require a compatible theme.
-        </s-paragraph>
-      </s-section>
-
-      {/* ── Method 2: Manual (older themes) ── */}
-      <s-section heading="Method 2 — Manual install (older or custom themes)">
-        <s-paragraph>
-          Use this when the theme does not offer app blocks. Duplicate the theme first.
-          Create each snippet in <strong>Online Store → Themes → Edit code → Snippets → Add a new snippet</strong>.
-          Manual snippets do not update the theme to Online Store 2.0.
-        </s-paragraph>
-        <s-banner tone="warning">
-          The extension does not copy its asset files into a theme automatically.
-          Render the snippets from Liquid templates, not from a page&apos;s rich-text editor.
-        </s-banner>
-
-        <s-section heading="Step 0 — Create assets/wishlist.css">
-          <s-paragraph>
-            In Edit code, add a new asset named <code>wishlist.css</code> and paste
-            the stylesheet below. The manual snippets load this asset.
-          </s-paragraph>
-          <s-banner tone="info">
-            <pre style={{fontSize:"0.8rem", whiteSpace:"pre-wrap"}}>{wishlistStyles}</pre>
-          </s-banner>
-        </s-section>
-
-        {/* ── Step 1: wishlist-button snippet ── */}
-        <s-section heading="Step 1 — Create snippets/wishlist-button.liquid">
-          <s-paragraph>
-            Create a new snippet file named <code>wishlist-button</code> and paste
-            the code below. Render it from the product template after the product form.
-          </s-paragraph>
-          <s-banner tone="info">
-            <code>{`{{ 'wishlist.css' | asset_url | stylesheet_tag }}
-{% assign wp = product %}
-<div data-sai-wishlist>
-  <button type="button" class="sai-wishlist" data-sai-wishlist-button
-    data-product-id="{{ wp.id }}"
-    data-product-handle="{{ wp.handle }}"
-    data-product-title="{{ wp.title | escape }}"
-    data-product-image="{{ wp.featured_image | image_url: width: 600 | escape }}"
-    data-product-price="{{ wp.price | money | escape }}"
-    aria-label="Add to wishlist">
-    <!-- Outline heart — shown when NOT saved -->
-    <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </span>
-    <!-- Filled heart — shown when saved (.is-active) via CSS -->
-    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
-      <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-      </svg>
-    </span>
-    <span class="sai-wishlist__label">Add to wishlist</span>
-  </button>
-</div>
-<script>
-  (() => {
-    const storageKey = 'saitriq_wishlist';
-    const visitorStorageKey = 'saitriq_wishlist_visitor';
-    const syncEndpoint = '/apps/saitriq-wishlist';
-    const script = document.currentScript;
-    const block = script && script.previousElementSibling;
-    const button = block && block.querySelector('[data-sai-wishlist-button]');
-    if (!button) return;
-
-    const productId     = button.dataset.productId;
-    const productHandle = button.dataset.productHandle;
-    const productTitle  = button.dataset.productTitle;
-    const productImage  = button.dataset.productImage;
-    const productPrice  = button.dataset.productPrice;
-    let requestInFlight = false;
-    let customerAuthenticated = false;
-
-    // Toast
-    const announce = (message) => {
-      let toast = document.querySelector('[data-sai-wishlist-toast]');
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.dataset.saiWishlistToast = '';
-        toast.className = 'sai-wishlist__toast';
-        toast.setAttribute('role', 'status');
-        document.body.append(toast);
-      }
-      toast.textContent = message;
-      toast.classList.add('is-visible');
-      clearTimeout(window.saitriqWishlistToastTimer);
-      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
-    };
-    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
-
-    const getWishlist = () => { try { const v = JSON.parse(localStorage.getItem(storageKey)||'[]'); return Array.isArray(v)?v:[]; } catch{return[];} };
-    const saveWishlist = (items) => { try{localStorage.setItem(storageKey,JSON.stringify(items));}catch{} window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated')); };
-    const getVisitorId = () => { let id=localStorage.getItem(visitorStorageKey); if(!id){id=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,14);localStorage.setItem(visitorStorageKey,id);} return id; };
-
-    const updateView = (saved) => {
-      button.classList.toggle('is-active', saved);
-      // Icons switch via CSS .is-active — just update aria-label and label text
-      button.setAttribute('aria-label', saved ? 'Saved' : 'Add to wishlist');
-      const label = button.querySelector('.sai-wishlist__label');
-      if (label) label.textContent = saved ? 'Saved' : 'Add to wishlist';
-    };
-    const refresh = () => updateView(getWishlist().some(i => String(i.id) === String(productId)));
-
-    const persistLocal = (operation, item) => {
-      const items = getWishlist();
-      const idx = items.findIndex(s => String(s.id) === String(item.productId));
-      if (operation === 'add' && idx < 0) items.push({ id: item.productId, handle: item.productHandle, title: item.productTitle, image: item.productImage||'', price: item.productPrice||'', addedAt: new Date().toISOString() });
-      if (operation === 'remove' && idx >= 0) items.splice(idx, 1);
-      saveWishlist(items);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation==='add'?'Added to wishlist':'Removed from wishlist' } }));
-      return items;
-    };
-
-    const sync = async (operation, item) => {
-      if (!customerAuthenticated) {
-        try { await fetch(syncEndpoint, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({ operation, visitorId:getVisitorId(), ...item }) }); } catch {}
-        return persistLocal(operation, item);
-      }
-      // Handle limit reached
-      const res = await fetch(syncEndpoint, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({ operation, visitorId:getVisitorId(), ...item }) });
-      if (res.status === 429) {
-        const d = await res.json().catch(()=>({}));
-        if (operation !== 'add') return getWishlist();
-        announce(d.error || 'Monthly wishlist limit reached. Upgrade your plan.');
-        return getWishlist();
-      }
-      if (!res.ok) { customerAuthenticated = false; return persistLocal(operation, item); }
-      const data = await res.json();
-      if (!Array.isArray(data.items)) { customerAuthenticated = false; return sync(operation, item); }
-      const synced = data.items.map(s => ({ id:s.productId, handle:s.productHandle, title:s.productTitle, image:s.productImage||'', price:s.productPrice||'', addedAt:s.createdAt }));
-      saveWishlist(synced);
-      window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: operation==='add'?'Added to wishlist':'Removed from wishlist' } }));
-      return synced;
-    };
-
-    // Initial sync (single-flight, merges local guest items)
-    const initialSync = (() => {
-      if (window.saitriqWishlistSyncPromise) return window.saitriqWishlistSyncPromise;
-      const run = (async () => {
-        const res = await fetch(syncEndpoint, { credentials:'same-origin' }).catch(()=>null);
-        if (!res || !res.ok) { refresh(); return; }
-        const data = await res.json();
-        customerAuthenticated = data.authenticated === true;
-        if (!data.authenticated || !Array.isArray(data.items)) { refresh(); return; }
-        let synced = data.items.map(s => ({ id:s.productId, handle:s.productHandle, title:s.productTitle, image:s.productImage||'', price:s.productPrice||'', addedAt:s.createdAt }));
-        for (const item of getWishlist()) {
-          if (!synced.some(s => String(s.id) === String(item.id))) {
-            const merged = await sync('add', { productId:item.id, productHandle:item.handle, productTitle:item.title, productImage:item.image, productPrice:item.price });
-            if (merged) synced = merged;
-          }
-        }
-        saveWishlist(synced);
-        refresh();
-      })();
-      window.saitriqWishlistSyncPromise = run.finally(() => { window.saitriqWishlistSyncPromise = null; });
-      return window.saitriqWishlistSyncPromise;
-    })();
-
-    button.addEventListener('click', async () => {
-      if (requestInFlight) return;
-      requestInFlight = true; button.disabled = true;
-      try {
-        await initialSync;
-        const saved = getWishlist().some(i => String(i.id) === String(productId));
-        const result = await sync(saved ? 'remove' : 'add', { productId, productHandle, productTitle, productImage, productPrice });
-        if (result) updateView(!saved);
-      } catch (err) {
-        console.error('Wishlist failed', err);
-        announce('Wishlist is temporarily unavailable. Please try again.');
-      } finally { button.disabled = false; requestInFlight = false; }
-    });
-
-    refresh();
-    window.addEventListener('saitriq:wishlist-updated', refresh);
-    window.addEventListener('storage', (e) => { if (e.key === storageKey) refresh(); });
-  })();
-</script>`}</code>
-          </s-banner>
-          <s-paragraph>
-            Then open <code>sections/main-product.liquid</code> (or <code>product-template.liquid</code>),
-            find the add-to-cart button and add below it:
-          </s-paragraph>
-          <s-banner tone="info"><code>{"{% render 'wishlist-button' %}"}</code></s-banner>
-        </s-section>
-
-        {/* ── Step 2: collection inject ── */}
-        <s-section heading="Step 2 — Create snippets/wishlist-collection-inject.liquid">
-          <s-paragraph>
-            Create a snippet named <code>wishlist-collection-inject</code> and paste this code.
-            Then in <code>layout/theme.liquid</code> add <code>{"{% render 'wishlist-collection-inject' %}"}</code> just before <code>{"</body>"}</code>.
-          </s-paragraph>
-          <s-banner tone="info">
-            <code>{`{{ 'wishlist.css' | asset_url | stylesheet_tag }}
-
-<!-- Button template: JS clones this onto every product card -->
-<template id="sai-collection-btn-tpl">
-  <button type="button" class="sai-wishlist sai-wishlist--collection"
-    data-sai-collection-wishlist aria-label="Add to wishlist">
-    <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </span>
-    <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true" style="display:none">
-      <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-      </svg>
-    </span>
-  </button>
-</template>
-
-<script>
-  (() => {
-    if (window.saitriqWishlistCollectionLoaded) return;
-    window.saitriqWishlistCollectionLoaded = true;
-
-    const storageKey = 'saitriq_wishlist';
-    const visitorStorageKey = 'saitriq_wishlist_visitor';
-    const endpoint = '/apps/saitriq-wishlist';
-    const tpl = document.getElementById('sai-collection-btn-tpl');
-    if (!tpl) return;
-
-    let customerAuthenticated = false;
-
-    const readItems = () => { try { const v=JSON.parse(localStorage.getItem(storageKey)||'[]'); return Array.isArray(v)?v:[]; } catch{return[];} };
-    const saveItems = (items) => { localStorage.setItem(storageKey,JSON.stringify(items)); window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated')); };
-    const getVisitorId = () => { let id=localStorage.getItem(visitorStorageKey); if(!id){id=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,14);localStorage.setItem(visitorStorageKey,id);} return id; };
-
-    // Toast
-    const announce = (message) => {
-      let toast = document.querySelector('[data-sai-wishlist-toast]');
-      if (!toast) { toast=document.createElement('div'); toast.dataset.saiWishlistToast=''; toast.className='sai-wishlist__toast'; toast.setAttribute('role','status'); document.body.append(toast); }
-      toast.textContent = message;
-      toast.classList.add('is-visible');
-      clearTimeout(window.saitriqWishlistToastTimer);
-      window.saitriqWishlistToastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
-    };
-    window.addEventListener('saitriq:wishlist-toast', (e) => { if (e.detail?.message) announce(e.detail.message); });
-
-    // View — CSS handles icon, JS only toggles class
-    const renderButton = (btn, productId) => {
-      const saved = readItems().some((i) => String(i.id) === String(productId));
-      btn.classList.toggle('is-active', saved);
-      btn.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
-    };
-
-    const toLocalItem = (item) => ({ id:item.productId, handle:item.productHandle, title:item.productTitle, image:item.productImage||'', price:item.productPrice||'' });
-    const persistLocal = (operation, item) => {
-      const items = readItems();
-      const idx = items.findIndex((s) => String(s.id) === String(item.productId));
-      if (operation==='add'&&idx<0) items.push({...toLocalItem(item), addedAt:new Date().toISOString()});
-      if (operation==='remove'&&idx>=0) items.splice(idx,1);
-      saveItems(items);
-      announce(operation==='add'?'Added to wishlist':'Removed from wishlist');
-      return items;
-    };
-
-    const sync = async (operation, item) => {
-      if (!customerAuthenticated) {
-        try { await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({operation,visitorId:getVisitorId(),...item})}); } catch {}
-        return persistLocal(operation, item);
-      }
-      const res = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({operation,visitorId:getVisitorId(),...item})});
-      if (res.status===429) {
-        const d = await res.json().catch(()=>({}));
-        if (operation!=='add') return readItems();
-        announce(d.error||'Monthly wishlist limit reached.');
-        return readItems();
-      }
-      const data = await res.json().catch(()=>({}));
-      if (!res.ok||!Array.isArray(data.items)) { customerAuthenticated=false; return persistLocal(operation,item); }
-      const synced = data.items.map((s)=>({id:s.productId,handle:s.productHandle,title:s.productTitle,image:s.productImage||'',price:s.productPrice||'',addedAt:s.createdAt}));
-      saveItems(synced);
-      announce(operation==='add'?'Added to wishlist':'Removed from wishlist');
-      return synced;
-    };
-
-    const productCache = new Map();
-    const productData = async (handle) => {
-      if (productCache.has(handle)) return productCache.get(handle);
-      const res = await fetch('/products/'+encodeURIComponent(handle)+'.js');
-      if (!res.ok) throw new Error('Product not found');
-      const p = await res.json();
-      const d = {productId:String(p.id),productHandle:p.handle,productTitle:p.title,productImage:p.featured_image||p.images?.[0]||'',productPrice:p.price?(p.price/100).toFixed(2):''};
-      productCache.set(handle,d);
-      return d;
-    };
-
-    const detectAuth = async () => {
-      try {
-        const res = await fetch(endpoint,{credentials:'same-origin'});
-        const data = await res.json().catch(()=>({}));
-        customerAuthenticated = data.authenticated === true;
-        if (customerAuthenticated && Array.isArray(data.items)) {
-          const serverIds = new Set(data.items.map((i)=>String(i.productId)));
-          readItems().filter((i)=>!serverIds.has(String(i.id))).forEach((local)=>{
-            fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({operation:'add',visitorId:getVisitorId(),productId:local.id,productHandle:local.handle,productTitle:local.title,productImage:local.image,productPrice:local.price})}).catch(()=>{});
-          });
-        }
-      } catch {}
-    };
-
-    const handleFromLink = (link) => { const m=new URL(link.href,location.origin).pathname.match(/^\\/products\\/([^/?#]+)/); return m?decodeURIComponent(m[1]):''; };
-
-    const attach = async (link) => {
-      const handle = handleFromLink(link);
-      const card = link.closest('li,article,.card-wrapper,.product-card-wrapper,.card,.product-card,.grid__item,[class*="product-card"],[class*="product-item"],[class*="card--product"]');
-      if (!handle||!card||card.dataset.saiWishlistAttaching||card.querySelector('[data-sai-collection-wishlist]')) return;
-      card.dataset.saiWishlistAttaching = '1';
-      const btn = tpl.content.cloneNode(true).querySelector('[data-sai-collection-wishlist]');
-      if (!btn) { delete card.dataset.saiWishlistAttaching; return; }
-      card.style.position = card.style.position || 'relative';
-      card.append(btn);
-      try {
-        const item = await productData(handle);
-        renderButton(btn, item.productId);
-        btn.addEventListener('click', async (e) => {
-          e.preventDefault(); e.stopPropagation();
-          if (btn.disabled) return;
-          btn.disabled = true;
-          try { const saved=readItems().some((i)=>String(i.id)===String(item.productId)); await sync(saved?'remove':'add',item); renderButton(btn,item.productId); }
-          catch(err){console.error('Collection wishlist failed',err);}
-          finally { btn.disabled=false; }
-        });
-      } catch { btn.remove(); delete card.dataset.saiWishlistAttaching; }
-    };
-
-    const scan = () => [...document.querySelectorAll('a[href*="/products/"]')]
-      .filter((a)=>handleFromLink(a))
-      .forEach(attach);
-
-    // Scan immediately, then again after auth resolves
-    scan();
-    detectAuth().finally(scan);
-    new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});
-    window.addEventListener('storage',(e)=>{ if(e.key===storageKey) scan(); });
-    window.addEventListener('saitriq:wishlist-updated',()=>{
-      document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn)=>{
-        const link = btn.parentElement?.querySelector('a[href*="/products/"]');
-        if (!link) return;
-        const handle = handleFromLink(link);
-        if (handle && productCache.has(handle)) renderButton(btn, productCache.get(handle).productId);
-      });
-    });
-  })();
-</script>`}</code>
-          </s-banner>
-        </s-section>
-
-        {/* ── Step 3: wishlist page ── */}
-        <s-section heading="Step 3 — Create snippets/wishlist-page.liquid">
-          <s-paragraph>
-            Create a snippet named <code>wishlist-page</code> and paste the full
-            code below. It is included here for copy-and-paste use. Do not substitute
-            <code>blocks/wishlist-page.liquid</code>, which needs Shopify&apos;s app-block
-            settings.
-            Then create <code>templates/page.wishlist.liquid</code> containing:
-          </s-paragraph>
-          <s-banner tone="info">
-            <pre style={{fontSize:"0.8rem", whiteSpace:"pre-wrap"}}>{wishlistPageSnippet}</pre>
-          </s-banner>
-          <s-banner tone="info"><code>{"{% render 'wishlist-page' %}"}</code></s-banner>
-          <s-paragraph>
-            Customise columns, heading, and card class by passing variables:
-          </s-paragraph>
-          <s-banner tone="info">
-            <code>{"{% render 'wishlist-page', heading: 'Saved items', columns: 3, card_class: 'product-card' %}"}</code>
-          </s-banner>
-        </s-section>
-
-        {/* ── Optional: custom card template ── */}
-        <s-section heading="Optional — Match your theme's product card layout">
-          <s-paragraph>
-            By default the wishlist page uses a simple card layout. To match your theme's exact
-            product card design, add a <code>{"<template>"}</code> element anywhere on your wishlist
-            page template with the attribute <code>data-sai-wishlist-page</code>.
-            The app will clone it for each saved item instead of using the default card.
-          </s-paragraph>
-          <s-paragraph>
-            Use these data attributes as hooks — the app fills them in automatically:
-          </s-paragraph>
-          <s-grid gap="small-200">
-            <s-stack direction="inline" gap="small-200" alignItems="center">
-              <s-badge tone="info">data-sai-item-link</s-badge>
-              <s-text>Sets <code>href="/products/{"{handle}"}"</code> on any <code>{"<a>"}</code></s-text>
-            </s-stack>
-            <s-stack direction="inline" gap="small-200" alignItems="center">
-              <s-badge tone="info">data-sai-item-image</s-badge>
-              <s-text>Sets <code>src</code> and <code>alt</code> on an <code>{"<img>"}</code></s-text>
-            </s-stack>
-            <s-stack direction="inline" gap="small-200" alignItems="center">
-              <s-badge tone="info">data-sai-item-title</s-badge>
-              <s-text>Sets the product title as text content</s-text>
-            </s-stack>
-            <s-stack direction="inline" gap="small-200" alignItems="center">
-              <s-badge tone="info">data-sai-item-price</s-badge>
-              <s-text>Sets the product price as text content (hidden if "Show prices" is off)</s-text>
-            </s-stack>
-            <s-stack direction="inline" gap="small-200" alignItems="center">
-              <s-badge tone="info">data-sai-item-remove</s-badge>
-              <s-text>Wires up the remove click handler (hidden if "Show remove" is off)</s-text>
-            </s-stack>
-            <s-stack direction="inline" gap="small-200" alignItems="center">
-              <s-badge tone="info">data-sai-item-product-id</s-badge>
-              <s-text>Sets <code>data-product-id</code> attribute — Shopify numeric product ID. Useful for cart forms.</s-text>
-            </s-stack>
-            <s-stack direction="inline" gap="small-200" alignItems="center">
-              <s-badge tone="info">data-sai-item-variant-id</s-badge>
-              <s-text>Sets <code>data-variant-id</code> and <code>value</code> — first available variant ID. Useful for <code>{"<input name=\"id\">"}</code> in cart forms.</s-text>
-            </s-stack>
-          </s-grid>
-          <s-paragraph>Example — paste into <code>templates/page.wishlist.liquid</code>:</s-paragraph>
-          <s-banner tone="info">
-            <pre style={{fontSize:"0.8rem", whiteSpace:"pre-wrap"}}>{`<template data-sai-wishlist-page>
-  <div class="card product-card">
-    <a class="card__media" data-sai-item-link>
-      <img class="card__image" data-sai-item-image>
-    </a>
-    <div class="card__content">
-      <a class="card__heading" data-sai-item-link data-sai-item-title></a>
-      <span class="card__price" data-sai-item-price></span>
-      <!-- Add to cart form — variant ID auto-filled -->
-      <form action="/cart/add" method="post">
-        <input type="hidden" name="id" data-sai-item-variant-id>
-        <button type="submit" class="card__add-to-cart">Add to cart</button>
-      </form>
-      <button class="card__btn" data-sai-item-remove>Remove</button>
-    </div>
-  </div>
-</template>`}</pre>
-          </s-banner>
-          <s-paragraph>
-            Any element can have multiple hooks — for example an <code>{"<a>"}</code> with both
-            <code>data-sai-item-link</code> and <code>data-sai-item-title</code> gets both
-            the href and the title text.
-          </s-paragraph>
-          <s-paragraph>
-            Use <code>data-sai-item-variant-id</code> to add an <strong>Add to cart</strong> button
-            directly on the wishlist page. The app fills in the first available variant ID automatically:
-          </s-paragraph>
-          <s-banner tone="info">
-            <pre style={{fontSize:"0.8rem", whiteSpace:"pre-wrap"}}>{`<template data-sai-wishlist-page>
-  <div class="card product-card">
-
-    <!-- Product image linking to product page -->
-    <a class="card__media" data-sai-item-link>
-      <img class="card__image" data-sai-item-image>
-    </a>
-
-    <div class="card__content">
-      <!-- Product title linking to product page -->
-      <a class="card__heading" data-sai-item-link data-sai-item-title></a>
-
-      <!-- Product price (hidden if "Show prices" is off in settings) -->
-      <span class="card__price" data-sai-item-price></span>
-
-      <!-- Add to cart form — variant ID is filled automatically -->
-      <form action="/cart/add" method="post">
-        <input type="hidden" name="id" data-sai-item-variant-id>
-        <input type="hidden" name="quantity" value="1">
-        <button type="submit" name="add" class="btn button">
-          Add to cart
-        </button>
-      </form>
-
-      <!-- Remove from wishlist button -->
-      <button class="card__btn" data-sai-item-remove>Remove</button>
-    </div>
-
-  </div>
-</template>`}</pre>
-          </s-banner>
-          <s-paragraph><strong>Where to add this template:</strong></s-paragraph>
-          <s-grid gap="small-200">
-            <s-stack direction="inline" gap="small-200" alignItems="flex-start">
-              <s-badge tone="success">App blocks</s-badge>
-              <s-paragraph>
-                Go to <strong>Online Store → Themes → Edit code → Templates → page.wishlist.liquid</strong>.
-                Paste the <code>{"<template>"}</code> anywhere in the file, before the Wishlist page section.
-              </s-paragraph>
-            </s-stack>
-            <s-stack direction="inline" gap="small-200" alignItems="flex-start">
-              <s-badge tone="info">Manual install</s-badge>
-              <s-paragraph>
-                Paste the <code>{"<template>"}</code> anywhere inside <code>templates/page.wishlist.liquid</code>
-                or at the top of your <code>snippets/wishlist-page.liquid</code> file.
-              </s-paragraph>
-            </s-stack>
-          </s-grid>
-          <s-paragraph>
-            The <code>{"<template>"}</code> is invisible — it never renders on the page itself.
-            The wishlist JS finds it, clones it for each saved item, and fills in the product data automatically.
-          </s-paragraph>
-          <s-banner tone="warning">
-            The cart form works for simple products. For products with multiple variants
-            (size, color, etc.) the app picks the first available variant. If you need
-            full variant selection, use <code>data-sai-item-product-id</code> to read the
-            product ID and build your own variant picker.
-          </s-banner>
-        </s-section>
-
-        {/* ── Step 4: header link ── */}
-        <s-section heading="Step 4 — Header wishlist link with live count (optional)">
-          <s-paragraph>
-            The header link cannot be added with a single render tag because the snippet file
-            lives in the app extension, not in your theme's snippet folder.
-            Instead, copy this code directly into your header section file
-            (<code>sections/header.liquid</code>) wherever you want the link to appear:
-          </s-paragraph>
-          <s-banner tone="info">
-            <code>{`<a href="/pages/wishlist" class="header-wishlist-link" aria-label="View wishlist" title="Wishlist">
-  <span class="header-wishlist-icon-wrapper" aria-hidden="true">
-    <svg class="header-wishlist-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-            stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-    </svg>
-    <span class="header-wishlist-badge" data-sai-wishlist-count>0</span>
-  </span>
-  <span class="hidden hide header-wishlist-text">Wishlist</span>
-</a>
-
-<script>
-  (() => {
-    const count = document.querySelector('[data-sai-wishlist-count]');
-    if (!count) return;
-    const update = () => {
-      try {
-        const items = JSON.parse(localStorage.getItem('saitriq_wishlist') || '[]');
-        count.textContent = Array.isArray(items) ? items.length : '0';
-      } catch { count.textContent = '0'; }
-    };
-    update();
-    window.addEventListener('storage', (e) => { if (e.key === 'saitriq_wishlist') update(); });
-    window.addEventListener('saitriq:wishlist-updated', update);
-  })();
-</script>
-
-<style>
-  .header-wishlist-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: inherit;
-    text-decoration: none;
-    font-weight: 600;
-  }
-  .header-wishlist-icon-wrapper {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .header-wishlist-svg {
-    display: block;
-    transition: transform 0.2s ease, color 0.2s ease;
-  }
-  .header-wishlist-link:hover .header-wishlist-svg {
-    transform: scale(1.08);
-    color: #D4AF37;
-  }
-  .header-wishlist-badge {
-    position: absolute;
-    top: -6px;
-    right: -8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.15rem;
-    height: 1.15rem;
-    padding: 0 0.2rem;
-    border-radius: 999px;
-    background: #D4AF37;
-    color: #0B0F19;
-    font-size: 0.65rem;
-    font-weight: 700;
-    line-height: 1;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
-</style>`}</code>
-          </s-banner>
-          <s-paragraph>
-            If you prefer a separate snippet file, create <code>snippets/wishlist-header-link.liquid</code>
-            in your theme (not the app) and paste the code there. Then render it with{" "}
-            <code>{"{% render 'wishlist-header-link' %}"}</code>.
-          </s-paragraph>
-        </s-section>
-      </s-section>
-
-      {/* ── Usage tracking ── */}
-      <s-section heading="Usage tracking">
-        <s-paragraph>
-          Each successful product save counts once toward your monthly limit.
-          Removing an item is tracked for analytics but does not restore a save credit.
-          Guest saves (shoppers not logged in) are also counted.
-          View your current usage on the <s-link href="/app">Dashboard</s-link> or the{" "}
-          <s-link href="/app/wishlist">Wishlist activity</s-link> page.
-        </s-paragraph>
-      </s-section>
-
-      <s-section heading="Troubleshooting">
-        <s-grid gap="base">
-          <s-box border="base" borderRadius="base" padding="base">
-            <s-grid gap="small-200">
-              <s-text><strong>Could not find asset snippets/wishlist-header-link.liquid</strong></s-text>
-              <s-paragraph>This file is in the app extension, not your theme. Paste the code directly into your header section file as shown in Step 4 above.</s-paragraph>
-            </s-grid>
-          </s-box>
-          <s-box border="base" borderRadius="base" padding="base">
-            <s-grid gap="small-200">
-              <s-text><strong>Heart button not appearing on collection page</strong></s-text>
-              <s-paragraph>The inject snippet looks for product card links inside <code>li</code>, <code>article</code>, <code>.card</code>, <code>.grid__item</code>, and elements with <code>product-card</code> or <code>product-item</code> in the class name. If your theme uses a different wrapper, add <code>position: relative</code> to it.</s-paragraph>
-            </s-grid>
-          </s-box>
-          <s-box border="base" borderRadius="base" padding="base">
-            <s-grid gap="small-200">
-              <s-text><strong>Wishlist not syncing for logged-in customers</strong></s-text>
-              <s-paragraph>Confirm the app proxy is active. Go to your Shopify Partner dashboard → App setup and verify the proxy URL. Run <code>shopify app deploy</code> if you recently changed it.</s-paragraph>
-            </s-grid>
-          </s-box>
-          <s-box border="base" borderRadius="base" padding="base">
-            <s-grid gap="small-200">
-              <s-text><strong>Items disappear after login</strong></s-text>
-              <s-paragraph>Expected on first sync. Guest items saved before login are merged into the customer account automatically.</s-paragraph>
-            </s-grid>
-          </s-box>
-          <s-box border="base" borderRadius="base" padding="base">
-            <s-grid gap="small-200">
-              <s-text><strong>CSS conflicts</strong></s-text>
-              <s-paragraph>All classes are prefixed with <code>.sai-wishlist</code>. Override them in your theme CSS.</s-paragraph>
-            </s-grid>
-          </s-box>
-        </s-grid>
-      </s-section>
-
     </s-page>
   );
 }
