@@ -4,10 +4,10 @@ export default function ApiDocsPage() {
 
       <s-section heading="Overview">
         <s-paragraph>
-          Saitriq Wishlist exposes two API surfaces. The <strong>Storefront API</strong> runs
-          through the Shopify app proxy and is callable from any storefront JavaScript.
-          The <strong>Admin API</strong> runs inside the embedded app and is intended for
-          server-side integrations, custom dashboards, or headless storefronts.
+          Saitriq Wishlist exposes a storefront app proxy and an authenticated
+          embedded-app API. The app proxy is called from the shop storefront. The
+          <code> /app/api</code> routes require Shopify Admin session authentication;
+          they are not a public bearer-token API for third-party or headless services.
         </s-paragraph>
       </s-section>
 
@@ -181,15 +181,15 @@ Content-Type: application/json
       </s-section>
 
       {/* ── ADMIN API ── */}
-      <s-section heading="Admin API (server-to-server)">
+      <s-section heading="Authenticated embedded-app API">
         <s-paragraph>
-          The Admin API is for server-side use: custom dashboards, headless storefronts,
-          data exports, or third-party integrations. It runs at <code>/app/api</code>
-          and requires Shopify session authentication (available inside the embedded app
-          or via Shopify's token exchange for server-side apps).
+          These routes are intended for requests made from the authenticated embedded
+          app. They use <code>authenticate.admin</code> and the app&apos;s Shopify session
+          context. They do not accept a shop access token in a custom Authorization
+          header and are not currently supported as a general server-to-server API.
         </s-paragraph>
         <s-banner tone="info">
-          <code>Base URL: https://saitriq-wishlist.vercel.app/app/api</code>
+          <code>Route: /app/api (authenticated embedded-app session required)</code>
         </s-banner>
 
         <s-section heading="GET ?resource=items — Customer items">
