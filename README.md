@@ -5,12 +5,16 @@ product and collection pages, a customer wishlist page, header navigation,
 cross-device sync for logged-in customers, and merchant-controlled appearance
 settings.
 
+See [SETUP.md](./SETUP.md) for complete merchant and developer setup steps,
+including older-theme manual installation, API configuration, deployment, and
+troubleshooting.
+
 ## Storefront setup
 
 1. Create a page with the handle `wishlist`.
 2. In Theme Editor, add the **Wishlist page** app block to that page.
-3. Add the **Wishlist button** app block to product and/or collection card
-   sections.
+3. Add the **Product Page Button** and/or **Collection wishlist icons** app
+   blocks to the relevant templates.
 4. Enable the **Saitriq Wishlist** app embed in Theme Editor. To add a
    wishlist link to your header automatically, open the embedded app's
    **Wishlist settings**, enter a CSS selector for the header container (for
@@ -18,8 +22,8 @@ settings.
    first matching element while the embed is enabled. Leave the selector blank
    to remove/disable the automatic link. If the selector doesn't match an
    element in the active theme, no link is added.
-5. In the embedded app, open **Page design settings** to configure the
-   wishlist button appearance and grid.
+5. In the embedded app, open **Wishlist settings** to configure wishlist
+   appearance and page behavior.
 
 The automatic header link does not edit theme files. The CSS selector is
 theme-specific; verify it against the storefront's markup. If you change the
@@ -34,20 +38,21 @@ monthly usage limit.
 
 ## Production deployment checklist
 
-- Deploy the app behind a stable HTTPS host and replace every
-  `REPLACE_WITH_YOUR_PRODUCTION_HOST` value in `shopify.app.toml`.
+- Deploy the app behind a stable HTTPS host and point `shopify.app.toml` at it.
 - Run `npm exec prisma migrate deploy` against a persistent production database.
-- Use a shared production database for more than one app instance; the default
-  SQLite database is suitable only for a single persistent instance.
+- Use a shared production database for more than one app instance.
 - Configure the app proxy route `/apps/saitriq-wishlist` in the Shopify app.
 - Test guest add/remove, customer login sync, theme blocks, custom SVG
   sanitization, and app-proxy requests on a development store before review.
 - Provide a privacy policy, support contact, and accurate App Store listing
   before submitting the app.
 
-This is a template for building a [Shopify app](https://shopify.dev/docs/apps/getting-started) using [React Router](https://reactrouter.com/). It was forked from the [Shopify Remix app template](https://github.com/Shopify/shopify-app-template-remix) and converted to React Router.
+Saitriq Wishlist is a [Shopify app](https://shopify.dev/docs/apps/getting-started)
+using [React Router](https://reactrouter.com/). See [SETUP.md](./SETUP.md) for
+instructions for this repository.
 
-Rather than cloning this repo, follow the [Quick Start steps](https://github.com/Shopify/shopify-app-template-react-router#quick-start).
+The app has already been scaffolded. Do not initialize another template in this
+directory; follow [SETUP.md](./SETUP.md) to configure and run this app.
 
 Visit the [`shopify.dev` documentation](https://shopify.dev/docs/api/shopify-app-react-router) for more details on the React Router app package.
 
@@ -64,7 +69,7 @@ Before you begin, you'll need to [download and install the Shopify CLI](https://
 ### Setup
 
 ```shell
-shopify app init --template=https://github.com/Shopify/shopify-app-template-react-router
+npm install
 ```
 
 ### Local Development
@@ -105,7 +110,7 @@ export async function loader({ request }) {
 }
 ```
 
-This template comes pre-configured with examples of:
+The upstream Shopify starter template included examples of:
 
 1. Setting up your Shopify app in [/app/shopify.server.ts](https://github.com/Shopify/shopify-app-template-react-router/blob/main/app/shopify.server.ts)
 2. Querying data using Graphql. Please see: [/app/routes/app.\_index.tsx](https://github.com/Shopify/shopify-app-template-react-router/blob/main/app/routes/app._index.tsx).
@@ -125,8 +130,7 @@ For more information on the Shopify Dev MCP please read [the documentation](http
 ### Application Storage
 
 This app uses [Prisma](https://www.prisma.io/) with PostgreSQL to store Shopify
-session data and merchant settings. Wishlist entries and wishlist analytics are
-stored in Shopify app-owned metaobjects.
+sessions, wishlist entries, analytics, settings, and billing records.
 The database is defined as a Prisma schema in `prisma/schema.prisma`.
 
 Before running `shopify app dev`, create a local `.env` file from
@@ -156,22 +160,10 @@ npx prisma migrate resolve --applied 20260920153143_init
 npm exec prisma migrate deploy
 ```
 
-```
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
-}
-```
-
 Only use `--applied` when the existing tables match the migration. For a
 different or incomplete schema, stop and inspect the database before changing
 migration history.
 
-This use of SQLite works in production if your app runs as a single instance.
 The database that works best for you depends on the data your app needs and how it is queried.
 Here’s a short list of databases providers that provide a free tier to get started:
 
