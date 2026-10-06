@@ -3,15 +3,18 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-color: var(--sai-btn-color, #1a1a1a);
-  color: var(--sai-btn-color, #1a1a1a);
+ 
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .sai-wishlist:hover {
   opacity: 0.8;
 }
-
+button.sai-wishlist.button--tertiary {
+    color: var(--sai-btn-active-color, #1a1a1a);
+    background: none;
+    border: none;
+}
 .sai-wishlist-header__link {
   display: inline-flex;
   align-items: center;
@@ -31,7 +34,7 @@
   right: -0.5rem;
   min-width: 1rem;
   border-radius: 999px;
-  background: #d4af37;
+  background: #FE847F;
   color: #0b0f19;
   font-size: 0.65rem;
   line-height: 1rem;
