@@ -1,7 +1,23 @@
 export default function ApiDocsPage() {
   return (
     <s-page heading="Developer API">
-
+      <style>{`
+        .api-code-block > code {
+          background-color: #1e1e1e;
+          border: 1px solid #3c3c3c;
+          border-radius: 0.5rem;
+          color: #d4d4d4;
+          display: block;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: 0.8rem;
+          line-height: 1.5;
+          margin: 0;
+          max-height: 32rem;
+          overflow: auto;
+          padding: 1rem;
+          white-space: pre;
+        }
+      `}</style>
       <s-section heading="Overview">
         <s-paragraph>
           Saitriq Wishlist exposes a storefront app proxy and an authenticated
@@ -16,9 +32,9 @@ export default function ApiDocsPage() {
         <s-paragraph>
           Base URL (from any storefront page):
         </s-paragraph>
-        <s-banner tone="info">
+        <div className="api-code-block">
           <code>https://yourstore.myshopify.com/apps/saitriq-wishlist</code>
-        </s-banner>
+        </div>
         <s-paragraph>
           All requests are authenticated automatically by Shopify via HMAC signing
           on the app proxy. No API key is needed in the storefront.
@@ -28,11 +44,11 @@ export default function ApiDocsPage() {
 
         <s-section heading="GET ?api=items — Customer wishlist">
           <s-paragraph>Returns all saved items for the currently logged-in customer.</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /apps/saitriq-wishlist?api=items</code>
-          </s-banner>
+          </div>
           <s-paragraph>Response:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{
   "items": [
     {
@@ -46,7 +62,7 @@ export default function ApiDocsPage() {
     }
   ]
 }`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?api=check — Is product saved?">
@@ -54,22 +70,22 @@ export default function ApiDocsPage() {
             Check whether a specific product is in the customer's wishlist.
             Useful for rendering the button state server-side or in headless.
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /apps/saitriq-wishlist?api=check&amp;productId=123456789</code>
-          </s-banner>
+          </div>
           <s-paragraph>Response:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{ "saved": true, "authenticated": true, "productId": "123456789" }`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?api=settings — Display settings">
           <s-paragraph>Returns the merchant's wishlist page and toast notification settings.</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /apps/saitriq-wishlist?api=settings</code>
-          </s-banner>
+          </div>
           <s-paragraph>Response:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{
   "settings": {
     "heading": "My wishlist",
@@ -83,20 +99,20 @@ export default function ApiDocsPage() {
     "toastPosition": "top-left"
   }
 }`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?api=analytics — Usage analytics">
           <s-paragraph>
             Returns add/remove totals and daily history for the current or specified month.
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /apps/saitriq-wishlist?api=analytics</code>
             <br />
             <code>GET /apps/saitriq-wishlist?api=analytics&amp;month=2026-09</code>
-          </s-banner>
+          </div>
           <s-paragraph>Response:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{
   "month": "2026-09",
   "adds": 42,
@@ -107,18 +123,18 @@ export default function ApiDocsPage() {
   ],
   "usage": { "used": 42, "limit": 100, "remaining": 58 }
 }`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?api=usage — Monthly usage">
           <s-paragraph>Returns used, limit, and remaining saves for the current month.</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /apps/saitriq-wishlist?api=usage</code>
-          </s-banner>
+          </div>
           <s-paragraph>Response:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{ "used": 42, "limit": 100, "remaining": 58 }`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="POST — Wishlist mutations">
@@ -127,7 +143,7 @@ export default function ApiDocsPage() {
           </s-paragraph>
 
           <s-section heading="Add a product">
-            <s-banner tone="info">
+            <div className="api-code-block">
               <code>{`POST /apps/saitriq-wishlist
 Content-Type: application/json
 
@@ -140,11 +156,11 @@ Content-Type: application/json
   "productImage": "https://cdn.shopify.com/...",
   "productPrice": "$29.00"
 }`}</code>
-            </s-banner>
+            </div>
           </s-section>
 
           <s-section heading="Remove a product">
-            <s-banner tone="info">
+            <div className="api-code-block">
               <code>{`POST /apps/saitriq-wishlist
 Content-Type: application/json
 
@@ -155,27 +171,27 @@ Content-Type: application/json
   "productHandle": "my-product",
   "productTitle": "My Product"
 }`}</code>
-            </s-banner>
+            </div>
           </s-section>
 
           <s-section heading="Clear all items">
-            <s-banner tone="info">
+            <div className="api-code-block">
               <code>{`POST /apps/saitriq-wishlist
 Content-Type: application/json
 
 { "operation": "clear", "visitorId": "abc123" }`}</code>
-            </s-banner>
+            </div>
           </s-section>
 
           <s-section heading="POST response (all mutations)">
-            <s-banner tone="info">
+            <div className="api-code-block">
               <code>{`{
   "authenticated": true,
   "tracked": true,
   "items": [ /* updated item list */ ],
   "usage": { "used": 43, "limit": 100, "remaining": 57 }
 }`}</code>
-            </s-banner>
+            </div>
           </s-section>
         </s-section>
       </s-section>
@@ -188,37 +204,37 @@ Content-Type: application/json
           context. They do not accept a shop access token in a custom Authorization
           header and are not currently supported as a general server-to-server API.
         </s-paragraph>
-        <s-banner tone="info">
+        <div className="api-code-block">
           <code>Route: /app/api (authenticated embedded-app session required)</code>
-        </s-banner>
+        </div>
 
         <s-section heading="GET ?resource=items — Customer items">
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /app/api?resource=items&amp;customerId=987</code>
-          </s-banner>
+          </div>
           <s-paragraph>Response:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{ "customerId": "987", "count": 3, "items": [ ... ] }`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?resource=check — Is product saved?">
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /app/api?resource=check&amp;customerId=987&amp;productId=123456789</code>
-          </s-banner>
+          </div>
           <s-paragraph>Response:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{ "customerId": "987", "productId": "123456789", "saved": true }`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?resource=all — All shop items (paginated)">
           <s-paragraph>Returns every wishlist item across all customers for the shop.</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /app/api?resource=all&amp;page=1&amp;pageSize=50</code>
-          </s-banner>
+          </div>
           <s-paragraph>Response:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{
   "page": 1,
   "pageSize": 50,
@@ -236,32 +252,32 @@ Content-Type: application/json
     }
   ]
 }`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?resource=analytics — Analytics">
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /app/api?resource=analytics&amp;month=2026-09</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?resource=settings — Display settings">
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /app/api?resource=settings</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="GET ?resource=usage — Monthly usage">
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>GET /app/api?resource=usage</code>
-          </s-banner>
+          </div>
         </s-section>
 
         <s-section heading="POST — Mutations (add / remove / clear)">
           <s-paragraph>
             Add a product to a customer's wishlist:
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`POST /app/api
 Content-Type: application/json
 
@@ -275,15 +291,15 @@ Content-Type: application/json
   "productImage": "https://cdn.shopify.com/...",
   "productPrice": "$29.00"
 }`}</code>
-          </s-banner>
+          </div>
           <s-paragraph>Remove:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{ "resource": "item", "operation": "remove", "customerId": "987", "productId": "123456789" }`}</code>
-          </s-banner>
+          </div>
           <s-paragraph>Clear all for a customer:</s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`{ "resource": "item", "operation": "clear", "customerId": "987" }`}</code>
-          </s-banner>
+          </div>
         </s-section>
       </s-section>
 
@@ -292,24 +308,24 @@ Content-Type: application/json
         <s-paragraph>
           Fetch the customer's wishlist from any storefront page:
         </s-paragraph>
-        <s-banner tone="info">
+        <div className="api-code-block">
           <code>{`const res = await fetch('/apps/saitriq-wishlist?api=items', {
   credentials: 'same-origin'
 });
 const { items } = await res.json();
 console.log(items); // array of wishlist items`}</code>
-        </s-banner>
+        </div>
         <s-paragraph>
           Check if a product is saved (useful for custom button rendering):
         </s-paragraph>
-        <s-banner tone="info">
+        <div className="api-code-block">
           <code>{`const res = await fetch(
   '/apps/saitriq-wishlist?api=check&productId=' + productId,
   { credentials: 'same-origin' }
 );
 const { saved } = await res.json();
 button.classList.toggle('is-saved', saved);`}</code>
-        </s-banner>
+        </div>
       </s-section>
 
       {/* ── THEME JS REFERENCE ── */}
@@ -326,7 +342,7 @@ button.classList.toggle('is-saved', saved);`}</code>
             Drop this once into your theme JavaScript. It exposes a
             {" "}<code>window.SaitriqWishlist</code> object all other modules use.
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`// saitriq-wishlist.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Core wishlist client — add once to your theme JS bundle
@@ -469,7 +485,7 @@ window.SaitriqWishlist = (() => {
 
   return { sync, isSaved, add, remove, toggle, clear, getAll, getSettings, onChange, offChange };
 })();`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         {/* Wishlist button */}
@@ -478,7 +494,7 @@ window.SaitriqWishlist = (() => {
             Wire up any button element as a wishlist toggle. Works with your own HTML —
             no class names required.
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`// Usage: call this for each wishlist button on the page
 // <button data-wishlist-btn data-product-id="123" data-product-handle="my-product"
 //         data-product-title="My Product" data-product-image="..." data-product-price="$29">
@@ -517,7 +533,7 @@ function initWishlistButton(button) {
 
 // Init all buttons on page load
 document.querySelectorAll('[data-wishlist-btn]').forEach(initWishlistButton);`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         {/* Counter badge */}
@@ -526,7 +542,7 @@ document.querySelectorAll('[data-wishlist-btn]').forEach(initWishlistButton);`}<
             Display a live wishlist item count that updates without a page reload.
             Put <code>{"<span data-wishlist-count></span>"}</code> anywhere in your HTML.
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`function initWishlistCounter(el) {
   const update = () => {
     el.textContent = SaitriqWishlist.getAll().length;
@@ -537,7 +553,7 @@ document.querySelectorAll('[data-wishlist-btn]').forEach(initWishlistButton);`}<
 }
 
 document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         {/* Wishlist page renderer */}
@@ -546,7 +562,7 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
             Render a full wishlist grid into any container element.
             Put <code>{'<div data-wishlist-page></div>'}</code> in your page template.
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`function initWishlistPage(container) {
   const esc = (s) => {
     const d = document.createElement('div');
@@ -579,7 +595,7 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
         <a href="/products/\${encodeURIComponent(item.handle)}">
           <img src="\${esc(item.image)}" alt="\${esc(item.title)}" loading="lazy">
         </a>
-        <div>
+        <div className="api-code-block">
           <a class="sai-wishlist-page__title" href="/products/\${encodeURIComponent(item.handle)}">\${esc(item.title)}</a>
           \${showPrices && item.price ? \`<div class="sai-wishlist-page__price">\${esc(item.price)}</div>\` : ''}
           \${showRemove ? \`<button type="button" class="sai-wishlist-page__remove">\${esc(buttonLabel)}</button>\` : ''}
@@ -609,7 +625,7 @@ document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
 
 const wishlistPage = document.querySelector('[data-wishlist-page]');
 if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         {/* Collection inject */}
@@ -618,7 +634,7 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
             Auto-inject heart buttons on collection pages. Call once after the DOM is ready.
             Uses <code>MutationObserver</code> so it works with infinite scroll too.
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`function initCollectionWishlist() {
   const cache = new Map();
 
@@ -697,7 +713,7 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
 }
 
 document.addEventListener('DOMContentLoaded', initCollectionWishlist);`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         {/* Events */}
@@ -706,7 +722,7 @@ document.addEventListener('DOMContentLoaded', initCollectionWishlist);`}</code>
             Listen to these events on <code>window</code> to react to wishlist changes
             from anywhere in your theme JS:
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`// Fired whenever the wishlist changes (add, remove, clear, sync)
 window.addEventListener('saitriq:wishlist-updated', () => {
   const items = SaitriqWishlist.getAll();
@@ -722,7 +738,7 @@ window.addEventListener('saitriq:wishlist-toast', (event) => {
 
 // Dispatch manually to trigger a wishlist re-render from outside
 window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
         {/* Full HTML example */}
@@ -731,7 +747,7 @@ window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));`}</code>
             A complete working example combining all the pieces above.
             Copy this into any theme template to get a working wishlist button and counter.
           </s-paragraph>
-          <s-banner tone="info">
+          <div className="api-code-block">
             <code>{`<!-- In your product template -->
 <button
   data-wishlist-btn
@@ -758,7 +774,7 @@ window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));`}</code>
     document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
   });
 </script>`}</code>
-          </s-banner>
+          </div>
         </s-section>
 
       </s-section>

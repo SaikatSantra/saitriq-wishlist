@@ -10,12 +10,31 @@ import manualCollectionSnippet from "../../extensions/wishlist-product/snippets/
 import manualPageSnippet from "../../extensions/wishlist-product/snippets/manual-wishlist-page.liquid?raw";
 import headerLinkSnippet from "../../extensions/wishlist-product/snippets/wishlist-header-link.liquid?raw";
 
-const codeStyle = { fontSize: "0.8rem", whiteSpace: "pre-wrap" };
+const codeStyle = {
+  backgroundColor: "#1e1e1e",
+  border: "1px solid #3c3c3c",
+  borderRadius: "0.5rem",
+  color: "#d4d4d4",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  fontSize: "0.8rem",
+  lineHeight: 1.5,
+  margin: 0,
+  maxHeight: "32rem",
+  overflow: "auto",
+  padding: "1rem",
+  whiteSpace: "pre",
+};
+
+const renderCode = (source) => (
+  <pre style={codeStyle}>
+    <code>{source}</code>
+  </pre>
+);
 
 const renderCopySource = (heading, source) => {
   return (
     <s-section heading={heading}>
-      <pre style={codeStyle}>{source}</pre>
+      {renderCode(source)}
     </s-section>
   );
 };
@@ -122,13 +141,13 @@ export default function HowToUsePage() {
             In <code>layout/theme.liquid</code>, render the shared assets in the
             head:
           </s-paragraph>
-          <pre style={codeStyle}>{"{% render 'manual-wishlist-assets' %}"}</pre>
+          {renderCode("{% render 'manual-wishlist-assets' %}")}
 
           {renderCopySource("snippets/manual-wishlist-button.liquid", manualButtonSnippet)}
           <s-paragraph>
             In the product Liquid template, render this after the product form:
           </s-paragraph>
-          <pre style={codeStyle}>{"{% render 'manual-wishlist-button' %}"}</pre>
+          {renderCode("{% render 'manual-wishlist-button' %}")}
 
           {renderCopySource("snippets/manual-wishlist-collection.liquid", manualCollectionSnippet)}
           <s-paragraph>
@@ -138,7 +157,7 @@ export default function HowToUsePage() {
             theme and have a developer adjust its product-card selector if
             required.
           </s-paragraph>
-          <pre style={codeStyle}>{"{% render 'manual-wishlist-collection' %}"}</pre>
+          {renderCode("{% render 'manual-wishlist-collection' %}")}
 
           {renderCopySource("snippets/manual-wishlist-page.liquid", manualPageSnippet)}
           <s-paragraph>
@@ -146,7 +165,7 @@ export default function HowToUsePage() {
             render tag, then assign the template to the page whose handle is
             <code>wishlist</code>:
           </s-paragraph>
-          <pre style={codeStyle}>{"{% render 'manual-wishlist-page' %}"}</pre>
+          {renderCode("{% render 'manual-wishlist-page' %}")}
         </s-section>
 
         <s-section heading="Optional header link">
@@ -157,7 +176,7 @@ export default function HowToUsePage() {
             The count reflects the visitor&apos;s local wishlist.
           </s-paragraph>
           {renderCopySource("snippets/wishlist-header-link.liquid", headerLinkSnippet)}
-          <pre style={codeStyle}>{"{% render 'wishlist-header-link' %}"}</pre>
+          {renderCode("{% render 'wishlist-header-link' %}")}
         </s-section>
       </s-section>
 
