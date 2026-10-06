@@ -1,3 +1,6 @@
+import wishlistPageSnippet from "../../extensions/wishlist-product/snippets/wishlist-page.liquid?raw";
+import wishlistStyles from "../../extensions/wishlist-product/assets/wishlist.css?raw";
+
 export default function HowToUsePage() {
   return (
     <s-page heading="How to use Saitriq Wishlist">
@@ -5,8 +8,8 @@ export default function HowToUsePage() {
       {/* ── Method 1: App Blocks ── */}
       <s-section heading="Method 1 — App blocks (recommended)">
         <s-paragraph>
-          Works with any Online Store 2.0 theme (Dawn, Sense, Craft, Refresh, etc.).
-          No code editing required.
+          Use this method with an Online Store 2.0 theme that supports app blocks
+          (including Dawn, Sense, Craft, and Refresh). No theme code editing is required.
         </s-paragraph>
         <s-banner tone="warning" heading="Enable the app embed first">
           Before adding any blocks, you must enable the Saitriq Wishlist app embed.
@@ -21,7 +24,7 @@ export default function HowToUsePage() {
           </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-badge tone="info">2</s-badge>
-            <s-paragraph>Open the <strong>Product</strong> template → Add block → <strong>Saitriq Wishlist → Wishlist</strong>. Save.</s-paragraph>
+            <s-paragraph>Open the <strong>Product</strong> template → Add block → <strong>Product Page Button</strong>. Save.</s-paragraph>
           </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
             <s-badge tone="info">3</s-badge>
@@ -42,21 +45,44 @@ export default function HowToUsePage() {
         </s-paragraph>
       </s-section>
 
+      <s-section heading="If the app block or embed is missing">
+        <s-paragraph>
+          Deploying an app or extension update does not upgrade your theme or
+          automatically insert blocks into its templates. In Theme Editor, select
+          the exact theme you are previewing, turn on the Saitriq Wishlist app
+          embed, save, and add each app block to its template. Refresh Theme Editor
+          after an extension update. If the theme has no app-block picker, use the
+          manual method below; app blocks require a compatible theme.
+        </s-paragraph>
+      </s-section>
+
       {/* ── Method 2: Manual (older themes) ── */}
       <s-section heading="Method 2 — Manual install (older or custom themes)">
         <s-paragraph>
-          For themes that do not support app blocks (Debut, older Brooklyn, Pipeline, fully
-          custom themes). All the code below is copy-paste ready — create each snippet file
-          yourself in <strong>Online Store → Themes → Edit code → Snippets → Add a new snippet</strong>.
+          Use this when the theme does not offer app blocks. Duplicate the theme first.
+          Create each snippet in <strong>Online Store → Themes → Edit code → Snippets → Add a new snippet</strong>.
+          Manual snippets do not update the theme to Online Store 2.0.
         </s-paragraph>
         <s-banner tone="warning">
-          Always duplicate your theme before editing code.
+          The extension does not copy its asset files into a theme automatically.
+          Render the snippets from Liquid templates, not from a page&apos;s rich-text editor.
         </s-banner>
+
+        <s-section heading="Step 0 — Create assets/wishlist.css">
+          <s-paragraph>
+            In Edit code, add a new asset named <code>wishlist.css</code> and paste
+            the stylesheet below. The manual snippets load this asset.
+          </s-paragraph>
+          <s-banner tone="info">
+            <pre style={{fontSize:"0.8rem", whiteSpace:"pre-wrap"}}>{wishlistStyles}</pre>
+          </s-banner>
+        </s-section>
 
         {/* ── Step 1: wishlist-button snippet ── */}
         <s-section heading="Step 1 — Create snippets/wishlist-button.liquid">
           <s-paragraph>
-            Create a new snippet file named <code>wishlist-button</code> and paste this code:
+            Create a new snippet file named <code>wishlist-button</code> and paste
+            the code below. Render it from the product template after the product form.
           </s-paragraph>
           <s-banner tone="info">
             <code>{`{{ 'wishlist.css' | asset_url | stylesheet_tag }}
@@ -383,10 +409,15 @@ export default function HowToUsePage() {
         {/* ── Step 3: wishlist page ── */}
         <s-section heading="Step 3 — Create snippets/wishlist-page.liquid">
           <s-paragraph>
-            Create a snippet named <code>wishlist-page</code>. The full snippet code is available in your theme extension files at{" "}
-            <code>extensions/wishlist-product/snippets/wishlist-page.liquid</code> — copy its contents into your theme snippet.
+            Create a snippet named <code>wishlist-page</code> and paste the full
+            code below. It is included here for copy-and-paste use. Do not substitute
+            <code>blocks/wishlist-page.liquid</code>, which needs Shopify&apos;s app-block
+            settings.
             Then create <code>templates/page.wishlist.liquid</code> containing:
           </s-paragraph>
+          <s-banner tone="info">
+            <pre style={{fontSize:"0.8rem", whiteSpace:"pre-wrap"}}>{wishlistPageSnippet}</pre>
+          </s-banner>
           <s-banner tone="info"><code>{"{% render 'wishlist-page' %}"}</code></s-banner>
           <s-paragraph>
             Customise columns, heading, and card class by passing variables:
