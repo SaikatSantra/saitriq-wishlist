@@ -85,14 +85,23 @@ const storefrontSettingsSelect = {
 const handleApiGet = async (api, url, session, customerId) => {
   const shop = session.shop;
   const month = url.searchParams.get("month") || monthKey();
+  const [entitlement, used, addonSaves] = await Promise.all([
+    getPlanEntitlement(shop, month),
+    currentUsage(shop, month),
+    getMonthlyAddonSaves(shop, month),
+  ]);
+  const limit = effectiveLimit(entitlement.planLimit, addonSaves);
+  const isLimitReached = Number.isFinite(limit) && used >= limit;
 
   switch (api) {
     case "items": {
+      if (isLimitReached) return json({ items: [], limitReached: true, stopped: true });
       if (!customerId) return json({ error: "Customer not authenticated." }, { status: 401 });
       const items = await listCustomerWishlistItems(shop, customerId);
       return json({ items });
     }
     case "check": {
+      if (isLimitReached) return json({ saved: false, authenticated: false, limitReached: true, stopped: true });
       if (!customerId) return json({ saved: false, authenticated: false });
       const productId = url.searchParams.get("productId");
       if (!productId) return json({ error: "productId is required." }, { status: 400 });
@@ -100,16 +109,10 @@ const handleApiGet = async (api, url, session, customerId) => {
       return json({ saved: items.some((i) => String(i.productId) === String(productId)), authenticated: true, productId });
     }
     case "analytics": {
-      const [totals, history, used] = await Promise.all([
+      const [totals, history] = await Promise.all([
         getAnalytics(shop, month),
         getAnalyticsHistory(shop, month),
-        currentUsage(shop, month),
       ]);
-      const [entitlement, addonSaves] = await Promise.all([
-        getPlanEntitlement(shop, month),
-        getMonthlyAddonSaves(shop, month),
-      ]);
-      const limit = effectiveLimit(entitlement.planLimit, addonSaves);
       return json({ month, adds: totals.adds, removes: totals.removes, history, usage: usageFor(used, limit) });
     }
     case "settings": {
@@ -120,12 +123,7 @@ const handleApiGet = async (api, url, session, customerId) => {
       return json({ settings: settings || defaultSettings });
     }
     case "usage": {
-      const [used, entitlement, addonSaves] = await Promise.all([
-        currentUsage(shop, month),
-        getPlanEntitlement(shop, month),
-        getMonthlyAddonSaves(shop, month),
-      ]);
-      return json(usageFor(used, effectiveLimit(entitlement.planLimit, addonSaves)));
+      return json(usageFor(used, limit));
     }
     default:
       return json({ error: `Unknown api endpoint: ${api}` }, { status: 400 });
@@ -148,17 +146,32 @@ export const loader = async ({ request }) => {
 
   const shop = session.shop;
   const month = monthKey();
-  const [entitlement, used, items, settings, addonSaves] = await Promise.all([
+  const [entitlement, used, addonSaves] = await Promise.all([
     getPlanEntitlement(shop, month),
     currentUsage(shop, month),
+    getMonthlyAddonSaves(shop, month),
+  ]);
+  const limit = effectiveLimit(entitlement.planLimit, addonSaves);
+  const isLimitReached = Number.isFinite(limit) && used >= limit;
+
+  if (isLimitReached) {
+    return json({
+      authenticated: false,
+      items: [],
+      limitReached: true,
+      stopped: true,
+      settings: defaultSettings,
+      usage: usageFor(used, limit),
+    });
+  }
+
+  const [items, settings] = await Promise.all([
     listCustomerWishlistItems(shop, customerId),
     prisma.wishlistSettings.findUnique({
       where: { shop },
       select: storefrontSettingsSelect,
     }),
-    getMonthlyAddonSaves(shop, month),
   ]);
-  const limit = effectiveLimit(entitlement.planLimit, addonSaves);
 
   return json({
     authenticated: true,
@@ -190,11 +203,24 @@ export const action = async ({ request }) => {
     }
 
     const month = monthKey();
-    const [entitlement, addonSaves] = await Promise.all([
+    const [entitlement, addonSaves, used] = await Promise.all([
       getPlanEntitlement(shop, month),
       getMonthlyAddonSaves(shop, month),
+      currentUsage(shop, month),
     ]);
     const limit = effectiveLimit(entitlement.planLimit, addonSaves);
+
+    // Hard Stop when limit reached: stops all wishlist operations (add, remove, clear)
+    if (Number.isFinite(limit) && used >= limit) {
+      return json({
+        authenticated: false,
+        limitReached: true,
+        stopped: true,
+        error: "Wishlist is temporarily unavailable.",
+        items: [],
+        usage: { used, limit, remaining: 0 },
+      }, { status: 429 });
+    }
 
     // ── clear ─────────────────────────────────────────────────────────────────
     if (operation === "clear") {
@@ -225,17 +251,6 @@ export const action = async ({ request }) => {
     }
 
     if (operation === "add") {
-      const used = await currentUsage(shop, month);
-      if (Number.isFinite(limit) && used >= limit) {
-        return json({
-          error: "Monthly limit reached. Please upgrade your plan.",
-          limitReached: true,
-          usage: { used, limit, remaining: 0 },
-        }, { status: 429 });
-      }
-    }
-
-    if (operation === "add") {
       if (customerId) {
         const result = await upsertWishlistItem(shop, customerId, {
           productId, variantId, variantTitle, productHandle, productTitle,
@@ -263,12 +278,25 @@ export const action = async ({ request }) => {
       }
     }
 
-    const used = await currentUsage(shop, month);
+    const currentUsed = await currentUsage(shop, month);
+
+    if (operation === "add" && Number.isFinite(limit) && currentUsed / limit >= 0.8) {
+      import("../email.server").then(({ checkAndSend80PercentQuotaEmail }) => {
+        checkAndSend80PercentQuotaEmail({
+          shop,
+          month,
+          used: currentUsed,
+          limit,
+          planName: entitlement.planId,
+        });
+      }).catch((err) => console.error("[80% Quota Trigger Error]", err));
+    }
+
     return json({
       authenticated: Boolean(customerId),
       tracked: true,
       items: customerId ? await listCustomerWishlistItems(shop, customerId) : [],
-      usage: usageFor(used, limit),
+      usage: usageFor(currentUsed, limit),
     });
   } catch (error) {
     console.error("Wishlist proxy operation failed", error);

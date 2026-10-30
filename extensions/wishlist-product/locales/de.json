@@ -6,7 +6,7 @@
     "added_to_wishlist": "Zum Wunschzettel hinzugefügt",
     "removed_from_wishlist": "Vom Wunschzettel entfernt",
     "wishlist_cleared": "Wunschzettel geleert",
-    "limit_reached": "Monatliches Limit erreicht. Bitte Tarif upgraden.",
+    "limit_reached": "Wunschliste ist vorübergehend nicht verfügbar",
     "temporarily_unavailable": "Wunschzettel ist vorübergehend nicht verfügbar. Bitte erneut versuchen.",
     "sold_out": "Ausverkauft",
     "added_to_cart": "In den Warenkorb gelegt",
@@ -28,4 +28,3 @@
     }
   }
 }
-

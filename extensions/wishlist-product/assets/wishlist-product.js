@@ -130,8 +130,9 @@
           });
 
           const data = await res.json().catch(() => ({}));
-          if (res.status === 429 || data.limitReached) {
-            return { limitReached: true, error: data.error };
+          if (res.status === 429 || data.limitReached || data.stopped) {
+            window.saitriqWishlistStopped = true;
+            return { limitReached: true, stopped: true, error: data.error };
           }
           if (res.ok && data.tracked) return data;
         } catch {}
@@ -140,10 +141,15 @@
       };
 
       const sync = async (operation, item) => {
+        if (window.saitriqWishlistStopped) {
+          refresh();
+          return getWishlist();
+        }
+
         if (!customerAuthenticated) {
           const guestResult = await trackGuest(operation, item);
-          if (operation === 'add' && guestResult?.limitReached) {
-            window.saitriqWishlistToast?.({ message: guestResult.error || locLimit });
+          if (guestResult?.limitReached || guestResult?.stopped) {
+            window.saitriqWishlistStopped = true;
             refresh();
             return getWishlist();
           }
@@ -163,13 +169,8 @@
 
         const data = await res.json().catch(() => ({}));
 
-        if (res.status === 429 || data.limitReached) {
-          if (operation === 'remove' || operation === 'clear') {
-            window.saitriqWishlistToast?.({ message: locRemoved });
-            return getWishlist();
-          }
-
-          window.saitriqWishlistToast?.({ message: data.error || locLimit });
+        if (res.status === 429 || data.limitReached || data.stopped) {
+          window.saitriqWishlistStopped = true;
           refresh();
           return getWishlist();
         }
@@ -211,6 +212,12 @@
           if (!res.ok) return;
 
           const data = await res.json().catch(() => ({}));
+          if (data.limitReached || data.stopped) {
+            window.saitriqWishlistStopped = true;
+            saveWishlist([]);
+            refresh();
+            return;
+          }
           customerAuthenticated = data.authenticated === true;
 
           if (!data.authenticated || !Array.isArray(data.items)) return;
@@ -267,6 +274,7 @@
       productScope.addEventListener('variant:change', refresh);
 
       button.addEventListener('click', async () => {
+        if (window.saitriqWishlistStopped) return;
         if (requestInFlight) return;
 
         requestInFlight = true;

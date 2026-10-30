@@ -6,7 +6,7 @@
     "added_to_wishlist": "Añadido a la lista de deseos",
     "removed_from_wishlist": "Eliminado de la lista de deseos",
     "wishlist_cleared": "Lista de deseos vaciada",
-    "limit_reached": "Límite mensual alcanzado. Actualice su plan.",
+    "limit_reached": "La lista de deseos no está disponible temporalmente",
     "temporarily_unavailable": "La lista de deseos no está disponible temporalmente. Inténtelo de nuevo.",
     "sold_out": "Agotado",
     "added_to_cart": "Añadido al carrito",
@@ -28,4 +28,3 @@
     }
   }
 }
-

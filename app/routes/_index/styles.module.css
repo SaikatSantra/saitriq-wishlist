@@ -1,73 +1,216 @@
 .index {
-  align-items: center;
+  min-height: 100vh;
+  width: 100%;
   display: flex;
   justify-content: center;
-  height: 100%;
-  width: 100%;
-  text-align: center;
-  padding: 1rem;
+  align-items: center;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  color: #1e293b;
+  padding: 40px 20px;
+  box-sizing: border-box;
 }
 
-.heading,
-.text {
-  padding: 0;
+.container {
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+}
+
+.header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.badgeIcon {
+  font-size: 14px;
+}
+
+.heading {
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.subheading {
+  font-size: 16px;
+  color: #64748b;
+  max-width: 620px;
+  line-height: 1.6;
   margin: 0;
 }
 
-.text {
-  font-size: 1.2rem;
-  padding-bottom: 2rem;
+/* ── Card & Form ── */
+.card {
+  width: 100%;
+  max-width: 480px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
 }
 
-.content {
-  display: grid;
-  gap: 2rem;
+.cardTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.cardDesc {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .form {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin: 0 auto;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 6px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .label {
-  display: grid;
-  gap: 0.2rem;
-  max-width: 20rem;
-  text-align: left;
-  font-size: 1rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.inputWrapper {
+  position: relative;
+  width: 100%;
 }
 
 .input {
-  padding: 0.4rem;
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  background: #ffffff;
+  border-color: #008060;
+  box-shadow: 0 0 0 3px rgba(0, 128, 96, 0.15);
+}
+
+.hint {
+  font-size: 11px;
+  color: #94a3b8;
 }
 
 .button {
-  padding: 0.4rem;
+  background: #008060;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.list {
-  list-style: none;
-  padding: 0;
-  padding-top: 3rem;
-  margin: 0;
+.button:hover {
+  background: #006e52;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 128, 96, 0.2);
+}
+
+.footerNote {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 14px;
+  margin-top: 4px;
+}
+
+/* ── Feature Grid ── */
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .featureGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.featureCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
   display: flex;
-  gap: 2rem;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
-.list > li {
-  max-width: 20rem;
-  text-align: left;
+.featureIcon {
+  font-size: 24px;
+  margin-bottom: 4px;
 }
 
-@media only screen and (max-width: 50rem) {
-  .list {
-    display: block;
-  }
+.featureTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
 
-  .list > li {
-    padding-bottom: 1rem;
-  }
+.featureText {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
 }

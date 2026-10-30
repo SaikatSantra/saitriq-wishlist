@@ -83,23 +83,10 @@
           body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
         });
         const data = await res.json().catch(() => ({}));
-        if (res.status === 429 || data.limitReached) {
-          return { limitReached: true, error: data.error };
-        }
-        if (res.ok && data.tracked) return data;
-      } catch {}
-      return null;
-    };
-
-    const sync = async (operation, item) => {
-      if (!customerAuthenticated) {
-        const guestResult = await trackGuest(operation, item);
-        if (operation === 'add' && guestResult?.limitReached) {
-          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-            detail: { message: guestResult.error || locales.limitMsg }
-          }));
-          return readItems();
-        }
+        if (res.status === 429 || data.limitReached || data.stopped) {
+        window.saitriqWishlistStopped = true;
+        return readItems();
+      }
         return persistLocalFallback(operation, item);
       }
       const res = await fetch(endpoint, {
@@ -216,7 +203,13 @@
       try {
         const res = await fetch(endpoint, { credentials: 'same-origin' });
         const data = await res.json().catch(() => ({}));
-        customerAuthenticated = data.authenticated === true;
+      if (data.limitReached || data.stopped) {
+        window.saitriqWishlistStopped = true;
+        saveItems([]);
+        refresh();
+        return;
+      }
+      customerAuthenticated = data.authenticated === true;
         if (customerAuthenticated && Array.isArray(data.items)) {
           const serverIds = new Set(data.items.map((i) => String(i.productId)));
           for (const local of readItems()) {

@@ -1,379 +1,80 @@
+import { useState, useMemo } from "react";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { detectLocale, createTranslator } from "../i18n.server";
+
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const locale = detectLocale({ request, session });
   const t = createTranslator(locale);
 
   return {
+    shop: session.shop,
     locale,
     i18n: {
-      title: t("apiDocs.title"),
-      subtitle: t("apiDocs.subtitle"),
-      overviewTitle: t("apiDocs.overviewTitle"),
-      overviewDesc: t("apiDocs.overviewDesc"),
-      statusCodesTitle: t("apiDocs.statusCodesTitle"),
-      code200: t("apiDocs.code200"),
-      code400: t("apiDocs.code400"),
-      code401: t("apiDocs.code401"),
-      code404: t("apiDocs.code404"),
-      code429: t("apiDocs.code429"),
-      code429Desc: t("apiDocs.code429Desc"),
+      title: t("apiDocs.title") || "Developer API Reference",
+      subtitle: t("apiDocs.subtitle") || "Integrate wishlist endpoints with custom headless storefronts and theme scripts.",
+      overviewTitle: t("apiDocs.overviewTitle") || "Overview & Architecture",
+      overviewDesc: t("apiDocs.overviewDesc") || "Saitriq Wishlist provides an App Proxy API mounted at /apps/saitriq-wishlist. Requests sent with credentials: 'same-origin' are securely signed and authenticated by Shopify HMAC.",
+      statusCodesTitle: t("apiDocs.statusCodesTitle") || "HTTP Status Codes & Quota Enforcement",
+      code200: t("apiDocs.code200") || "Success - request completed normally.",
+      code400: t("apiDocs.code400") || "Bad Request - missing required parameters.",
+      code401: t("apiDocs.code401") || "Unauthorized - shopper session required.",
+      code404: t("apiDocs.code404") || "Not Found - endpoint or item not found.",
+      code429: t("apiDocs.code429") || "Too Many Requests - monthly plan quota exceeded.",
+      code429Desc: t("apiDocs.code429Desc") || "When a merchant exceeds their monthly plan quota, mutating operations (such as adding saves) return HTTP 429 with limitReached: true. Removal and clear operations continue to function.",
     },
   };
 };
 
+const codeBoxStyle = {
+  backgroundColor: "#1a1a1a",
+  border: "1px solid #333333",
+  borderRadius: "8px",
+  color: "#d4d4d4",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  fontSize: "12px",
+  lineHeight: 1.55,
+  margin: "8px 0 0 0",
+  maxHeight: "26rem",
+  overflow: "auto",
+  padding: "14px",
+  whiteSpace: "pre",
+};
+
 export default function ApiDocsPage() {
-  const { i18n } = useLoaderData() || {};
-  return (
-    <s-page heading={i18n?.title || "Developer API"}>
-      <style>{`
-        .api-code-block > code {
-          background-color: #1e1e1e;
-          border: 1px solid #3c3c3c;
-          border-radius: 0.5rem;
-          color: #d4d4d4;
-          display: block;
-          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-          font-size: 0.8rem;
-          line-height: 1.5;
-          margin: 0;
-          max-height: 32rem;
-          overflow: auto;
-          padding: 1rem;
-          white-space: pre;
-        }
-      `}</style>
-      <s-section heading={i18n?.overviewTitle || "Overview"}>
-        <s-paragraph>
-          Saitriq Wishlist exposes a storefront app proxy and an authenticated
-          embedded-app API. The app proxy is called from the shop storefront. The
-          <code> /app/api</code> routes require Shopify Admin session authentication;
-          they are not a public bearer-token API for third-party or headless services.
-        </s-paragraph>
-      </s-section>
+  const { shop, i18n } = useLoaderData() || {};
+  const [activeTab, setActiveTab] = useState("proxy");
+  const [copiedKey, setCopiedKey] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeSdkModule, setActiveSdkModule] = useState("core");
 
-      {/* ── STOREFRONT API ── */}
-      <s-section heading="Storefront API">
-        <s-paragraph>
-          Base URL (from any storefront page):
-        </s-paragraph>
-        <div className="api-code-block">
-          <code>https://yourstore.myshopify.com/apps/saitriq-wishlist</code>
-        </div>
-        <s-paragraph>
-          All requests are authenticated automatically by Shopify via HMAC signing
-          on the app proxy. No API key is needed in the storefront.
-          The <code>logged_in_customer_id</code> query param is appended automatically
-          by Shopify for logged-in customers.
-        </s-paragraph>
-
-        <s-section heading="GET ?api=items — Customer wishlist">
-          <s-paragraph>Returns all saved items for the currently logged-in customer.</s-paragraph>
-          <div className="api-code-block">
-            <code>GET /apps/saitriq-wishlist?api=items</code>
-          </div>
-          <s-paragraph>Response:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{
-  "items": [
-    {
-      "productId": "123456789",
-      "productHandle": "my-product",
-      "productTitle": "My Product",
-      "productImage": "https://cdn.shopify.com/...",
-      "productPrice": "$29.00",
-      "customerId": "987",
-      "createdAt": "2026-09-01T10:00:00.000Z"
+  const handleCopy = (key, text) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
     }
-  ]
-}`}</code>
-          </div>
-        </s-section>
+  };
 
-        <s-section heading="GET ?api=check — Is product saved?">
-          <s-paragraph>
-            Check whether a specific product is in the customer's wishlist.
-            Useful for rendering the button state server-side or in headless.
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>GET /apps/saitriq-wishlist?api=check&amp;productId=123456789</code>
-          </div>
-          <s-paragraph>Response:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{ "saved": true, "authenticated": true, "productId": "123456789" }`}</code>
-          </div>
-        </s-section>
-
-        <s-section heading="GET ?api=settings — Display settings">
-          <s-paragraph>Returns the merchant's wishlist page and toast notification settings.</s-paragraph>
-          <div className="api-code-block">
-            <code>GET /apps/saitriq-wishlist?api=settings</code>
-          </div>
-          <s-paragraph>Response:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{
-  "settings": {
-    "heading": "My wishlist",
-    "emptyMessage": "You have not saved any products yet.",
-    "showPrices": true,
-    "showRemove": true,
-    "buttonLabel": "Remove",
-    "customCss": "",
-    "toastBg": "#1a1a1a",
-    "toastColor": "#ffffff",
-    "toastPosition": "top-left"
-  }
-}`}</code>
-          </div>
-        </s-section>
-
-        <s-section heading="GET ?api=analytics — Usage analytics">
-          <s-paragraph>
-            Returns add/remove totals and daily history for the current or specified month.
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>GET /apps/saitriq-wishlist?api=analytics</code>
-            <br />
-            <code>GET /apps/saitriq-wishlist?api=analytics&amp;month=2026-09</code>
-          </div>
-          <s-paragraph>Response:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{
-  "month": "2026-09",
-  "adds": 42,
-  "removes": 5,
-  "history": [
-    { "day": "2026-09-01", "adds": 10, "removes": 1 },
-    { "day": "2026-09-02", "adds": 32, "removes": 4 }
-  ],
-  "usage": { "used": 42, "limit": 100, "remaining": 58 }
-}`}</code>
-          </div>
-        </s-section>
-
-        <s-section heading="GET ?api=usage — Monthly usage">
-          <s-paragraph>Returns used, limit, and remaining saves for the current month.</s-paragraph>
-          <div className="api-code-block">
-            <code>GET /apps/saitriq-wishlist?api=usage</code>
-          </div>
-          <s-paragraph>Response:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{ "used": 42, "limit": 100, "remaining": 58 }`}</code>
-          </div>
-        </s-section>
-
-        <s-section heading="POST — Wishlist mutations">
-          <s-paragraph>
-            All wishlist writes use a single POST endpoint with an <code>operation</code> field.
-          </s-paragraph>
-
-          <s-section heading="Add a product">
-            <div className="api-code-block">
-              <code>{`POST /apps/saitriq-wishlist
-Content-Type: application/json
-
-{
-  "operation": "add",
-  "visitorId": "abc123",
-  "productId": "123456789",
-  "productHandle": "my-product",
-  "productTitle": "My Product",
-  "productImage": "https://cdn.shopify.com/...",
-  "productPrice": "$29.00"
-}`}</code>
-            </div>
-          </s-section>
-
-          <s-section heading="Remove a product">
-            <div className="api-code-block">
-              <code>{`POST /apps/saitriq-wishlist
-Content-Type: application/json
-
-{
-  "operation": "remove",
-  "visitorId": "abc123",
-  "productId": "123456789",
-  "productHandle": "my-product",
-  "productTitle": "My Product"
-}`}</code>
-            </div>
-          </s-section>
-
-          <s-section heading="Clear all items">
-            <div className="api-code-block">
-              <code>{`POST /apps/saitriq-wishlist
-Content-Type: application/json
-
-{ "operation": "clear", "visitorId": "abc123" }`}</code>
-            </div>
-          </s-section>
-
-          <s-section heading="POST response (all mutations)">
-            <div className="api-code-block">
-              <code>{`{
-  "authenticated": true,
-  "tracked": true,
-  "items": [ /* updated item list */ ],
-  "usage": { "used": 43, "limit": 100, "remaining": 57 }
-}`}</code>
-            </div>
-          </s-section>
-        </s-section>
-      </s-section>
-
-      {/* ── ADMIN API ── */}
-      <s-section heading="Authenticated embedded-app API">
-        <s-paragraph>
-          These routes are intended for requests made from the authenticated embedded
-          app. They use <code>authenticate.admin</code> and the app&apos;s Shopify session
-          context. They do not accept a shop access token in a custom Authorization
-          header and are not currently supported as a general server-to-server API.
-        </s-paragraph>
-        <div className="api-code-block">
-          <code>Route: /app/api (authenticated embedded-app session required)</code>
-        </div>
-
-        <s-section heading="GET ?resource=items — Customer items">
-          <div className="api-code-block">
-            <code>GET /app/api?resource=items&amp;customerId=987</code>
-          </div>
-          <s-paragraph>Response:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{ "customerId": "987", "count": 3, "items": [ ... ] }`}</code>
-          </div>
-        </s-section>
-
-        <s-section heading="GET ?resource=check — Is product saved?">
-          <div className="api-code-block">
-            <code>GET /app/api?resource=check&amp;customerId=987&amp;productId=123456789</code>
-          </div>
-          <s-paragraph>Response:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{ "customerId": "987", "productId": "123456789", "saved": true }`}</code>
-          </div>
-        </s-section>
-
-        <s-section heading="GET ?resource=all — All shop items (paginated)">
-          <s-paragraph>Returns every wishlist item across all customers for the shop.</s-paragraph>
-          <div className="api-code-block">
-            <code>GET /app/api?resource=all&amp;page=1&amp;pageSize=50</code>
-          </div>
-          <s-paragraph>Response:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{
-  "page": 1,
-  "pageSize": 50,
-  "total": 120,
-  "totalPages": 3,
-  "items": [
-    {
-      "customerId": "987",
-      "productId": "123456789",
-      "productHandle": "my-product",
-      "productTitle": "My Product",
-      "productImage": "https://cdn.shopify.com/...",
-      "productPrice": "$29.00",
-      "createdAt": "2026-09-01T10:00:00.000Z"
-    }
-  ]
-}`}</code>
-          </div>
-        </s-section>
-
-        <s-section heading="GET ?resource=analytics — Analytics">
-          <div className="api-code-block">
-            <code>GET /app/api?resource=analytics&amp;month=2026-09</code>
-          </div>
-        </s-section>
-
-        <s-section heading="GET ?resource=settings — Display settings">
-          <div className="api-code-block">
-            <code>GET /app/api?resource=settings</code>
-          </div>
-        </s-section>
-
-        <s-section heading="GET ?resource=usage — Monthly usage">
-          <div className="api-code-block">
-            <code>GET /app/api?resource=usage</code>
-          </div>
-        </s-section>
-
-        <s-section heading="POST — Mutations (add / remove / clear)">
-          <s-paragraph>
-            Add a product to a customer's wishlist:
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>{`POST /app/api
-Content-Type: application/json
-
-{
-  "resource": "item",
-  "operation": "add",
-  "customerId": "987",
-  "productId": "123456789",
-  "productHandle": "my-product",
-  "productTitle": "My Product",
-  "productImage": "https://cdn.shopify.com/...",
-  "productPrice": "$29.00"
-}`}</code>
-          </div>
-          <s-paragraph>Remove:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{ "resource": "item", "operation": "remove", "customerId": "987", "productId": "123456789" }`}</code>
-          </div>
-          <s-paragraph>Clear all for a customer:</s-paragraph>
-          <div className="api-code-block">
-            <code>{`{ "resource": "item", "operation": "clear", "customerId": "987" }`}</code>
-          </div>
-        </s-section>
-      </s-section>
-
-      {/* ── STOREFRONT USAGE EXAMPLE ── */}
-      <s-section heading="Storefront JavaScript example">
-        <s-paragraph>
-          Fetch the customer's wishlist from any storefront page:
-        </s-paragraph>
-        <div className="api-code-block">
-          <code>{`const res = await fetch('/apps/saitriq-wishlist?api=items', {
-  credentials: 'same-origin'
-});
-const { items } = await res.json();
-console.log(items); // array of wishlist items`}</code>
-        </div>
-        <s-paragraph>
-          Check if a product is saved (useful for custom button rendering):
-        </s-paragraph>
-        <div className="api-code-block">
-          <code>{`const res = await fetch(
-  '/apps/saitriq-wishlist?api=check&productId=' + productId,
-  { credentials: 'same-origin' }
-);
-const { saved } = await res.json();
-button.classList.toggle('is-saved', saved);`}</code>
-        </div>
-      </s-section>
-
-      {/* ── THEME JS REFERENCE ── */}
-      <s-section heading="Theme JavaScript reference">
-        <s-paragraph>
-          Use these ready-to-paste JavaScript modules in your theme's JS files
-          (<code>assets/theme.js</code>, <code>assets/custom.js</code>, etc.).
-          Each module is self-contained and works alongside the app blocks and manual snippets.
-        </s-paragraph>
-
-        {/* Core client */}
-        <s-section heading="1 — Core wishlist client (copy once into your theme JS)">
-          <s-paragraph>
-            Drop this once into your theme JavaScript. It exposes a
-            {" "}<code>window.SaitriqWishlist</code> object all other modules use.
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>{`// saitriq-wishlist.js
-// ─────────────────────────────────────────────────────────────────────────────
+  const sdkModules = {
+    core: {
+      title: "1 — Core Wishlist Client",
+      filename: "assets/saitriq-wishlist.js",
+      desc: "Drop this once into your theme JS. Exposes window.SaitriqWishlist used by all custom components.",
+      code: `// assets/saitriq-wishlist.js
 // Core wishlist client — add once to your theme JS bundle
-// ─────────────────────────────────────────────────────────────────────────────
 window.SaitriqWishlist = (() => {
   const STORAGE_KEY  = 'saitriq_wishlist';
   const VISITOR_KEY  = 'saitriq_wishlist_visitor';
@@ -401,18 +102,24 @@ window.SaitriqWishlist = (() => {
     return id;
   };
 
-  // ── Auth state ─────────────────────────────────────────────────────────────
+  // ── Auth & Sync State ─────────────────────────────────────────────────────
   let _authenticated = false;
   let _settings      = {};
   let _syncPromise   = null;
 
-  // ── Fetch helpers ──────────────────────────────────────────────────────────
+  // ── Fetch Helpers ─────────────────────────────────────────────────────────
   const apiFetch = async (path, options = {}) => {
     const res = await fetch(ENDPOINT + path, {
       credentials: 'same-origin',
       ...options,
     });
-    if (!res.ok) throw new Error(\`Wishlist API error: \${res.status}\`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-limit-reached', { detail: errData }));
+      }
+      throw new Error(errData.error || \`Wishlist API error: \${res.status}\`);
+    }
     return res.json();
   };
 
@@ -423,7 +130,7 @@ window.SaitriqWishlist = (() => {
       body: JSON.stringify({ visitorId: getVisitorId(), ...body }),
     });
 
-  // ── Initial sync (single-flight) ───────────────────────────────────────────
+  // ── Initial Single-Flight Sync ───────────────────────────────────────────
   const sync = () => {
     if (_syncPromise) return _syncPromise;
     _syncPromise = apiFetch('')
@@ -449,15 +156,11 @@ window.SaitriqWishlist = (() => {
   });
 
   // ── Public API ─────────────────────────────────────────────────────────────
-
-  /** Check if a product is in the local wishlist */
   const isSaved = (productId) =>
     getItems().some((i) => String(i.id) === String(productId));
 
-  /** Add a product to the wishlist */
   const add = async (item) => {
     if (!_authenticated) {
-      // guest: fire-and-forget analytics, local-only save
       post({ operation: 'add', ...item }).catch(() => {});
       const items = getItems();
       if (!items.some((i) => String(i.id) === String(item.productId))) {
@@ -472,7 +175,6 @@ window.SaitriqWishlist = (() => {
     return synced;
   };
 
-  /** Remove a product from the wishlist */
   const remove = async (item) => {
     if (!_authenticated) {
       post({ operation: 'remove', ...item }).catch(() => {});
@@ -485,11 +187,9 @@ window.SaitriqWishlist = (() => {
     return synced;
   };
 
-  /** Toggle a product (add if not saved, remove if saved) */
   const toggle = async (item) =>
     isSaved(item.productId) ? remove(item) : add(item);
 
-  /** Clear all wishlist items */
   const clear = async () => {
     const data = await post({ operation: 'clear' });
     const synced = (data.items || []).map(_mapItem);
@@ -497,35 +197,25 @@ window.SaitriqWishlist = (() => {
     return synced;
   };
 
-  /** Get current items from localStorage */
   const getAll = () => getItems();
-
-  /** Get display settings from the last sync */
   const getSettings = () => _settings;
-
-  /** Listen for wishlist changes */
   const onChange = (fn) => window.addEventListener('saitriq:wishlist-updated', fn);
   const offChange = (fn) => window.removeEventListener('saitriq:wishlist-updated', fn);
 
-  // Auto-sync on load
+  // Auto-sync on script execution
   sync();
 
   return { sync, isSaved, add, remove, toggle, clear, getAll, getSettings, onChange, offChange };
-})();`}</code>
-          </div>
-        </s-section>
-
-        {/* Wishlist button */}
-        <s-section heading="2 — Custom wishlist button">
-          <s-paragraph>
-            Wire up any button element as a wishlist toggle. Works with your own HTML —
-            no class names required.
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>{`// Usage: call this for each wishlist button on the page
-// <button data-wishlist-btn data-product-id="123" data-product-handle="my-product"
-//         data-product-title="My Product" data-product-image="..." data-product-price="$29">
-//   ♡ Save
+})();`,
+    },
+    button: {
+      title: "2 — Custom Wishlist Button Hook",
+      filename: "assets/custom-button.js",
+      desc: "Wire up any custom HTML button as an interactive wishlist toggle.",
+      code: `// Usage: Call on any button with data attributes:
+// <button data-wishlist-btn data-product-id="123456" data-product-handle="silver-ring"
+//         data-product-title="Silver Ring" data-product-image="https://..." data-product-price="$49.00">
+//   ♡ Add to Wishlist
 // </button>
 
 function initWishlistButton(button) {
@@ -536,139 +226,64 @@ function initWishlistButton(button) {
   const productPrice  = button.dataset.productPrice || '';
 
   const refresh = () => {
-    const saved = SaitriqWishlist.isSaved(productId);
-    button.classList.toggle('is-active', saved);
-    button.setAttribute('aria-pressed', String(saved));
-    button.textContent = saved ? '♥ Saved' : '♡ Save';
+    const saved = window.SaitriqWishlist?.isSaved(productId);
+    button.classList.toggle('is-active', Boolean(saved));
+    button.setAttribute('aria-pressed', String(Boolean(saved)));
+    button.textContent = saved ? '♥ Saved in Wishlist' : '♡ Add to Wishlist';
   };
 
-  button.addEventListener('click', async () => {
+  button.addEventListener('click', async (e) => {
+    e.preventDefault();
     if (button.disabled) return;
     button.disabled = true;
     try {
-      await SaitriqWishlist.toggle({ productId, productHandle, productTitle, productImage, productPrice });
+      await window.SaitriqWishlist?.toggle({ productId, productHandle, productTitle, productImage, productPrice });
     } catch (err) {
-      console.error('Wishlist toggle failed', err);
+      console.warn('Wishlist toggle exception:', err.message);
     } finally {
       button.disabled = false;
     }
   });
 
-  SaitriqWishlist.onChange(refresh);
+  window.SaitriqWishlist?.onChange(refresh);
   refresh();
 }
 
-// Init all buttons on page load
-document.querySelectorAll('[data-wishlist-btn]').forEach(initWishlistButton);`}</code>
-          </div>
-        </s-section>
+document.querySelectorAll('[data-wishlist-btn]').forEach(initWishlistButton);`,
+    },
+    counter: {
+      title: "3 — Live Header Counter Badge",
+      filename: "assets/counter-badge.js",
+      desc: "Display a reactive wishlist item count that updates automatically without page reloads.",
+      code: `// Usage: Place anywhere in your theme:
+// <a href="/pages/wishlist">
+//   Wishlist <span data-wishlist-count hidden>0</span>
+// </a>
 
-        {/* Counter badge */}
-        <s-section heading="3 — Live counter badge">
-          <s-paragraph>
-            Display a live wishlist item count that updates without a page reload.
-            Put <code>{"<span data-wishlist-count></span>"}</code> anywhere in your HTML.
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>{`function initWishlistCounter(el) {
+function initWishlistCounter(badge) {
   const update = () => {
-    el.textContent = SaitriqWishlist.getAll().length;
-    el.hidden = SaitriqWishlist.getAll().length === 0;
+    const count = window.SaitriqWishlist?.getAll().length || 0;
+    badge.textContent = count;
+    badge.hidden = count === 0;
   };
-  SaitriqWishlist.onChange(update);
+
+  window.SaitriqWishlist?.onChange(update);
   update();
 }
 
-document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);`}</code>
-          </div>
-        </s-section>
-
-        {/* Wishlist page renderer */}
-        <s-section heading="4 — Wishlist page renderer">
-          <s-paragraph>
-            Render a full wishlist grid into any container element.
-            Put <code>{'<div data-wishlist-page></div>'}</code> in your page template.
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>{`function initWishlistPage(container) {
-  const esc = (s) => {
-    const d = document.createElement('div');
-    d.textContent = String(s ?? '');
-    return d.innerHTML;
-  };
-
-  const render = () => {
-    const items    = SaitriqWishlist.getAll();
-    const settings = SaitriqWishlist.getSettings();
-    const heading       = settings.heading      || 'My wishlist';
-    const emptyMessage  = settings.emptyMessage || 'No saved items yet.';
-    const showPrices    = settings.showPrices   !== false;
-    const showRemove    = settings.showRemove   !== false;
-    const buttonLabel   = settings.buttonLabel  || 'Remove';
-    
-
-    if (items.length === 0) {
-      container.innerHTML = \`<p class="sai-wishlist-page__empty">\${esc(emptyMessage)}</p>\`;
-      return;
-    }
-
-    const grid = document.createElement('ul');
-    grid.className = 'sai-wishlist-page__items';
-
-    items.forEach((item) => {
-      const li = document.createElement('li');
-      li.className = 'sai-wishlist-page__item';
-      li.innerHTML = \`
-        <a href="/products/\${encodeURIComponent(item.handle)}">
-          <img src="\${esc(item.image)}" alt="\${esc(item.title)}" loading="lazy">
-        </a>
-        <div className="api-code-block">
-          <a class="sai-wishlist-page__title" href="/products/\${encodeURIComponent(item.handle)}">\${esc(item.title)}</a>
-          \${showPrices && item.price ? \`<div class="sai-wishlist-page__price">\${esc(item.price)}</div>\` : ''}
-          \${showRemove ? \`<button type="button" class="sai-wishlist-page__remove">\${esc(buttonLabel)}</button>\` : ''}
-        </div>
-      \`;
-      li.querySelector('.sai-wishlist-page__remove')?.addEventListener('click', async () => {
-        await SaitriqWishlist.remove({ productId: item.id, productHandle: item.handle, productTitle: item.title });
-      });
-      grid.append(li);
-    });
-
-    const header = document.createElement('div');
-    header.innerHTML = \`
-      <h2>\${esc(heading)}</h2>
-      <button type="button" class="sai-wishlist-page__clear button">Clear all</button>
-    \`;
-    header.querySelector('.sai-wishlist-page__clear button').addEventListener('click', () => {
-      SaitriqWishlist.clear();
-    });
-
-    container.replaceChildren(header, grid);
-  };
-
-  SaitriqWishlist.onChange(render);
-  SaitriqWishlist.sync().then(render);
-}
-
-const wishlistPage = document.querySelector('[data-wishlist-page]');
-if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
-          </div>
-        </s-section>
-
-        {/* Collection inject */}
-        <s-section heading="5 — Collection page heart icons">
-          <s-paragraph>
-            Auto-inject heart buttons on collection pages. Call once after the DOM is ready.
-            Uses <code>MutationObserver</code> so it works with infinite scroll too.
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>{`function initCollectionWishlist() {
+document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);`,
+    },
+    collection: {
+      title: "4 — Collection Page Grid Hearts",
+      filename: "assets/collection-hearts.js",
+      desc: "Inject wishlist heart buttons dynamically into collection product cards with infinite scroll support.",
+      code: `function initCollectionWishlist() {
   const cache = new Map();
 
   const getProductData = async (handle) => {
     if (cache.has(handle)) return cache.get(handle);
     const res = await fetch(\`/products/\${encodeURIComponent(handle)}.js\`);
-    if (!res.ok) throw new Error('Product not found');
+    if (!res.ok) throw new Error('Product metadata fetch failed');
     const p = await res.json();
     const data = {
       productId:     String(p.id),
@@ -689,7 +304,7 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
   const attach = async (link) => {
     const handle = handleFromLink(link);
     if (!handle) return;
-    const card = link.closest('li, article, .card-wrapper, .product-card-wrapper, .card, .product-card, .grid__item, [class*="product-card"], [class*="product-item"], [class*="card--product"]');
+    const card = link.closest('li, article, .card-wrapper, .product-card, .grid__item');
     if (!card || card.querySelector('[data-sai-col-btn]')) return;
 
     const btn = document.createElement('button');
@@ -709,9 +324,9 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
     }
 
     const refresh = () => {
-      const saved = SaitriqWishlist.isSaved(item.productId);
+      const saved = window.SaitriqWishlist?.isSaved(item.productId);
       btn.textContent = saved ? '♥' : '♡';
-      btn.classList.toggle('is-active', saved);
+      btn.classList.toggle('is-active', Boolean(saved));
       btn.setAttribute('aria-label', saved ? 'Remove from wishlist' : 'Add to wishlist');
     };
 
@@ -720,92 +335,888 @@ if (wishlistPage) initWishlistPage(wishlistPage);`}</code>
       e.stopPropagation();
       if (btn.disabled) return;
       btn.disabled = true;
-      try { await SaitriqWishlist.toggle(item); }
-      catch (err) { console.error('Collection wishlist failed', err); }
-      finally { btn.disabled = false; }
+      try {
+        await window.SaitriqWishlist?.toggle(item);
+      } finally {
+        btn.disabled = false;
+      }
     });
 
-    SaitriqWishlist.onChange(refresh);
+    window.SaitriqWishlist?.onChange(refresh);
     refresh();
   };
 
   const scan = () => {
-    [...document.querySelectorAll('a[href*="/products/"]')]
-      .filter((l) => handleFromLink(l))
-      .forEach(attach);
+    document.querySelectorAll('a[href*="/products/"]').forEach(attach);
   };
 
   scan();
   new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
 }
 
-document.addEventListener('DOMContentLoaded', initCollectionWishlist);`}</code>
-          </div>
-        </s-section>
-
-        {/* Events */}
-        <s-section heading="6 — Custom events reference">
-          <s-paragraph>
-            Listen to these events on <code>window</code> to react to wishlist changes
-            from anywhere in your theme JS:
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>{`// Fired whenever the wishlist changes (add, remove, clear, sync)
+document.addEventListener('DOMContentLoaded', initCollectionWishlist);`,
+    },
+    events: {
+      title: "5 — Custom Window Events Reference",
+      filename: "assets/event-listeners.js",
+      desc: "Listen for global wishlist updates and limit notifications anywhere in your theme.",
+      code: `// 1. Fired whenever wishlist items are added, removed, or synced
 window.addEventListener('saitriq:wishlist-updated', () => {
-  const items = SaitriqWishlist.getAll();
-  console.log('Wishlist updated, item count:', items.length);
+  const items = window.SaitriqWishlist?.getAll() || [];
+  console.log('Wishlist synchronized. Active count:', items.length);
 });
 
-// Fired when a toast notification should be shown
+// 2. Fired when merchant monthly quota is reached (HTTP 429)
+window.addEventListener('saitriq:wishlist-limit-reached', (event) => {
+  console.warn('Monthly plan limit reached:', event.detail);
+  // Optional: Trigger custom store banner or modal
+});
+
+// 3. Fired when toast notification is requested
 window.addEventListener('saitriq:wishlist-toast', (event) => {
-  console.log('Toast message:', event.detail.message);
-  // show your own toast / snackbar here
-  myToast.show(event.detail.message);
+  console.log('Toast triggered:', event.detail.message);
 });
 
-// Dispatch manually to trigger a wishlist re-render from outside
-window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));`}</code>
+// 4. Dispatch manually to force all theme buttons to refresh
+window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));`,
+    },
+  };
+
+  const proxyEndpoints = [
+    {
+      id: "proxy-items",
+      method: "GET",
+      path: "/apps/saitriq-wishlist?api=items",
+      title: "Get Customer Wishlist Items",
+      desc: "Returns all saved items for the logged-in customer or guest session.",
+      auth: "Automatic via App Proxy HMAC",
+      params: [
+        { name: "api", type: "string", required: true, desc: "Fixed value: 'items'" },
+        { name: "logged_in_customer_id", type: "string", required: false, desc: "Appended automatically by Shopify App Proxy" },
+      ],
+      response: `{
+  "items": [
+    {
+      "productId": "8192348572",
+      "productHandle": "sapphire-pendant-necklace",
+      "productTitle": "Sapphire Pendant Necklace",
+      "productImage": "https://cdn.shopify.com/s/files/1/0000/products/sapphire.jpg",
+      "productPrice": "$149.00",
+      "customerId": "7192839182",
+      "createdAt": "2026-10-15T12:00:00.000Z"
+    }
+  ]
+}`,
+    },
+    {
+      id: "proxy-check",
+      method: "GET",
+      path: "/apps/saitriq-wishlist?api=check&productId={id}",
+      title: "Check If Product Is In Wishlist",
+      desc: "Checks whether a specific product is saved. Useful for headless server rendering.",
+      auth: "Automatic via App Proxy HMAC",
+      params: [
+        { name: "api", type: "string", required: true, desc: "Fixed value: 'check'" },
+        { name: "productId", type: "string", required: true, desc: "Shopify numeric Product ID" },
+      ],
+      response: `{
+  "saved": true,
+  "authenticated": true,
+  "productId": "8192348572"
+}`,
+    },
+    {
+      id: "proxy-settings",
+      method: "GET",
+      path: "/apps/saitriq-wishlist?api=settings",
+      title: "Get Store Wishlist Settings",
+      desc: "Returns merchant customization settings, button labels, toast configuration, and CSS.",
+      auth: "Automatic via App Proxy HMAC",
+      params: [
+        { name: "api", type: "string", required: true, desc: "Fixed value: 'settings'" },
+      ],
+      response: `{
+  "settings": {
+    "heading": "My wishlist",
+    "emptyMessage": "You have not saved any products yet.",
+    "showPrices": true,
+    "showRemove": true,
+    "buttonLabel": "Remove",
+    "showAddToCart": true,
+    "addToCartLabel": "Add to cart",
+    "toastBg": "#1a1a1a",
+    "toastColor": "#ffffff",
+    "toastPosition": "top-left"
+  }
+}`,
+    },
+    {
+      id: "proxy-usage",
+      method: "GET",
+      path: "/apps/saitriq-wishlist?api=usage",
+      title: "Get Current Month Usage & Capacity",
+      desc: "Returns monthly used saves, plan limit, remaining allowance, and quota state.",
+      auth: "Automatic via App Proxy HMAC",
+      params: [
+        { name: "api", type: "string", required: true, desc: "Fixed value: 'usage'" },
+      ],
+      response: `{
+  "used": 420,
+  "limit": 5000,
+  "remaining": 4580,
+  "planId": "starter"
+}`,
+    },
+    {
+      id: "proxy-mutate",
+      method: "POST",
+      path: "/apps/saitriq-wishlist",
+      title: "Mutate Wishlist (Add, Remove, Clear)",
+      desc: "Single unified POST mutation endpoint. Handles adding, removing, and clearing items with quota protection.",
+      auth: "Automatic via App Proxy HMAC",
+      params: [
+        { name: "operation", type: "string", required: true, desc: "'add' | 'remove' | 'clear'" },
+        { name: "productId", type: "string", required: "For add/remove", desc: "Shopify numeric Product ID" },
+        { name: "productHandle", type: "string", required: "For add", desc: "Product URL slug" },
+        { name: "productTitle", type: "string", required: "For add", desc: "Product Title" },
+        { name: "productPrice", type: "string", required: "Optional", desc: "Formatted price string (e.g. '$29.00')" },
+        { name: "productImage", type: "string", required: "Optional", desc: "CDN image URL" },
+      ],
+      response: `{
+  "authenticated": true,
+  "tracked": true,
+  "items": [ /* Updated wishlist array */ ],
+  "usage": {
+    "used": 421,
+    "limit": 5000,
+    "remaining": 4579
+  }
+}`,
+    },
+  ];
+
+  const adminEndpoints = [
+    {
+      id: "admin-items",
+      method: "GET",
+      path: "/app/api?resource=items&customerId={id}",
+      title: "Admin: Customer Items",
+      desc: "Fetch wishlist items for any specific customer inside the embedded admin app.",
+      auth: "Shopify Admin Session Cookie",
+      params: [
+        { name: "resource", type: "string", required: true, desc: "Fixed: 'items'" },
+        { name: "customerId", type: "string", required: true, desc: "Target Shopify Customer ID" },
+      ],
+      response: `{
+  "customerId": "7192839182",
+  "count": 3,
+  "items": [ /* Array of product items */ ]
+}`,
+    },
+    {
+      id: "admin-all",
+      method: "GET",
+      path: "/app/api?resource=all&page=1&pageSize=50",
+      title: "Admin: Paginated Store Wishlists",
+      desc: "Retrieve all saved wishlist records across the entire shop with pagination metadata.",
+      auth: "Shopify Admin Session Cookie",
+      params: [
+        { name: "resource", type: "string", required: true, desc: "Fixed: 'all'" },
+        { name: "page", type: "number", required: false, desc: "Page index (defaults to 1)" },
+        { name: "pageSize", type: "number", required: false, desc: "Items per page (max 100, default 50)" },
+      ],
+      response: `{
+  "page": 1,
+  "pageSize": 50,
+  "total": 312,
+  "totalPages": 7,
+  "items": [ /* List of shop wishlist entries */ ]
+}`,
+    },
+    {
+      id: "admin-analytics",
+      method: "GET",
+      path: "/app/api?resource=analytics&month=2026-10",
+      title: "Admin: Monthly Analytics Summary",
+      desc: "Returns total add/remove operations and day-by-day activity trend history.",
+      auth: "Shopify Admin Session Cookie",
+      params: [
+        { name: "resource", type: "string", required: true, desc: "Fixed: 'analytics'" },
+        { name: "month", type: "string", required: false, desc: "Format: YYYY-MM (default: current month)" },
+      ],
+      response: `{
+  "month": "2026-10",
+  "adds": 640,
+  "removes": 82,
+  "history": [
+    { "day": "2026-10-01", "adds": 24, "removes": 3 },
+    { "day": "2026-10-02", "adds": 31, "removes": 5 }
+  ],
+  "usage": { "used": 640, "limit": 5000, "remaining": 4360 }
+}`,
+    },
+    {
+      id: "admin-mutate",
+      method: "POST",
+      path: "/app/api",
+      title: "Admin: Mutate Customer Wishlist",
+      desc: "Add, remove, or clear items on behalf of a customer from the Shopify Admin panel.",
+      auth: "Shopify Admin Session Cookie",
+      params: [
+        { name: "resource", type: "string", required: true, desc: "Fixed: 'item'" },
+        { name: "operation", type: "string", required: true, desc: "'add' | 'remove' | 'clear'" },
+        { name: "customerId", type: "string", required: true, desc: "Target Customer ID" },
+        { name: "productId", type: "string", required: "For add/remove", desc: "Product ID" },
+      ],
+      response: `{
+  "success": true,
+  "customerId": "7192839182",
+  "operation": "add",
+  "usage": { "used": 641, "limit": 5000, "remaining": 4359 }
+}`,
+    },
+  ];
+
+  const statusCodes = [
+    {
+      code: "200 OK",
+      badgeTone: "success",
+      badgeColor: "#008060",
+      desc: i18n?.code200 || "Success - request completed normally.",
+      details: "Returned for successful queries and operations. Payload includes updated item data and current usage counters.",
+    },
+    {
+      code: "400 Bad Request",
+      badgeTone: "warning",
+      badgeColor: "#d97706",
+      desc: i18n?.code400 || "Bad Request - missing required parameters.",
+      details: "Returned when required fields like productId, customerId, or valid operation strings are omitted in mutation bodies.",
+    },
+    {
+      code: "401 Unauthorized",
+      badgeTone: "critical",
+      badgeColor: "#dc2626",
+      desc: i18n?.code401 || "Unauthorized - shopper session required.",
+      details: "Returned if an Admin API endpoint is invoked without a valid Shopify Admin session cookie.",
+    },
+    {
+      code: "404 Not Found",
+      badgeTone: "warning",
+      badgeColor: "#6b7280",
+      desc: i18n?.code404 || "Not Found - endpoint or item not found.",
+      details: "Returned if an unrecognized resource or non-existent endpoint path is called.",
+    },
+    {
+      code: "429 Too Many Requests",
+      badgeTone: "critical",
+      badgeColor: "#b91c1c",
+      desc: i18n?.code429 || "Too Many Requests - monthly plan quota exceeded.",
+      details: i18n?.code429Desc || "When monthly capacity is exhausted on operation: 'add', the API responds with HTTP 429. Note: 'remove' and 'clear' are NEVER blocked.",
+      example: `{
+  "error": "Monthly limit reached. Please upgrade your plan.",
+  "limitReached": true,
+  "usage": {
+    "used": 5000,
+    "limit": 5000,
+    "remaining": 0,
+    "planId": "starter"
+  }
+}`,
+    },
+  ];
+
+  const filteredProxy = useMemo(() => {
+    if (!searchQuery.trim()) return proxyEndpoints;
+    const q = searchQuery.toLowerCase();
+    return proxyEndpoints.filter((ep) =>
+      ep.title.toLowerCase().includes(q) ||
+      ep.path.toLowerCase().includes(q) ||
+      ep.desc.toLowerCase().includes(q)
+    );
+  }, [searchQuery, proxyEndpoints]);
+
+  const filteredAdmin = useMemo(() => {
+    if (!searchQuery.trim()) return adminEndpoints;
+    const q = searchQuery.toLowerCase();
+    return adminEndpoints.filter((ep) =>
+      ep.title.toLowerCase().includes(q) ||
+      ep.path.toLowerCase().includes(q) ||
+      ep.desc.toLowerCase().includes(q)
+    );
+  }, [searchQuery, adminEndpoints]);
+
+  return (
+    <s-page heading={i18n?.title || "Developer API Reference"}>
+      {/* ── Top Hero Card ── */}
+      <s-section>
+        <s-box border="base" borderRadius="base" padding="large" background="base">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                <span style={{ fontSize: "24px" }}>⚡</span>
+                <s-heading>{i18n?.title || "Developer API Reference"}</s-heading>
+              </div>
+              <p style={{ margin: 0, fontSize: "14px", color: "#5c5f62", maxWidth: "680px", lineHeight: "1.5" }}>
+                {i18n?.subtitle || "Build custom headless wishlists, theme drawers, and custom customer portal integrations with complete REST and JavaScript interfaces."}
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ background: "#f0f7f5", border: "1px solid #cce8db", borderRadius: "8px", padding: "8px 14px", fontSize: "12px", color: "#006e52" }}>
+                <strong>Storefront Base:</strong> <code>/apps/saitriq-wishlist</code>
+              </div>
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 14px", fontSize: "12px", color: "#1e293b" }}>
+                <strong>Admin Route:</strong> <code>/app/api</code>
+              </div>
+            </div>
           </div>
-        </s-section>
-
-        {/* Full HTML example */}
-        <s-section heading="7 — Minimal full HTML example">
-          <s-paragraph>
-            A complete working example combining all the pieces above.
-            Copy this into any theme template to get a working wishlist button and counter.
-          </s-paragraph>
-          <div className="api-code-block">
-            <code>{`<!-- In your product template -->
-<button
-  data-wishlist-btn
-  data-product-id="{{ product.id }}"
-  data-product-handle="{{ product.handle }}"
-  data-product-title="{{ product.title | escape }}"
-  data-product-image="{{ product.featured_image | image_url: width: 600 }}"
-  data-product-price="{{ product.price | money }}"
-  aria-pressed="false"
->
-  ♡ Save
-</button>
-
-<!-- In your header -->
-<a href="/pages/wishlist">
-  Wishlist <span data-wishlist-count>0</span>
-</a>
-
-<!-- At the bottom of theme.liquid, before </body> -->
-<script src="{{ 'saitriq-wishlist.js' | asset_url }}" defer></script>
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-wishlist-btn]').forEach(initWishlistButton);
-    document.querySelectorAll('[data-wishlist-count]').forEach(initWishlistCounter);
-  });
-</script>`}</code>
-          </div>
-        </s-section>
-
+        </s-box>
       </s-section>
 
+      {/* ── Main Tabbed Content Section ── */}
+      <s-section>
+        <s-box border="base" borderRadius="base" padding="base" background="base">
+          {/* Top Controls: Tabs & Search Bar */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "12px",
+            borderBottom: "1px solid #e1e3e5",
+            paddingBottom: "16px",
+            marginBottom: "20px"
+          }}>
+            {/* Category Navigation Pills */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab("proxy")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "9px 16px",
+                  borderRadius: "8px",
+                  border: activeTab === "proxy" ? "2px solid #008060" : "1px solid #d2d5d8",
+                  background: activeTab === "proxy" ? "#f0f7f5" : "#ffffff",
+                  color: activeTab === "proxy" ? "#008060" : "#202223",
+                  fontWeight: activeTab === "proxy" ? "700" : "500",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  boxShadow: activeTab === "proxy" ? "0 2px 4px rgba(0, 128, 96, 0.12)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>🌐</span>
+                Storefront App Proxy
+                <span style={{ background: activeTab === "proxy" ? "#008060" : "#e4e5e7", color: activeTab === "proxy" ? "#ffffff" : "#4a4c4e", borderRadius: "10px", fontSize: "10px", padding: "1px 6px" }}>5</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("admin")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "9px 16px",
+                  borderRadius: "8px",
+                  border: activeTab === "admin" ? "2px solid #008060" : "1px solid #d2d5d8",
+                  background: activeTab === "admin" ? "#f0f7f5" : "#ffffff",
+                  color: activeTab === "admin" ? "#008060" : "#202223",
+                  fontWeight: activeTab === "admin" ? "700" : "500",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  boxShadow: activeTab === "admin" ? "0 2px 4px rgba(0, 128, 96, 0.12)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>🔒</span>
+                Admin Session API
+                <span style={{ background: activeTab === "admin" ? "#008060" : "#e4e5e7", color: activeTab === "admin" ? "#ffffff" : "#4a4c4e", borderRadius: "10px", fontSize: "10px", padding: "1px 6px" }}>4</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("sdk")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "9px 16px",
+                  borderRadius: "8px",
+                  border: activeTab === "sdk" ? "2px solid #008060" : "1px solid #d2d5d8",
+                  background: activeTab === "sdk" ? "#f0f7f5" : "#ffffff",
+                  color: activeTab === "sdk" ? "#008060" : "#202223",
+                  fontWeight: activeTab === "sdk" ? "700" : "500",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  boxShadow: activeTab === "sdk" ? "0 2px 4px rgba(0, 128, 96, 0.12)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>📦</span>
+                Theme JavaScript SDK
+                <span style={{ background: activeTab === "sdk" ? "#008060" : "#e4e5e7", color: activeTab === "sdk" ? "#ffffff" : "#4a4c4e", borderRadius: "10px", fontSize: "10px", padding: "1px 6px" }}>5</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("status")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "9px 16px",
+                  borderRadius: "8px",
+                  border: activeTab === "status" ? "2px solid #008060" : "1px solid #d2d5d8",
+                  background: activeTab === "status" ? "#f0f7f5" : "#ffffff",
+                  color: activeTab === "status" ? "#008060" : "#202223",
+                  fontWeight: activeTab === "status" ? "700" : "500",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  boxShadow: activeTab === "status" ? "0 2px 4px rgba(0, 128, 96, 0.12)" : "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>🚦</span>
+                Status Codes & Quotas
+              </button>
+            </div>
+
+            {/* Quick Filter Search Input */}
+            {(activeTab === "proxy" || activeTab === "admin") && (
+              <div style={{ position: "relative", minWidth: "220px" }}>
+                <input
+                  type="text"
+                  placeholder="Filter endpoints..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "7px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #d2d5d8",
+                    fontSize: "13px",
+                    outline: "none"
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 1: STOREFRONT APP PROXY                                    */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {activeTab === "proxy" && (
+            <div>
+              <div style={{ background: "#f8faf9", border: "1px solid #e1e3e5", borderRadius: "8px", padding: "14px 18px", marginBottom: "20px" }}>
+                <div style={{ fontSize: "13px", color: "#202223", lineHeight: "1.5" }}>
+                  <strong>Storefront Authentication:</strong> All storefront requests are signed with Shopify&apos;s HMAC proxy verification.
+                  No secret API keys are needed in theme client code. When a customer is logged in, Shopify automatically forwards their customer ID.
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: "18px" }}>
+                {filteredProxy.map((ep) => (
+                  <div
+                    key={ep.id}
+                    style={{
+                      background: "#ffffff",
+                      border: "1px solid #e1e3e5",
+                      borderRadius: "10px",
+                      padding: "18px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
+                    }}
+                  >
+                    {/* Endpoint Header Bar */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                        <span style={{
+                          background: ep.method === "GET" ? "#0284c7" : "#059669",
+                          color: "#ffffff",
+                          fontWeight: "800",
+                          fontSize: "11px",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          letterSpacing: "0.5px"
+                        }}>
+                          {ep.method}
+                        </span>
+                        <code style={{ fontSize: "14px", fontWeight: "700", color: "#202223" }}>{ep.path}</code>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(ep.id, ep.path)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          background: copiedKey === ep.id ? "#008060" : "#f1f2f3",
+                          color: copiedKey === ep.id ? "#ffffff" : "#202223",
+                          border: "none",
+                          borderRadius: "4px",
+                          padding: "5px 10px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease"
+                        }}
+                      >
+                        {copiedKey === ep.id ? "✓ Copied" : "Copy Path"}
+                      </button>
+                    </div>
+
+                    <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "#5c5f62" }}>{ep.desc}</p>
+
+                    {/* Parameters Table */}
+                    {ep.params && ep.params.length > 0 && (
+                      <div style={{ marginBottom: "14px", overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
+                          <thead>
+                            <tr style={{ background: "#f8faf9", borderBottom: "1px solid #e1e3e5" }}>
+                              <th style={{ padding: "6px 10px", color: "#6d7175" }}>Parameter</th>
+                              <th style={{ padding: "6px 10px", color: "#6d7175" }}>Type</th>
+                              <th style={{ padding: "6px 10px", color: "#6d7175" }}>Required</th>
+                              <th style={{ padding: "6px 10px", color: "#6d7175" }}>Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ep.params.map((p, idx) => (
+                              <tr key={idx} style={{ borderBottom: "1px solid #f1f2f3" }}>
+                                <td style={{ padding: "6px 10px", fontFamily: "monospace", color: "#008060", fontWeight: "600" }}>{p.name}</td>
+                                <td style={{ padding: "6px 10px", color: "#6d7175" }}>{p.type}</td>
+                                <td style={{ padding: "6px 10px", color: p.required === true ? "#dc2626" : "#6d7175", fontWeight: p.required === true ? "700" : "normal" }}>
+                                  {String(p.required)}
+                                </td>
+                                <td style={{ padding: "6px 10px", color: "#202223" }}>{p.desc}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* Response JSON */}
+                    <div style={{ marginTop: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "#6d7175", textTransform: "uppercase" }}>Response 200 OK</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(`${ep.id}-res`, ep.response)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: copiedKey === `${ep.id}-res` ? "#008060" : "#6d7175",
+                            fontSize: "11px",
+                            cursor: "pointer",
+                            fontWeight: "600"
+                          }}
+                        >
+                          {copiedKey === `${ep.id}-res` ? "✓ Copied JSON" : "Copy JSON"}
+                        </button>
+                      </div>
+                      <pre style={codeBoxStyle}>
+                        <code>{ep.response}</code>
+                      </pre>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 2: ADMIN SESSION API                                       */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {activeTab === "admin" && (
+            <div>
+              <div style={{ background: "#f8faf9", border: "1px solid #e1e3e5", borderRadius: "8px", padding: "14px 18px", marginBottom: "20px" }}>
+                <div style={{ fontSize: "13px", color: "#202223", lineHeight: "1.5" }}>
+                  <strong>Admin Session Security:</strong> <code>/app/api</code> routes require Shopify Admin session authentication (`authenticate.admin`).
+                  These endpoints power the embedded app React interface and are not a public bearer-token API.
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: "18px" }}>
+                {filteredAdmin.map((ep) => (
+                  <div
+                    key={ep.id}
+                    style={{
+                      background: "#ffffff",
+                      border: "1px solid #e1e3e5",
+                      borderRadius: "10px",
+                      padding: "18px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                        <span style={{
+                          background: ep.method === "GET" ? "#0284c7" : "#059669",
+                          color: "#ffffff",
+                          fontWeight: "800",
+                          fontSize: "11px",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          letterSpacing: "0.5px"
+                        }}>
+                          {ep.method}
+                        </span>
+                        <code style={{ fontSize: "14px", fontWeight: "700", color: "#202223" }}>{ep.path}</code>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(ep.id, ep.path)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          background: copiedKey === ep.id ? "#008060" : "#f1f2f3",
+                          color: copiedKey === ep.id ? "#ffffff" : "#202223",
+                          border: "none",
+                          borderRadius: "4px",
+                          padding: "5px 10px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease"
+                        }}
+                      >
+                        {copiedKey === ep.id ? "✓ Copied" : "Copy Path"}
+                      </button>
+                    </div>
+
+                    <p style={{ margin: "0 0 14px 0", fontSize: "13px", color: "#5c5f62" }}>{ep.desc}</p>
+
+                    {/* Parameters Table */}
+                    {ep.params && ep.params.length > 0 && (
+                      <div style={{ marginBottom: "14px", overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
+                          <thead>
+                            <tr style={{ background: "#f8faf9", borderBottom: "1px solid #e1e3e5" }}>
+                              <th style={{ padding: "6px 10px", color: "#6d7175" }}>Parameter</th>
+                              <th style={{ padding: "6px 10px", color: "#6d7175" }}>Type</th>
+                              <th style={{ padding: "6px 10px", color: "#6d7175" }}>Required</th>
+                              <th style={{ padding: "6px 10px", color: "#6d7175" }}>Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ep.params.map((p, idx) => (
+                              <tr key={idx} style={{ borderBottom: "1px solid #f1f2f3" }}>
+                                <td style={{ padding: "6px 10px", fontFamily: "monospace", color: "#008060", fontWeight: "600" }}>{p.name}</td>
+                                <td style={{ padding: "6px 10px", color: "#6d7175" }}>{p.type}</td>
+                                <td style={{ padding: "6px 10px", color: p.required === true ? "#dc2626" : "#6d7175", fontWeight: p.required === true ? "700" : "normal" }}>
+                                  {String(p.required)}
+                                </td>
+                                <td style={{ padding: "6px 10px", color: "#202223" }}>{p.desc}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* Response JSON */}
+                    <div style={{ marginTop: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "700", color: "#6d7175", textTransform: "uppercase" }}>Response 200 OK</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(`${ep.id}-res`, ep.response)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: copiedKey === `${ep.id}-res` ? "#008060" : "#6d7175",
+                            fontSize: "11px",
+                            cursor: "pointer",
+                            fontWeight: "600"
+                          }}
+                        >
+                          {copiedKey === `${ep.id}-res` ? "✓ Copied JSON" : "Copy JSON"}
+                        </button>
+                      </div>
+                      <pre style={codeBoxStyle}>
+                        <code>{ep.response}</code>
+                      </pre>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 3: THEME JAVASCRIPT SDK                                    */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {activeTab === "sdk" && (
+            <div>
+              <div style={{ marginBottom: "16px" }}>
+                <h3 style={{ margin: "0 0 6px 0", fontSize: "16px", color: "#202223" }}>
+                  Theme JavaScript Reference Modules
+                </h3>
+                <p style={{ margin: 0, fontSize: "13px", color: "#5c5f62" }}>
+                  Use these ready-to-paste JavaScript snippets in your theme (e.g. <code>assets/theme.js</code>).
+                </p>
+              </div>
+
+              {/* Module Selector Pills */}
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "18px" }}>
+                {Object.entries(sdkModules).map(([key, mod]) => {
+                  const isSelected = activeSdkModule === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActiveSdkModule(key)}
+                      style={{
+                        padding: "7px 14px",
+                        borderRadius: "20px",
+                        border: isSelected ? "1.5px solid #008060" : "1px solid #d2d5d8",
+                        background: isSelected ? "#008060" : "#ffffff",
+                        color: isSelected ? "#ffffff" : "#202223",
+                        fontSize: "12px",
+                        fontWeight: isSelected ? "700" : "500",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {mod.title}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Module Card */}
+              {(() => {
+                const currentMod = sdkModules[activeSdkModule];
+                return (
+                  <div style={{ background: "#ffffff", border: "1px solid #e1e3e5", borderRadius: "10px", padding: "18px" }}>
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "10px",
+                      borderBottom: "1px solid #e1e3e5",
+                      paddingBottom: "12px",
+                      marginBottom: "12px"
+                    }}>
+                      <div>
+                        <strong style={{ fontSize: "14px", color: "#202223", display: "block" }}>{currentMod.title}</strong>
+                        <span style={{ fontSize: "12px", color: "#6d7175" }}>{currentMod.desc}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(`sdk-${activeSdkModule}`, currentMod.code)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          background: copiedKey === `sdk-${activeSdkModule}` ? "#008060" : "#202223",
+                          color: "#ffffff",
+                          border: "none",
+                          borderRadius: "6px",
+                          padding: "8px 16px",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        {copiedKey === `sdk-${activeSdkModule}` ? "✓ Copied to clipboard!" : "📋 Copy Code"}
+                      </button>
+                    </div>
+
+                    <pre style={codeBoxStyle}>
+                      <code>{currentMod.code}</code>
+                    </pre>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {/* TAB 4: HTTP STATUS CODES & QUOTAS                              */}
+          {/* ══════════════════════════════════════════════════════════════ */}
+          {activeTab === "status" && (
+            <div>
+              <div style={{ marginBottom: "16px" }}>
+                <h3 style={{ margin: "0 0 4px 0", fontSize: "16px", color: "#202223" }}>
+                  {i18n?.statusCodesTitle || "HTTP Status Codes & Quota Enforcement"}
+                </h3>
+                <p style={{ margin: 0, fontSize: "13px", color: "#5c5f62" }}>
+                  Detailed specifications of server responses and plan quota protection mechanisms.
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gap: "14px" }}>
+                {statusCodes.map((sc, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: sc.code.startsWith("429") ? "#fffbeb" : "#ffffff",
+                      border: sc.code.startsWith("429") ? "1.5px solid #f59e0b" : "1px solid #e1e3e5",
+                      borderRadius: "8px",
+                      padding: "16px 20px"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                      <span style={{
+                        background: sc.badgeColor,
+                        color: "#ffffff",
+                        fontWeight: "700",
+                        fontSize: "12px",
+                        padding: "3px 8px",
+                        borderRadius: "4px"
+                      }}>
+                        {sc.code}
+                      </span>
+                      <strong style={{ fontSize: "14px", color: "#202223" }}>{sc.desc}</strong>
+                    </div>
+
+                    <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#5c5f62", lineHeight: "1.5" }}>
+                      {sc.details}
+                    </p>
+
+                    {sc.example && (
+                      <div style={{ marginTop: "12px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "11px", fontWeight: "700", color: "#b45309", textTransform: "uppercase" }}>
+                            HTTP 429 Payload Structure
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy("429-payload", sc.example)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: copiedKey === "429-payload" ? "#008060" : "#b45309",
+                              fontSize: "11px",
+                              cursor: "pointer",
+                              fontWeight: "600"
+                            }}
+                          >
+                            {copiedKey === "429-payload" ? "✓ Copied" : "Copy Payload"}
+                          </button>
+                        </div>
+                        <pre style={codeBoxStyle}>
+                          <code>{sc.example}</code>
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </s-box>
+      </s-section>
     </s-page>
   );
 }
