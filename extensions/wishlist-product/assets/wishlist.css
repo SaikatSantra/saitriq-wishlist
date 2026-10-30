@@ -18,27 +18,52 @@ button.sai-wishlist.button--tertiary {
 .sai-wishlist-header__link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  position: relative;
   gap: 0.4rem;
   color: inherit;
   text-decoration: none;
+  cursor: pointer;
+}
+
+.sai-wishlist-header__link:hover {
+  opacity: 0.85;
+}
+
+.sai-wishlist-header__link svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
 }
 
 .sai-wishlist-header__icon {
   position: relative;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sai-wishlist-header__count {
   position: absolute;
   top: -0.35rem;
-  right: -0.5rem;
-  min-width: 1rem;
+  right: -0.55rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.25rem;
   border-radius: 999px;
-  background: #FE847F;
-  color: #0b0f19;
+  background: var(--sai-icon-color, #FE847F);
+  color: #ffffff;
   font-size: 0.65rem;
-  line-height: 1rem;
+  font-weight: 700;
+  line-height: 1.15rem;
   text-align: center;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.sai-wishlist-header__label {
+  display: none;
 }
 
 /* Saved state */
@@ -51,7 +76,7 @@ button.sai-wishlist.button--tertiary {
 /* ── Collection badge variant ────────────────────────────── */
 .sai-wishlist--collection {
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   top: 0.75rem;
   right: 0.75rem;
   width: 2.5rem;
@@ -61,10 +86,21 @@ button.sai-wishlist.button--tertiary {
   background: var(--sai-btn-color, #ffffff);
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .sai-wishlist--collection:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transform: scale(1.06);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+}
+
+.sai-wishlist--collection.is-active {
+  background: var(--sai-btn-active-color, #ffffff);
+  border-color: rgba(0, 0, 0, 0.12);
 }
 
 .sai-wishlist--collection-top-left {
