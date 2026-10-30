@@ -12,7 +12,7 @@
   data-product-id="{{ product_for_wishlist.id }}"
   data-product-handle="{{ product_for_wishlist.handle }}"
   data-product-title="{{ product_for_wishlist.title | escape }}"
-  data-product-image="{{ product_for_wishlist.featured_image | image_url: width: 600 | escape }}"
+  data-product-image="{{ product_for_wishlist.featured_image | default: product_for_wishlist.images[0] | image_url: width: 600 | escape }}"
   data-product-price="{{ product_for_wishlist.price | money | escape }}"
   data-product-variant-id="{{ product_for_wishlist.selected_or_first_available_variant.id }}"
   data-label-add="{{ label_add | escape }}"

@@ -53,10 +53,14 @@
       const productId = container.dataset.productId;
       const productHandle = container.dataset.productHandle;
       const productTitle = container.dataset.productTitle;
-      const productImage = container.dataset.productImage;
+      let productImage = container.dataset.productImage;
       const productPrice = container.dataset.productPrice;
       
       const productScope = button.closest('product-info, .shopify-section') || document;
+      if (!productImage) {
+        const pageImg = productScope.querySelector('.product__media img, [data-media-id] img, .product-media img, .product-gallery img, img[src*="/products/"], img[src*="cdn.shopify.com"]');
+        if (pageImg) productImage = pageImg.currentSrc || pageImg.src || '';
+      }
       const getVariantInput = () => productScope.querySelector('form[action*="/cart/add"] [name="id"]') || productScope.querySelector('[name="id"]');
       const getVariantId = () => String(getVariantInput()?.value || container.dataset.productVariantId || '').trim();
       
@@ -107,11 +111,13 @@
 
         saveWishlist(items);
 
-        window.saitriqWishlistToast?.({
+        const toastDetail = {
           message: operation === 'add' ? locAdded : locRemoved,
-          image: item.productImage || '',
-          title: item.productTitle || ''
-        });
+          image: item.productImage || productImage || '',
+          title: item.productTitle || productTitle || ''
+        };
+        window.saitriqWishlistToast?.(toastDetail);
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: toastDetail }));
 
         return items;
       };
@@ -193,11 +199,13 @@
 
         saveWishlist(synced);
 
-        window.saitriqWishlistToast?.({
+        const syncToastDetail = {
           message: operation === 'add' ? locAdded : locRemoved,
-          image: item.productImage || '',
-          title: item.productTitle || ''
-        });
+          image: item.productImage || productImage || '',
+          title: item.productTitle || productTitle || ''
+        };
+        window.saitriqWishlistToast?.(syncToastDetail);
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: syncToastDetail }));
 
         return synced;
       };
@@ -287,6 +295,10 @@
           const variantData = { id: productId, variantId };
           const saved = getWishlist().some(item => itemKey(item) === itemKey(variantData));
 
+          if (!productImage) {
+            const pageImg = productScope.querySelector('.product__media img, [data-media-id] img, .product-media img, .product-gallery img, img[src*="/products/"], img[src*="cdn.shopify.com"]');
+            if (pageImg) productImage = pageImg.currentSrc || pageImg.src || '';
+          }
           const result = await sync(saved ? 'remove' : 'add', {
             productId,
             variantId,

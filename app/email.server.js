@@ -61,17 +61,46 @@ export async function checkAndSend80PercentQuotaEmail({ shop, month, used, limit
     return { skipped: true, reason: "already_sent_this_month" };
   }
 
-  // Find recipient email from Shopify offline session
+  // Find recipient email from Shopify session (online or offline with email)
   const session = await prisma.session.findFirst({
-    where: { shop },
+    where: { shop, email: { not: null } },
     select: { email: true, shop: true },
     orderBy: { expires: "desc" },
   }).catch(() => null);
 
-  const recipientEmail = session?.email || process.env.STORE_OWNER_NOTIFICATION_EMAIL;
+  let recipientEmail = session?.email || process.env.STORE_OWNER_NOTIFICATION_EMAIL;
+
+  // If not found in database session, query Shopify Admin GraphQL via unauthenticated.admin
+  if (!recipientEmail) {
+    try {
+      const { unauthenticated } = await import("./shopify.server");
+      const { admin } = await unauthenticated.admin(shop);
+      const res = await admin.graphql(`
+        query GetShopContactEmail {
+          shop {
+            email
+            contactEmail
+          }
+        }
+      `);
+      const body = await res.json();
+      recipientEmail = body?.data?.shop?.contactEmail || body?.data?.shop?.email;
+      if (recipientEmail) {
+        // Cache back to offline session for future lookups
+        await prisma.session.updateMany({
+          where: { shop, isOnline: false },
+          data: { email: recipientEmail },
+        }).catch(() => {});
+      }
+    } catch (err) {
+      // GraphQL query failed or offline session not ready
+    }
+  }
 
   if (!recipientEmail) {
-    console.warn(`[EmailAlert] 80% quota reached for ${shop}, but no merchant email found in session.`);
+    console.warn(`[EmailAlert] 80% quota reached for ${shop}, but no merchant email found in session or admin API.`);
+    // Record alert to prevent repetitive console warning on every single wish save
+    recordAlertSent(shop, month, 80, "unresolved");
     return { skipped: true, reason: "no_recipient_email" };
   }
 

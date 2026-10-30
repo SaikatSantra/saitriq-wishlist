@@ -19,41 +19,6 @@
     const visitorStorageKey = 'saitriq_wishlist_visitor';
     const endpoint          = '/apps/saitriq-wishlist';
 
-    let tpl = document.querySelector('[data-sai-collection-tpl]');
-    if (!tpl) {
-      tpl = document.createElement('template');
-      tpl.setAttribute('data-sai-collection-tpl', '');
-      tpl.innerHTML = `
-        <button
-          type="button"
-          class="sai-wishlist sai-wishlist--collection sai-wishlist--collection-top-right"
-          data-sai-collection-wishlist
-          aria-label="Add to wishlist"
-        >
-          <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span class="sai-wishlist__icon sai-wishlist__icon--active" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-          </span>
-        </button>
-      `;
-      document.body.appendChild(tpl);
-    }
-
-    // Read the translations from the template's data attributes
-    const locales = {
-      addLabel:    tpl.dataset.labelAdd    || 'Add to wishlist',
-      removeLabel: tpl.dataset.labelRemove || 'Remove from wishlist',
-      addedMsg:    tpl.dataset.msgAdded    || 'Added to wishlist',
-      removedMsg:  tpl.dataset.msgRemoved  || 'Removed from wishlist',
-      limitMsg:    tpl.dataset.msgLimit    || 'Wishlist is temporarily unavailable'
-    };
-
     let customerAuthenticated = false;
 
     const readItems = () => {
@@ -68,12 +33,6 @@
       window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
     };
 
-    const renderButton = (button, productId) => {
-      const saved = readItems().some((i) => String(i.id) === String(productId));
-      button.classList.toggle('is-active', saved);
-      button.setAttribute('aria-label', saved ? locales.removeLabel : locales.addLabel);
-    };
-
     const getVisitorId = () => {
       let id = localStorage.getItem(visitorStorageKey);
       if (!id) {
@@ -85,13 +44,31 @@
 
     const toLocalItem = (item) => ({
       id: item.productId,
+      variantId: item.variantId || '',
       handle: item.productHandle,
       title: item.productTitle,
       image: item.productImage || '',
       price: item.productPrice || ''
     });
 
-    const persistLocalFallback = (operation, item) => {
+    const formatMoney = (cents) => {
+      if (cents == null || isNaN(cents)) return '';
+      const amount = Number(cents) / 100;
+      const moneyFormat = window.Shopify?.money_format || window.theme?.moneyFormat;
+      if (window.Shopify?.formatMoney && moneyFormat) {
+        try {
+          return window.Shopify.formatMoney(cents, moneyFormat);
+        } catch (e) {}
+      }
+      const currency = window.Shopify?.currency?.active || 'USD';
+      try {
+        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+      } catch (e) {
+        return `$${amount.toFixed(2)}`;
+      }
+    };
+
+    const persistLocalFallback = (operation, item, locales) => {
       const items = readItems();
       const idx = items.findIndex((s) => String(s.id) === String(item.productId));
       if (operation === 'add' && idx < 0) {
@@ -103,7 +80,7 @@
       saveItems(items);
       window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
         detail: {
-          message: operation === 'add' ? locales.addedMsg : locales.removedMsg,
+          message: operation === 'add' ? (locales.addedMsg || 'Added to wishlist') : (locales.removedMsg || 'Removed from wishlist'),
           image: item.productImage || '',
           title: item.productTitle || ''
         }
@@ -129,14 +106,16 @@
       return null;
     };
 
-    const sync = async (operation, item) => {
+    const sync = async (operation, item, locales) => {
+      if (window.saitriqWishlistStopped) return readItems();
+
       if (!customerAuthenticated) {
         const guestResult = await trackGuest(operation, item);
         if (guestResult?.limitReached || guestResult?.stopped) {
           window.saitriqWishlistStopped = true;
           return readItems();
         }
-        return persistLocalFallback(operation, item);
+        return persistLocalFallback(operation, item, locales);
       }
 
       const res = await fetch(endpoint, {
@@ -155,7 +134,7 @@
 
       if (!res.ok || !Array.isArray(data.items)) {
         customerAuthenticated = false;
-        return persistLocalFallback(operation, item);
+        return persistLocalFallback(operation, item, locales);
       }
 
       const synced = data.items.map((s) => ({
@@ -169,7 +148,7 @@
       saveItems(synced);
       window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
         detail: {
-          message: operation === 'add' ? locales.addedMsg : locales.removedMsg,
+          message: operation === 'add' ? (locales.addedMsg || 'Added to wishlist') : (locales.removedMsg || 'Removed from wishlist'),
           image: item.productImage || '',
           title: item.productTitle || ''
         }
@@ -179,18 +158,23 @@
 
     const productCache = new Map();
     const productData = async (handle) => {
-      if (productCache.has(handle)) return productCache.get(handle);
-      const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
+      const cleanHandle = String(handle || '').replace(/^\/?products\//, '').split('?')[0].split('#')[0].replace(/\/$/, '').trim();
+      if (!cleanHandle) return null;
+      if (productCache.has(cleanHandle)) return productCache.get(cleanHandle);
+      const root = window.Shopify?.routes?.root || '/';
+      const res = await fetch(`${root}products/${encodeURIComponent(cleanHandle)}.js`);
       if (!res.ok) throw new Error(`Product lookup failed: ${res.status}`);
       const p = await res.json();
+      const firstVariant = p.variants?.find((v) => v.available) || p.variants?.[0];
       const data = {
-        productId:     String(p.id),
-        productHandle: p.handle,
-        productTitle:  p.title,
-        productImage:  p.featured_image || p.images?.[0] || '',
-        productPrice:  p.price ? (p.price / 100).toFixed(2) : ''
+        productId:        String(p.id),
+        productVariantId: firstVariant ? String(firstVariant.id) : '',
+        productHandle:    p.handle,
+        productTitle:     p.title,
+        productImage:     p.featured_image || p.images?.[0] || '',
+        productPrice:     p.price ? formatMoney(p.price) : ''
       };
-      productCache.set(handle, data);
+      productCache.set(cleanHandle, data);
       return data;
     };
 
@@ -205,65 +189,138 @@
       }
     };
 
-    const productLinks = () => [...document.querySelectorAll('a[href*="/products/"]')]
-      .filter((a) => handleFromLink(a));
+    const updateButtonView = (button, productId, locales) => {
+      if (!productId) return;
+      const isSaved = readItems().some((i) => String(i.id) === String(productId));
+      button.classList.toggle('is-active', isSaved);
+      button.setAttribute('aria-label', isSaved ? locales.removeLabel : locales.addLabel);
+    };
 
-    const CARD_SELECTOR = [
-      '.card-wrapper',
-      '.product-card-wrapper',
-      '.card',
-      '.product-card',
-      '[class*="product-card"]',
-      '[class*="product-item"]',
-      '[class*="card--product"]',
-      'article',
-      '.grid__item',
-      'li'
-    ].join(', ');
+    // Initialize individual button rendered by theme app extension or snippet
+    const initButton = async (button) => {
+      if (button.dataset.saiInitialized === 'true') return;
+      button.dataset.saiInitialized = 'true';
 
-    const attach = async (link) => {
-      const handle = handleFromLink(link);
-      const card = link.closest(CARD_SELECTOR);
-      if (!handle || !card || card.dataset.saiWishlistAttaching || card.querySelector('[data-sai-collection-wishlist]')) return;
+      const container = button.closest('[data-sai-collection-item]') || button;
 
-      card.dataset.saiWishlistAttaching = '1';
+      const locales = {
+        addLabel:    container.dataset.labelAdd    || button.dataset.labelAdd    || 'Add to wishlist',
+        removeLabel: container.dataset.labelRemove || button.dataset.labelRemove || 'Remove from wishlist',
+        addedMsg:    container.dataset.msgAdded    || button.dataset.msgAdded    || 'Added to wishlist',
+        removedMsg:  container.dataset.msgRemoved  || button.dataset.msgRemoved  || 'Removed from wishlist'
+      };
 
-      const button = tpl.content.cloneNode(true).querySelector('[data-sai-collection-wishlist]');
-      if (!button) {
-        delete card.dataset.saiWishlistAttaching;
-        return;
+      let productId        = container.dataset.productId        || button.dataset.productId;
+      let productVariantId = container.dataset.productVariantId || button.dataset.productVariantId || '';
+      let productHandle    = container.dataset.productHandle    || button.dataset.productHandle;
+      let productTitle     = container.dataset.productTitle     || button.dataset.productTitle;
+      let productImage     = container.dataset.productImage     || button.dataset.productImage || '';
+      let productPrice     = container.dataset.productPrice     || button.dataset.productPrice;
+
+      // Ensure parent card container is relative positioning context for clean absolute positioning
+      const parentCard = button.closest('li, article, .card-wrapper, .product-card, .card, [class*="product-"]') || button.parentElement;
+      if (parentCard) {
+        const computed = window.getComputedStyle(parentCard);
+        if (computed.position === 'static') {
+          parentCard.style.position = 'relative';
+        }
       }
 
-      const targetContainer = card.querySelector('.card__inner') || card.querySelector('.card__media') || card;
-      if (getComputedStyle(targetContainer).position === 'static') {
-        targetContainer.style.position = 'relative';
+      // If image is missing, grab from card DOM
+      if (!productImage && parentCard) {
+        const cardImg = parentCard.querySelector('img[src*="/products/"], img[src*="cdn.shopify.com"], img');
+        if (cardImg) {
+          productImage = cardImg.currentSrc || cardImg.src || '';
+        }
       }
-      targetContainer.append(button);
 
-      try {
-        const item = await productData(handle);
-        renderButton(button, item.productId);
+      // If handle is missing, inspect the nearest product link in the parent card
+      if (!productHandle) {
+        const link = parentCard?.querySelector('a[href*="/products/"]');
+        if (link) {
+          productHandle = handleFromLink(link);
+        }
+      }
 
-        button.addEventListener('click', async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (button.disabled) return;
-          button.disabled = true;
-          try {
-            const saved = readItems().some((i) => String(i.id) === String(item.productId));
-            await sync(saved ? 'remove' : 'add', item);
-            renderButton(button, item.productId);
-          } catch (err) {
-            console.error('Collection wishlist request failed', err);
-          } finally {
-            button.disabled = false;
+      // If productId or variantId or title or image is missing but handle exists, fetch product metadata
+      if ((!productId || !productVariantId || !productTitle || !productImage) && productHandle) {
+        try {
+          const fetched = await productData(productHandle);
+          if (fetched) {
+            productId        = productId        || fetched.productId;
+            productVariantId = productVariantId || fetched.productVariantId;
+            productTitle     = productTitle     || fetched.productTitle;
+            productImage     = productImage     || fetched.productImage;
+            productPrice     = productPrice     || fetched.productPrice;
+            container.dataset.productId        = productId;
+            container.dataset.productVariantId = productVariantId;
+            container.dataset.productImage     = productImage;
+            container.dataset.productTitle     = productTitle;
+            button.dataset.productId           = productId;
+            button.dataset.productVariantId    = productVariantId;
+            button.dataset.productImage        = productImage;
+            button.dataset.productTitle        = productTitle;
           }
-        });
-      } catch (err) {
-        button.remove();
-        delete card.dataset.saiWishlistAttaching;
-        console.error('Collection wishlist product lookup failed', err);
+        } catch (err) {}
       }
+
+      if (productId) {
+        button.dataset.productId = productId;
+        updateButtonView(button, productId, locales);
+      }
+
+      button.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (button.disabled || window.saitriqWishlistStopped) return;
+        button.disabled = true;
+
+        try {
+          // Resolve image from card DOM if still missing
+          if (!productImage && parentCard) {
+            const cardImg = parentCard.querySelector('img[src*="/products/"], img[src*="cdn.shopify.com"], img');
+            if (cardImg) {
+              productImage = cardImg.currentSrc || cardImg.src || '';
+            }
+          }
+
+          // Resolve product data if not yet loaded
+          if ((!productId || !productVariantId || !productImage) && productHandle) {
+            const fetched = await productData(productHandle);
+            if (fetched) {
+              productId        = productId        || fetched.productId;
+              productVariantId = productVariantId || fetched.productVariantId;
+              productTitle     = productTitle     || fetched.productTitle;
+              productImage     = productImage     || fetched.productImage;
+              productPrice     = productPrice     || fetched.productPrice;
+              button.dataset.productId        = productId;
+              button.dataset.productVariantId = productVariantId;
+              button.dataset.productImage     = productImage;
+              button.dataset.productTitle     = productTitle;
+            }
+          }
+
+          if (!productId) return;
+
+          const saved = readItems().some((i) => String(i.id) === String(productId));
+          const itemPayload = {
+            productId,
+            variantId:     productVariantId || '',
+            productHandle: productHandle || '',
+            productTitle:  productTitle  || '',
+            productImage:  productImage  || '',
+            productPrice:  productPrice  || ''
+          };
+
+          await sync(saved ? 'remove' : 'add', itemPayload, locales);
+          updateButtonView(button, productId, locales);
+        } catch (err) {
+          console.error('[saitriq-wishlist] Button click failed', err);
+        } finally {
+          button.disabled = false;
+        }
+      });
     };
 
     const detectAuthentication = async () => {
@@ -288,6 +345,7 @@
                   operation: 'add',
                   visitorId: getVisitorId(),
                   productId: local.id,
+                  variantId: local.variantId || '',
                   productHandle: local.handle,
                   productTitle: local.title,
                   productImage: local.image,
@@ -300,24 +358,36 @@
       } catch {}
     };
 
-    const scan = () => productLinks().forEach(attach);
+    const scan = () => {
+      document.querySelectorAll('[data-sai-collection-wishlist]:not([data-sai-initialized="true"])').forEach(initButton);
+    };
 
     scan();
     detectAuthentication().finally(scan);
-    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
 
-    window.addEventListener('storage', (e) => { if (e.key === storageKey) scan(); });
+    // Watch for new elements added dynamically (e.g. infinite scroll, AJAX filters)
+    new MutationObserver(() => {
+      scan();
+    }).observe(document.body, { childList: true, subtree: true });
 
-    window.addEventListener('saitriq:wishlist-updated', () => {
+    // Shopify Theme Editor live updates
+    document.addEventListener('shopify:section:load', scan);
+    document.addEventListener('shopify:block:select', scan);
+
+    // Update active states when wishlist changes
+    const refreshAllButtons = () => {
       document.querySelectorAll('[data-sai-collection-wishlist]').forEach((btn) => {
-        const card = btn.closest(CARD_SELECTOR) || btn.parentElement;
-        const link = card && card.querySelector('a[href*="/products/"]');
-        if (!link) return;
-        const handle = handleFromLink(link);
-        if (handle && productCache.has(handle)) {
-          renderButton(btn, productCache.get(handle).productId);
+        const id = btn.dataset.productId || btn.closest('[data-sai-collection-item]')?.dataset.productId;
+        if (id) {
+          const saved = readItems().some((i) => String(i.id) === String(id));
+          btn.classList.toggle('is-active', saved);
         }
       });
+    };
+
+    window.addEventListener('saitriq:wishlist-updated', refreshAllButtons);
+    window.addEventListener('storage', (e) => {
+      if (e.key === storageKey) refreshAllButtons();
     });
   });
 })();
