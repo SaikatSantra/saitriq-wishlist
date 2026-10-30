@@ -74,11 +74,46 @@ button.sai-wishlist.button--tertiary {
 }
 
 /* ── Collection badge variant ────────────────────────────── */
+.sai-wishlist-collection-wrapper {
+  position: absolute !important;
+  z-index: 4 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 0;
+}
+
+.sai-wishlist-collection-wrapper.sai-wishlist--collection-top-left {
+  top: 0.75rem !important;
+  left: 0.75rem !important;
+  right: auto !important;
+  bottom: auto !important;
+}
+
+.sai-wishlist-collection-wrapper.sai-wishlist--collection-top-right {
+  top: 0.75rem !important;
+  right: 0.75rem !important;
+  left: auto !important;
+  bottom: auto !important;
+}
+
+.sai-wishlist-collection-wrapper.sai-wishlist--collection-bottom-left {
+  top: auto !important;
+  bottom: 0.75rem !important;
+  left: 0.75rem !important;
+  right: auto !important;
+}
+
+.sai-wishlist-collection-wrapper.sai-wishlist--collection-bottom-right {
+  top: auto !important;
+  bottom: 0.75rem !important;
+  right: 0.75rem !important;
+  left: auto !important;
+}
+
 .sai-wishlist--collection {
-  position: absolute;
-  z-index: 4;
-  top: 0.75rem;
-  right: 0.75rem;
   width: 2.5rem;
   height: 2.5rem;
   padding: 0;
@@ -86,11 +121,18 @@ button.sai-wishlist.button--tertiary {
   background: var(--sai-btn-color, #ffffff);
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  margin: 0 !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 4 !important;
 }
 
 .sai-wishlist--collection:hover {
@@ -103,28 +145,23 @@ button.sai-wishlist.button--tertiary {
   border-color: rgba(0, 0, 0, 0.12);
 }
 
-.sai-wishlist--collection-top-left {
-    right: auto;
-    left: 0.75rem;
+/* Standalone button fallback when rendered without wrapper */
+.sai-wishlist--collection:not(.sai-wishlist-collection-wrapper .sai-wishlist--collection) {
+  position: absolute !important;
 }
 
-.sai-wishlist--collection-top-right {
-    right: 0.75rem;
-    left: auto;
+.sai-wishlist--collection:not(.sai-wishlist-collection-wrapper .sai-wishlist--collection).sai-wishlist--collection-top-left {
+  top: 0.75rem !important;
+  left: 0.75rem !important;
+  right: auto !important;
+  bottom: auto !important;
 }
 
-.sai-wishlist--collection-bottom-left {
-  top: auto;
-  bottom: 0.75rem;
-    right: 0;
-    left: 0.75rem;
-}
-
-.sai-wishlist--collection-bottom-right {
-  top: auto;
-  bottom: 0.75rem;
-    right: 0.75rem;
-    left: 0;
+.sai-wishlist--collection:not(.sai-wishlist-collection-wrapper .sai-wishlist--collection).sai-wishlist--collection-top-right {
+  top: 0.75rem !important;
+  right: 0.75rem !important;
+  left: auto !important;
+  bottom: auto !important;
 }
 
 /* ── Icon spans ──────────────────────────────────────────── */
@@ -140,7 +177,7 @@ button.sai-wishlist.button--tertiary {
   display: block;
   width: 1.2em;
   height: 1.2em;
-  color: var(--sai-icon-color);
+  color: var(--sai-icon-color, #FE847F);
 }
 
 /* Default icon: visible when NOT saved, hidden when saved */
@@ -210,9 +247,12 @@ button.sai-wishlist.button--tertiary {
   flex-shrink: 0;
   width: 3rem;
   height: 3rem;
+  min-width: 3rem;
+  min-height: 3rem;
   object-fit: cover;
-  border-radius: 0.25rem;
-  background: #333;
+  border-radius: 0.375rem;
+  background: #f1f2f3;
+  display: block;
 }
 
 .sai-wishlist__toast-body {

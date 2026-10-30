@@ -1,7 +1,11 @@
 /* ─── Saitriq Modern Wishlist Page Styles ──────────────────────────────── */
 
+[data-block-handle="wishlist-page"] {
+  width: 100%;
+}
+
 .sai-wishlist-page {
-  max-width: 1240px;
+  width: 100%;
   margin-inline: auto;
   padding: var(--padding-block-start, 40px) 20px var(--padding-block-end, 80px);
   box-sizing: border-box;
@@ -9,8 +13,22 @@
   color: inherit;
 }
 
+/* ── Prevent Hidden Elements from Being Shown by CSS ── */
+.sai-wishlist-page [hidden],
+.sai-wishlist-page[hidden],
+[data-sai-wishlist-page][hidden],
+.sai-wishlist-page__empty-container[hidden],
+.sai-wishlist-page__items[hidden],
+.sai-wishlist-page__share[hidden],
+.sai-wishlist-page__clear[hidden],
+.sai-wishlist-page__count-badge[hidden] {
+  display: none !important;
+}
+
 /* ── Header ── */
 .sai-wishlist-page__header {
+  width: 100% !important;
+  box-sizing: border-box !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -85,16 +103,19 @@
 
 /* ── Empty State ── */
 .sai-wishlist-page__empty-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 5rem 1.5rem;
+  padding: 4.5rem 1.5rem;
   background: #fafbfa;
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 20px;
-  margin: 2rem 0;
+  margin: 1.5rem 0 2rem;
 }
 
 .sai-wishlist-page__empty-icon {
@@ -147,8 +168,10 @@
 
 /* ── Grid ── */
 .sai-wishlist-page__items {
+  width: 100% !important;
+  box-sizing: border-box !important;
   display: grid !important;
-  grid-template-columns: repeat(var(--sai-wishlist-columns, 4), 1fr) !important;
+  grid-template-columns: repeat(var(--sai-wishlist-columns, 4), minmax(0, 1fr)) !important;
   gap: 24px !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -157,15 +180,22 @@
 
 @media (max-width: 1024px) {
   .sai-wishlist-page__items {
-    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 20px !important;
   }
 }
 
 @media (max-width: 768px) {
   .sai-wishlist-page__items {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 14px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .sai-wishlist-page__items {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
   }
 }
 
@@ -181,6 +211,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
   position: relative;
+  min-width: 0;
 }
 
 .sai-wishlist-page__item:hover {
@@ -278,11 +309,26 @@
 }
 
 .sai-wishlist-page__price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 16px;
   font-weight: 700;
   color: #111827;
   margin-bottom: 12px;
   letter-spacing: -0.01em;
+}
+
+.sai-wishlist-page__price--current {
+  color: #111827;
+}
+
+.sai-wishlist-page__price--compare {
+  font-size: 13px;
+  font-weight: 400;
+  color: #9ca3af;
+  text-decoration: line-through;
 }
 
 /* Card Actions */

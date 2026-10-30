@@ -1,9 +1,23 @@
 {% doc %}
-Renders the collection-card wishlist button template for the shared app script.
+Renders the collection-card wishlist button for a product card.
+@param {object} [product] - The product object
+@param {object} [card_product] - Fallback product object
+@param {string} [position] - Icon position (top-left or top-right)
 {% enddoc %}
 
-<template
-  data-sai-collection-tpl
+{%- assign current_product = product | default: card_product -%}
+{%- assign position = position | default: 'top-right' -%}
+
+<div
+  class="sai-wishlist-collection-wrapper sai-wishlist--collection-{{ position }}"
+  data-sai-collection-item
+  data-position="{{ position }}"
+  data-product-id="{{ current_product.id }}"
+  data-product-handle="{{ current_product.handle }}"
+  data-product-title="{{ current_product.title | escape }}"
+  data-product-image="{{ current_product.featured_image | default: current_product.images[0] | image_url: width: 600 | escape }}"
+  data-product-price="{{ current_product.price | money | escape }}"
+  data-product-variant-id="{{ current_product.selected_or_first_available_variant.id }}"
   data-label-add="{{ 'wishlist.add_to_wishlist' | t | default: 'Add to wishlist' | escape }}"
   data-label-remove="{{ 'wishlist.remove_from_wishlist' | t | default: 'Remove from wishlist' | escape }}"
   data-msg-added="{{ 'wishlist.added_to_wishlist' | t | default: 'Added to wishlist' | escape }}"
@@ -12,8 +26,12 @@ Renders the collection-card wishlist button template for the shared app script.
 >
   <button
     type="button"
-    class="sai-wishlist sai-wishlist--collection sai-wishlist--collection-top-right"
+    class="sai-wishlist sai-wishlist--collection sai-wishlist--collection-{{ position }}"
     data-sai-collection-wishlist
+    data-position="{{ position }}"
+    data-product-id="{{ current_product.id }}"
+    data-product-handle="{{ current_product.handle }}"
+    data-product-variant-id="{{ current_product.selected_or_first_available_variant.id }}"
     aria-label="{{ 'wishlist.add_to_wishlist' | t | default: 'Add to wishlist' | escape }}"
   >
     <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
@@ -27,4 +45,4 @@ Renders the collection-card wishlist button template for the shared app script.
       </svg>
     </span>
   </button>
-</template>
+</div>

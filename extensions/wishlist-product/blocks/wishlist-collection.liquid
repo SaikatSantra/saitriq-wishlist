@@ -1,21 +1,35 @@
+{%- assign current_product = block.settings.product | default: product -%}
 {%- assign btn_color        = block.settings.button_color | default: '#ffffff' -%}
 {%- assign btn_active_color = block.settings.active_color | default: '#ffffff' -%}
 {%- assign icon_color       = block.settings.icon_color   | default: '#FE847F' -%}
+{%- assign position         = block.settings.position     | default: 'top-right' -%}
 {%- assign custom_svg       = block.settings.custom_svg -%}
 
-<template 
-  data-sai-collection-tpl
-  data-label-add="{{ 'wishlist.add_to_wishlist' | t | escape }}"
-  data-label-remove="{{ 'wishlist.remove_from_wishlist' | t | escape }}"
-  data-msg-added="{{ 'wishlist.added_to_wishlist' | t | escape }}"
-  data-msg-removed="{{ 'wishlist.removed_from_wishlist' | t | escape }}"
-  data-msg-limit="{{ 'wishlist.limit_reached' | t | escape }}"
+<div
+  class="sai-wishlist-collection-wrapper sai-wishlist--collection-{{ position }}"
+  data-sai-collection-item
+  data-position="{{ position }}"
+  data-product-id="{{ current_product.id }}"
+  data-product-handle="{{ current_product.handle }}"
+  data-product-title="{{ current_product.title | escape }}"
+  data-product-image="{{ current_product.featured_image | default: current_product.images[0] | image_url: width: 600 | escape }}"
+  data-product-price="{{ current_product.price | money | escape }}"
+  data-product-variant-id="{{ current_product.selected_or_first_available_variant.id }}"
+  data-label-add="{{ 'wishlist.add_to_wishlist' | t | default: 'Add to wishlist' | escape }}"
+  data-label-remove="{{ 'wishlist.remove_from_wishlist' | t | default: 'Remove from wishlist' | escape }}"
+  data-msg-added="{{ 'wishlist.added_to_wishlist' | t | default: 'Added to wishlist' | escape }}"
+  data-msg-removed="{{ 'wishlist.removed_from_wishlist' | t | default: 'Removed from wishlist' | escape }}"
+  data-msg-limit="{{ 'wishlist.limit_reached' | t | default: 'Wishlist is temporarily unavailable' | escape }}"
 >
   <button
     type="button"
-    class="sai-wishlist sai-wishlist--collection sai-wishlist--collection-{{ block.settings.position }}"
+    class="sai-wishlist sai-wishlist--collection sai-wishlist--collection-{{ position }}"
     data-sai-collection-wishlist
-    aria-label="{{ 'wishlist.add_to_wishlist' | t | escape }}"
+    data-position="{{ position }}"
+    data-product-id="{{ current_product.id }}"
+    data-product-handle="{{ current_product.handle }}"
+    data-product-variant-id="{{ current_product.selected_or_first_available_variant.id }}"
+    aria-label="{{ 'wishlist.add_to_wishlist' | t | default: 'Add to wishlist' | escape }}"
     style="
       --sai-btn-color: {{ btn_color }};
       --sai-btn-active-color: {{ btn_active_color }};
@@ -30,7 +44,7 @@
         {{- custom_svg -}}
       </span>
     {%- else -%}
-      <span class="sai-wishlist__icon sai-wishlist__icon--default " aria-hidden="true">
+      <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
             stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -43,7 +57,7 @@
       </span>
     {%- endif -%}
   </button>
-</template>
+</div>
 
 {% schema %}
 {
@@ -51,6 +65,12 @@
   "target": "section",
   "javascript": "wishlist-collection.js",
   "settings": [
+    {
+      "type": "product",
+      "id": "product",
+      "label": "Product",
+      "autofill": true
+    },
     {
       "type": "header",
       "content": "Button appearance"
@@ -96,7 +116,6 @@
           "value": "top-right",
           "label": "Top Right"
         }
-        
       ],
       "default": "top-right"
     }

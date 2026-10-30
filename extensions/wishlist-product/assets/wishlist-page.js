@@ -15,7 +15,8 @@
     const page = document.querySelector('[data-sai-wishlist-page]');
     if (!page) return;
 
-    page.hidden = false; // Reveal page — embed confirmed enabled
+    page.hidden = false;
+    page.style.display = 'block';
 
     const storageKey = 'saitriq_wishlist';
     const visitorStorageKey = 'saitriq_wishlist_visitor';
@@ -24,14 +25,18 @@
     let customerAuthenticated = false;
 
     // Read settings & localized strings from HTML dataset
+    const themeAtc = page.dataset.settingShowAtc === 'true';
+    const themePrices = page.dataset.settingShowPrices !== 'false';
+    const themeRemove = page.dataset.settingShowRemove !== 'false';
+
     let settings = {
       heading: page.dataset.settingHeading || 'My Wishlist',
-      emptyMessage: page.dataset.settingEmptyMsg || 'Your wishlist is empty',
+      emptyMessage: page.dataset.settingEmptyMsg || 'You have not saved any products yet.',
       columns: Number(page.dataset.settingColumns) || 4,
-      showPrices: page.dataset.settingShowPrices !== 'false',
-      showRemove: page.dataset.settingShowRemove !== 'false',
+      showPrices: themePrices,
+      showRemove: themeRemove,
       buttonLabel: page.dataset.settingBtnLabel || 'Remove',
-      showAddToCart: page.dataset.settingShowAtc === 'true',
+      showAddToCart: themeAtc,
       addToCartLabel: page.dataset.settingAtcLabel || 'Add to cart',
       cardClass: '',
       customCss: ''
@@ -70,6 +75,34 @@
       return visitorId;
     };
 
+    const formatMoney = (cents) => {
+      if (cents == null || isNaN(cents)) return '';
+      const amount = Number(cents) / 100;
+      const moneyFormat = page.dataset.moneyFormat || window.Shopify?.money_format || window.theme?.moneyFormat || window.theme?.money_format;
+      if (window.Shopify?.formatMoney && moneyFormat) {
+        try {
+          return window.Shopify.formatMoney(cents, moneyFormat);
+        } catch (e) {}
+      }
+      if (moneyFormat && /\{\{\s*amount/.test(moneyFormat)) {
+        const val = amount.toFixed(2);
+        return moneyFormat
+          .replace(/\{\{\s*amount\s*\}\}/g, val)
+          .replace(/\{\{\s*amount_no_decimals\s*\}\}/g, Math.round(amount).toString())
+          .replace(/\{\{\s*amount_with_comma_separator\s*\}\}/g, val.replace('.', ','))
+          .replace(/\{\{\s*amount_no_decimals_with_comma_separator\s*\}\}/g, Math.round(amount).toString());
+      }
+      const currency = page.dataset.currency || window.Shopify?.currency?.active || 'USD';
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: currency
+        }).format(amount);
+      } catch (e) {
+        return `$${amount.toFixed(2)}`;
+      }
+    };
+
     const persistLocalFallback = (operation, item = {}) => {
       const items = getItems();
       const itemId = String(item.productId || item.id || '');
@@ -78,6 +111,7 @@
       if (operation === 'add' && itemId && index < 0) {
         items.push({
           id: itemId,
+          variantId: item.variantId || '',
           handle: item.productHandle || item.handle || '',
           title: item.productTitle || item.title || 'Product',
           image: item.productImage || item.image || '',
@@ -108,7 +142,14 @@
 
     const applySettings = (data) => {
       if (!data?.settings) return;
-      settings = { ...settings, ...data.settings };
+      const dbAtc = data.settings.showAddToCart === true || data.settings.showAddToCart === 'true' || data.settings.showAddToCart === 'on' || data.settings.showAddToCart === 1;
+      settings = {
+        ...settings,
+        ...data.settings,
+        showAddToCart: themeAtc || dbAtc,
+        showPrices: themePrices && data.settings.showPrices !== false && data.settings.showPrices !== 'false',
+        showRemove: themeRemove && data.settings.showRemove !== false && data.settings.showRemove !== 'false',
+      };
       let customStyle = document.querySelector('[data-sai-wishlist-custom-css]');
       if (!customStyle) {
         customStyle = document.createElement('style');
@@ -157,8 +198,31 @@
           return;
         }
 
+        // Merge local guest items to server if authenticated
+        const serverIds = new Set(data.items.map((saved) => String(saved.productId)));
+        const localItems = getItems();
+        for (const local of localItems) {
+          if (!serverIds.has(String(local.id))) {
+            fetch(syncEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                operation: 'add',
+                visitorId: getVisitorId(),
+                productId: local.id,
+                variantId: local.variantId || '',
+                productHandle: local.handle,
+                productTitle: local.title,
+                productImage: local.image,
+                productPrice: local.price
+              })
+            }).catch(() => {});
+          }
+        }
+
         let items = data.items.map((saved) => ({
-          id: saved.productId,
+          id: String(saved.productId),
           variantId: saved.variantId || '',
           variantTitle: saved.variantTitle || '',
           handle: saved.productHandle,
@@ -167,6 +231,12 @@
           price: saved.productPrice || '',
           addedAt: saved.createdAt
         }));
+
+        for (const local of localItems) {
+          if (!serverIds.has(String(local.id))) {
+            items.push(local);
+          }
+        }
 
         localStorage.setItem(storageKey, JSON.stringify(items));
         render();
@@ -186,24 +256,40 @@
 
     const _productDataCache = new Map();
     const fetchProductData = async (handle, savedVariantId = '') => {
+      const rawHandle = String(handle || '').replace(/^\/?products\//, '').trim();
+      const cleanHandle = rawHandle.split('?')[0].split('#')[0].replace(/\/$/, '').trim();
+      if (!cleanHandle) return null;
+
+      let variantFromHandle = '';
+      if (rawHandle.includes('variant=')) {
+        try {
+          const params = new URLSearchParams(rawHandle.split('?')[1] || '');
+          variantFromHandle = params.get('variant') || '';
+        } catch (e) {}
+      }
+      const effectiveVariantId = savedVariantId || variantFromHandle;
+
       const resolveVariant = (product) => {
         const variants = product.variants || [];
-        const savedVariant = variants.find((variant) => String(variant.id) === String(savedVariantId));
+        const savedVariant = variants.find((variant) => String(variant.id) === String(effectiveVariantId));
         const variant = savedVariant || variants.find((entry) => entry.available) || variants[0];
         return {
           productId: String(product.id),
           variantId: variant ? String(variant.id) : null,
           variantTitle: variant?.title || '',
-          variantAvailable: variant?.available === true,
+          variantAvailable: variant ? variant.available === true : product.available === true,
+          price: variant?.price != null ? variant.price : product.price,
+          compareAtPrice: variant?.compare_at_price != null ? variant.compare_at_price : product.compare_at_price
         };
       };
 
-      if (_productDataCache.has(handle)) return resolveVariant(_productDataCache.get(handle));
+      if (_productDataCache.has(cleanHandle)) return resolveVariant(_productDataCache.get(cleanHandle));
       try {
-        const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
+        const root = window.Shopify?.routes?.root || '/';
+        const res = await fetch(`${root}products/${encodeURIComponent(cleanHandle)}.js`);
         if (!res.ok) return null;
         const p = await res.json();
-        _productDataCache.set(handle, p);
+        _productDataCache.set(cleanHandle, p);
         return resolveVariant(p);
       } catch { return null; }
     };
@@ -267,6 +353,42 @@
 
     const buildCard = async (item) => {
       const productData = await fetchProductData(item.handle, item.variantId);
+      const isAtcEnabled = settings.showAddToCart === true || themeAtc;
+      const variantId = productData?.variantId || item.variantId;
+      const isAvailable = productData ? productData.variantAvailable : true;
+
+      // Robust price resolution
+      let priceHtml = '';
+      if (settings.showPrices) {
+        let currentPriceStr = '';
+        let comparePriceStr = '';
+
+        if (productData?.price != null) {
+          currentPriceStr = formatMoney(productData.price);
+          if (productData.compareAtPrice && productData.compareAtPrice > productData.price) {
+            comparePriceStr = formatMoney(productData.compareAtPrice);
+          }
+        } else if (item.price && /[^0-9.,\s]/.test(String(item.price))) {
+          currentPriceStr = String(item.price).trim();
+        } else if (item.price) {
+          const cleanNum = parseFloat(String(item.price).replace(/[^0-9.]/g, ''));
+          if (!isNaN(cleanNum)) {
+            const isCents = String(item.price).indexOf('.') === -1 && cleanNum >= 100;
+            currentPriceStr = formatMoney(isCents ? cleanNum : Math.round(cleanNum * 100));
+          } else {
+            currentPriceStr = String(item.price).trim();
+          }
+        }
+
+        if (currentPriceStr) {
+          priceHtml = `
+            <div class="sai-wishlist-page__price">
+              <span class="sai-wishlist-page__price--current">${esc(currentPriceStr)}</span>
+              ${comparePriceStr ? `<s class="sai-wishlist-page__price--compare">${esc(comparePriceStr)}</s>` : ''}
+            </div>
+          `;
+        }
+      }
 
       const card = document.createElement('div');
       card.className = `sai-wishlist-page__item ${settings.cardClass || ''}`.trim();
@@ -285,18 +407,24 @@
         <div class="sai-wishlist-page__info">
           <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${esc(item.title) || 'Product'}</a>
           ${productData?.variantTitle && productData.variantTitle !== 'Default Title' ? `<div class="sai-wishlist-page__variant">${esc(productData.variantTitle)}</div>` : ''}
-          ${settings.showPrices && item.price ? `<div class="sai-wishlist-page__price">${esc(item.price)}</div>` : ''}
+          ${priceHtml}
           <div class="sai-wishlist-page__card-actions">
             ${
-              settings.showAddToCart && productData?.variantId
-                ? `<form class="sai-wishlist-page__atc-form" action="/cart/add" method="post">
-                    <input type="hidden" name="id" value="${productData.variantId}">
-                    <input type="hidden" name="quantity" value="1">
-                    <button type="submit" name="add" class="sai-wishlist-page__add-to-cart" ${!productData.variantAvailable ? 'disabled' : ''}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-                      <span>${!productData.variantAvailable ? esc(locales.soldOut) : esc(settings.addToCartLabel || 'Add to cart')}</span>
-                    </button>
-                  </form>`
+              isAtcEnabled
+                ? (variantId
+                    ? `<form class="sai-wishlist-page__atc-form" action="/cart/add" method="post">
+                        <input type="hidden" name="id" value="${variantId}">
+                        <input type="hidden" name="quantity" value="1">
+                        <button type="submit" name="add" class="sai-wishlist-page__add-to-cart" ${!isAvailable ? 'disabled' : ''}>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                          <span>${!isAvailable ? esc(locales.soldOut) : esc(settings.addToCartLabel || 'Add to cart')}</span>
+                        </button>
+                      </form>`
+                    : `<a href="/products/${encodeURIComponent(item.handle)}" class="sai-wishlist-page__add-to-cart" style="text-decoration:none;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                        <span>${esc(settings.addToCartLabel || 'Add to cart')}</span>
+                      </a>`
+                  )
                 : `<a href="/products/${encodeURIComponent(item.handle)}" class="sai-wishlist-page__view-btn">View Product</a>`
             }
           </div>
@@ -319,7 +447,9 @@
         if (image.dataset.fallbackAttempted) return;
         image.dataset.fallbackAttempted = 'true';
         try {
-          const response = await fetch(`/products/${encodeURIComponent(item.handle)}.js`);
+          const cleanHandle = String(item.handle || '').replace(/^\/?products\//, '').replace(/\/$/, '').trim();
+          const root = window.Shopify?.routes?.root || '/';
+          const response = await fetch(`${root}products/${encodeURIComponent(cleanHandle)}.js`);
           if (!response.ok) return;
           const product = await response.json();
           const fallback = product.featured_image || product.images?.[0];
@@ -345,7 +475,13 @@
           const nextItems = getItems().filter((s) => !(String(s.id) === String(item.id) && String(s.variantId || '') === String(item.variantId || '')));
           localStorage.setItem(storageKey, JSON.stringify(nextItems));
           window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: locales.removed } }));
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+            detail: {
+              message: locales.removed,
+              image: item.image || '',
+              title: item.title || ''
+            }
+          }));
           render();
           return;
         }
@@ -388,7 +524,13 @@
         localStorage.setItem(storageKey, JSON.stringify(serverItems));
 
         window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: locales.removed } }));
+        window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+          detail: {
+            message: locales.removed,
+            image: item.image || '',
+            title: item.title || ''
+          }
+        }));
         render();
       } catch (error) {
         console.error('Wishlist remove failed', error);
@@ -405,13 +547,16 @@
       render._pending = true;
       try {
         const items = getItems();
+        const hasItems = items.length > 0;
+
         const titleEl = page.querySelector('.wislist-page-title');
         if (titleEl) titleEl.textContent = settings.heading || 'My Wishlist';
 
         const countBadge = page.querySelector('[data-sai-wishlist-page-count]');
         if (countBadge) {
           countBadge.textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
-          countBadge.hidden = items.length === 0;
+          countBadge.hidden = !hasItems;
+          countBadge.style.display = hasItems ? 'inline-block' : 'none';
         }
 
         const emptyTitle = emptyMessage.querySelector('.sai-wishlist-page__empty-title');
@@ -419,15 +564,29 @@
           emptyTitle.textContent = settings.emptyMessage;
         }
 
+        // Strictly toggle empty message & grid using BOTH hidden attribute AND display style
+        emptyMessage.hidden = hasItems;
+        emptyMessage.style.display = hasItems ? 'none' : 'flex';
+
+        itemsContainer.hidden = !hasItems;
+        itemsContainer.style.display = hasItems ? 'grid' : 'none';
+
+        if (clearButton) {
+          clearButton.hidden = !hasItems;
+          clearButton.style.display = hasItems ? 'inline-flex' : 'none';
+        }
+        if (shareButton) {
+          shareButton.hidden = !hasItems;
+          shareButton.style.display = hasItems ? 'inline-flex' : 'none';
+        }
+
         itemsContainer.style.setProperty('--sai-wishlist-columns', settings.columns);
         itemsContainer.replaceChildren();
 
-        emptyMessage.hidden = items.length > 0;
-        if (clearButton) clearButton.hidden = items.length === 0;
-        if (shareButton) shareButton.hidden = items.length === 0;
-
-        const cards = await Promise.all(items.map((item) => buildCard(item)));
-        cards.forEach((card) => itemsContainer.append(card));
+        if (hasItems) {
+          const cards = await Promise.all(items.map((item) => buildCard(item)));
+          cards.forEach((card) => itemsContainer.append(card));
+        }
       } finally {
         render._pending = false;
         if (render._again) {
@@ -521,8 +680,14 @@
       localStorage.setItem(storageKey, JSON.stringify(sharedItems));
       settings.showRemove = false;
       settings.heading = 'Shared wishlist';
-      if (clearButton) clearButton.hidden = true;
-      if (shareButton) shareButton.hidden = true;
+      if (clearButton) {
+        clearButton.hidden = true;
+        clearButton.style.display = 'none';
+      }
+      if (shareButton) {
+        shareButton.hidden = true;
+        shareButton.style.display = 'none';
+      }
     }
 
     if (shareButton) {

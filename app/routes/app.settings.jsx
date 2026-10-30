@@ -74,17 +74,22 @@ export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
 
+  const isChecked = (name) => {
+    const val = formData.get(name);
+    return val === "on" || val === "true" || val === "1" || val === true;
+  };
+
   const settings = {
     heading: String(formData.get("heading") || defaults.heading).trim(),
     emptyMessage: String(
       formData.get("emptyMessage") || defaults.emptyMessage
     ).trim(),
-    showPrices: formData.get("showPrices") === "on",
-    showRemove: formData.get("showRemove") === "on",
+    showPrices: isChecked("showPrices"),
+    showRemove: isChecked("showRemove"),
     buttonLabel: String(
       formData.get("buttonLabel") || defaults.buttonLabel
     ).trim(),
-    showAddToCart: formData.get("showAddToCart") === "on",
+    showAddToCart: isChecked("showAddToCart"),
     addToCartLabel: String(
       formData.get("addToCartLabel") || defaults.addToCartLabel
     ).trim(),
@@ -161,15 +166,15 @@ export default function WishlistSettingsPage() {
                   value={preview.emptyMessage}
                   onInput={(e) => setPreview({ ...preview, emptyMessage: e.target.value })}
                 />
+                <input type="hidden" name="showPrices" value={preview.showPrices ? "true" : "false"} />
                 <s-checkbox
                   label={i18n.showPricesLabel}
-                  name="showPrices"
                   checked={preview.showPrices}
                   onChange={(e) => setPreview({ ...preview, showPrices: e.target.checked })}
                 />
+                <input type="hidden" name="showRemove" value={preview.showRemove ? "true" : "false"} />
                 <s-checkbox
                   label={i18n.showRemoveLabel}
-                  name="showRemove"
                   checked={preview.showRemove}
                   onChange={(e) => setPreview({ ...preview, showRemove: e.target.checked })}
                 />
@@ -181,9 +186,9 @@ export default function WishlistSettingsPage() {
                     onInput={(e) => setPreview({ ...preview, buttonLabel: e.target.value })}
                   />
                 )}
+                <input type="hidden" name="showAddToCart" value={preview.showAddToCart ? "true" : "false"} />
                 <s-checkbox
                   label={i18n.showAtcLabel}
-                  name="showAddToCart"
                   checked={preview.showAddToCart}
                   onChange={(e) => setPreview({ ...preview, showAddToCart: e.target.checked })}
                 />
