@@ -83,13 +83,23 @@
           body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
         });
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.tracked) return;
+        if (res.status === 429 || data.limitReached) {
+          return { limitReached: true, error: data.error };
+        }
+        if (res.ok && data.tracked) return data;
       } catch {}
+      return null;
     };
 
     const sync = async (operation, item) => {
       if (!customerAuthenticated) {
-        await trackGuest(operation, item);
+        const guestResult = await trackGuest(operation, item);
+        if (operation === 'add' && guestResult?.limitReached) {
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+            detail: { message: guestResult.error || locales.limitMsg }
+          }));
+          return readItems();
+        }
         return persistLocalFallback(operation, item);
       }
       const res = await fetch(endpoint, {
@@ -98,8 +108,9 @@
         body: JSON.stringify({ operation, visitorId: getVisitorId(), ...item })
       });
 
-      if (res.status === 429) {
-        const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 429 || data.limitReached) {
         if (operation === 'remove' || operation === 'clear') return readItems();
         window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
           detail: { message: data.error || locales.limitMsg }
@@ -107,12 +118,7 @@
         return readItems();
       }
 
-      if (!res.ok) {
-        customerAuthenticated = false;
-        return persistLocalFallback(operation, item);
-      }
-      const data = await res.json();
-      if (!Array.isArray(data.items)) {
+      if (!res.ok || !Array.isArray(data.items)) {
         customerAuthenticated = false;
         return persistLocalFallback(operation, item);
       }

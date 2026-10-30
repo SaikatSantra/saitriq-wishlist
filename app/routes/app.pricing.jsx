@@ -4,6 +4,7 @@ import { Buffer } from "node:buffer";
 import { env } from "node:process";
 import { authenticate } from "../shopify.server";
 import { PLANS } from "../plans";
+import { detectLocale, createTranslator } from "../i18n.server";
 import { currentUsage } from "../db.wishlist.server";
 import { PLAN_RANK } from "../plan-entitlements";
 import {
@@ -24,6 +25,8 @@ export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
   const month = monthKey();
+  const locale = detectLocale({ request, session });
+  const t = createTranslator(locale);
 
   const [entitlement, used, addonSaves] = await Promise.all([
     getPlanEntitlement(shop, month, admin),
@@ -44,8 +47,35 @@ export const loader = async ({ request }) => {
   const billingError = url.searchParams.get("billingError") === "1";
   const allocationAdded = url.searchParams.get("allocationAdded") === "1";
 
+  const localizedPlans = PLANS.map((plan) => {
+    const locPlan = t(`pricing.plans.${plan.id}`);
+    return {
+      ...plan,
+      name: locPlan?.name || plan.name,
+      description: locPlan?.description || plan.description,
+      features: locPlan?.features || plan.features,
+    };
+  });
+
   return {
-    plans: PLANS,
+    plans: localizedPlans,
+    locale,
+    i18n: {
+      title: t("pricing.title"),
+      subtitle: t("pricing.subtitle"),
+      currentPlanBadge: t("pricing.currentPlanBadge"),
+      activeBadge: t("pricing.activeBadge"),
+      perMonth: t("pricing.perMonth"),
+      trialNote: (days) => t("pricing.trialNote", { days }),
+      upgradeButton: (name) => t("pricing.upgradeButton", { name }),
+      downgradeButton: (name) => t("pricing.downgradeButton", { name }),
+      quotaUsed: t("pricing.quotaUsed"),
+      usedOf: (used, limit) => t("pricing.usedOf", { used, limit }),
+      extraAddonTitle: t("pricing.extraAddonTitle"),
+      extraAddonDesc: t("pricing.extraAddonDesc"),
+      extraAddonButton: t("pricing.extraAddonButton"),
+      limitReachedWarning: t("pricing.limitReachedWarning"),
+    },
     activePlanId,
     scheduledPlanId: entitlement.scheduledPlanId,
     effectiveMonth: entitlement.effectiveMonth,
@@ -238,6 +268,7 @@ export default function PricingPage() {
     addonSaves,
     addon,
     addonStatus,
+    i18n,
   } = useLoaderData();
   const fetcher = useFetcher();
   const actionData = fetcher.data;
@@ -275,10 +306,10 @@ export default function PricingPage() {
   }, []);
 
   return (
-    <s-page heading="Pricing">
+    <s-page heading={i18n?.title || "Plans & Pricing"}>
 
       {/* ── Usage summary ── */}
-      <s-section heading="Current usage">
+      <s-section heading={i18n?.quotaUsed || "Current usage"}>
         <s-grid
           gridTemplateColumns="@container (inline-size <= 400px) 1fr, 1fr auto 1fr auto 1fr"
           gap="small"
@@ -418,7 +449,7 @@ export default function PricingPage() {
       )}
 
       {/* ── Plan cards ── */}
-      <s-section heading="Choose a plan">
+      <s-section heading={i18n?.title || "Choose a plan"}>
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -448,7 +479,7 @@ export default function PricingPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <s-heading>{plan.name}</s-heading>
-                    {isActive && <s-badge tone="success">Current plan</s-badge>}
+                    {isActive && <s-badge tone="success">{i18n?.currentPlanBadge || "Current plan"}</s-badge>}
                     {isActive && purchaseCount > 1 && (
                       <s-badge tone="info">{purchaseCount} allocations</s-badge>
                     )}
@@ -525,7 +556,7 @@ export default function PricingPage() {
                       loading={isSubmitting}
                       inlineSize="fill"
                     >
-                      Upgrade to {plan.name}
+                      {i18n?.upgradeButton ? i18n.upgradeButton(plan.name) : `Upgrade to ${plan.name}`}
                     </s-button>
                   </fetcher.Form>
                 ) : plan.id === scheduledPlanId ? (
@@ -543,7 +574,7 @@ export default function PricingPage() {
                       disabled={isSubmitting}
                       inlineSize="fill"
                     >
-                      Downgrade to {plan.name}
+                      {i18n?.downgradeButton ? i18n.downgradeButton(plan.name) : `Downgrade to ${plan.name}`}
                     </s-button>
                   </fetcher.Form>
                 ) : null}

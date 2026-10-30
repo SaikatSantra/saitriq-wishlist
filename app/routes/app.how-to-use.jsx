@@ -1,3 +1,6 @@
+import { useLoaderData } from "react-router";
+import { authenticate } from "../shopify.server";
+import { detectLocale, createTranslator } from "../i18n.server";
 import wishlistStyles from "../../extensions/wishlist-product/assets/wishlist.css?raw";
 import wishlistPageStyles from "../../extensions/wishlist-product/assets/wishlist-page.css?raw";
 import wishlistEmbedScript from "../../extensions/wishlist-product/assets/wishlist.js?raw";
@@ -39,10 +42,34 @@ const renderCopySource = (heading, source) => {
   );
 };
 
+export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const locale = detectLocale({ request, session });
+  const t = createTranslator(locale);
+
+  return {
+    locale,
+    i18n: {
+      title: t("howToUse.title"),
+      subtitle: t("howToUse.subtitle"),
+      os2Title: t("howToUse.os2Title"),
+      os2Desc: t("howToUse.os2Desc"),
+      step1: t("howToUse.step1"),
+      step2: t("howToUse.step2"),
+      step3: t("howToUse.step3"),
+      step4: t("howToUse.step4"),
+      step5: t("howToUse.step5"),
+      manualTitle: t("howToUse.manualTitle"),
+      manualDesc: t("howToUse.manualDesc"),
+    },
+  };
+};
+
 export default function HowToUsePage() {
+  const { i18n } = useLoaderData() || {};
   return (
-    <s-page heading="How to use Saitriq Wishlist">
-      <s-section heading="Online Store 2.0 theme (recommended)">
+    <s-page heading={i18n?.title || "How to use Saitriq Wishlist"}>
+      <s-section heading={i18n?.os2Title || "Online Store 2.0 theme (recommended)"}>
         <s-paragraph>
           App blocks work on themes that support Shopify app blocks. Updating the
           app does not upgrade the theme or place blocks into its templates.
@@ -81,7 +108,7 @@ export default function HowToUsePage() {
         </s-paragraph>
       </s-section>
 
-      <s-section heading="Older or custom theme without app blocks">
+      <s-section heading={i18n?.manualTitle || "Older or custom theme without app blocks"}>
         <s-banner tone="warning" heading="Manual setup is a separate installation">
           These steps copy the current extension runtime into the theme. Use
           either the manual setup below or the theme app embed plus app blocks;

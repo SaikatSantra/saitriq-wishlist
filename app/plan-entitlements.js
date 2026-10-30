@@ -1,6 +1,6 @@
 import { monthlyLimit } from "./plans.js";
 
-export const PLAN_RANK = { free: 0, growth: 1, unlimited: 2 };
+export const PLAN_RANK = { free: 0, starter:1, growth: 2, unlimited: 3 };
 
 export const higherPlan = (firstPlanId, secondPlanId) =>
   (PLAN_RANK[secondPlanId] ?? 0) > (PLAN_RANK[firstPlanId] ?? 0)

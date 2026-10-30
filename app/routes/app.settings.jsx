@@ -1,25 +1,29 @@
 import { Form, useActionData, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { detectLocale, createTranslator } from "../i18n.server";
 
 const defaults = {
-  heading:        "My wishlist",
-  emptyMessage:   "You have not saved any products yet.",
-  showPrices:     true,
-  showRemove:     true,
-  buttonLabel:    "Remove",
-  showAddToCart:  false,
+  heading: "My wishlist",
+  emptyMessage: "You have not saved any products yet.",
+  showPrices: true,
+  showRemove: true,
+  buttonLabel: "Remove",
+  showAddToCart: false,
   addToCartLabel: "Add to cart",
-  cardClass:      "sai-wishlist-page__item",
-  customCss:      "",
+  cardClass: "sai-wishlist-page__item",
+  customCss: "",
   headerSelector: "",
-  toastBg:        "#1a1a1a",
-  toastColor:     "#ffffff",
-  toastPosition:  "top-left",
+  toastBg: "#1a1a1a",
+  toastColor: "#ffffff",
+  toastPosition: "top-left",
 };
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
+  const locale = detectLocale({ request, session });
+  const t = createTranslator(locale);
+
   const settings = await prisma.wishlistSettings.findUnique({
     where: { shop: session.shop },
     select: {
@@ -39,7 +43,30 @@ export const loader = async ({ request }) => {
     },
   });
 
-  return { settings: settings || defaults };
+  return {
+    settings: settings || defaults,
+    locale,
+    i18n: {
+      title: t("settings.title"),
+      subtitle: t("settings.subtitle"),
+      pageSection: t("settings.pageSection"),
+      headingLabel: t("settings.headingLabel"),
+      emptyMsgLabel: t("settings.emptyMsgLabel"),
+      showPricesLabel: t("settings.showPricesLabel"),
+      showRemoveLabel: t("settings.showRemoveLabel"),
+      buttonLabelLabel: t("settings.buttonLabelLabel"),
+      showAtcLabel: t("settings.showAtcLabel"),
+      atcLabelLabel: t("settings.atcLabelLabel"),
+      toastSection: t("settings.toastSection"),
+      toastBgLabel: t("settings.toastBgLabel"),
+      toastColorLabel: t("settings.toastColorLabel"),
+      headerSection: t("settings.headerSection"),
+      headerSelectorLabel: t("settings.headerSelectorLabel"),
+      headerSelectorHelp: t("settings.headerSelectorHelp"),
+      saveButton: t("settings.saveButton"),
+      savedToast: t("settings.savedToast"),
+    },
+  };
 };
 
 export const action = async ({ request }) => {
@@ -51,7 +78,6 @@ export const action = async ({ request }) => {
     emptyMessage: String(
       formData.get("emptyMessage") || defaults.emptyMessage
     ).trim(),
-    
     showPrices: formData.get("showPrices") === "on",
     showRemove: formData.get("showRemove") === "on",
     buttonLabel: String(
@@ -95,152 +121,100 @@ export const action = async ({ request }) => {
 };
 
 export default function WishlistSettingsPage() {
-  const { settings } = useLoaderData();
+  const { settings, i18n } = useLoaderData();
   const actionData = useActionData();
 
   return (
-    <s-page heading="Wishlist settings">
+    <s-page heading={i18n.title}>
       <Form method="post">
         <s-stack direction="block" gap="large">
-
-          {/* Intro */}
           <s-section>
             <s-stack direction="block" gap="small">
-              <s-heading>Customize your wishlist</s-heading>
-
-              <s-text>
-                Configure how your wishlist page looks and behaves for
-                customers. You can customize the page content, remove button,
-                and notification messages. Set the wishlist grid columns on
-                the Wishlist page app block in Theme Editor.
-              </s-text>
-
-              <s-text tone="subdued">
-                Changes are applied to your storefront wishlist experience.
-              </s-text>
+              <s-heading>{i18n.title}</s-heading>
+              <s-text>{i18n.subtitle}</s-text>
             </s-stack>
           </s-section>
 
-          {/* Wishlist */}
-          <s-section heading="Wishlist page">
+          {/* Wishlist Page Appearance */}
+          <s-section heading={i18n.pageSection}>
             <s-stack direction="block" gap="base">
-
               <s-text-field
-                label="Page heading"
+                label={i18n.headingLabel}
                 name="heading"
                 value={settings.heading}
-                helpText="Shown at the top of the customer's wishlist page."
               />
-
               <s-text-field
-                label="Empty state message"
+                label={i18n.emptyMsgLabel}
                 name="emptyMessage"
                 value={settings.emptyMessage}
-                helpText="Shown when the customer has no saved products."
               />
-
-              
-
               <s-checkbox
-                label="Show product prices"
+                label={i18n.showPricesLabel}
                 name="showPrices"
                 checked={settings.showPrices}
               />
-
               <s-checkbox
-                label="Show remove button"
+                label={i18n.showRemoveLabel}
                 name="showRemove"
                 checked={settings.showRemove}
               />
-
               <s-text-field
-                label="Remove button label"
+                label={i18n.buttonLabelLabel}
                 name="buttonLabel"
                 value={settings.buttonLabel}
               />
-
               <s-checkbox
-                label="Show Add to cart button"
+                label={i18n.showAtcLabel}
                 name="showAddToCart"
                 checked={settings.showAddToCart}
               />
-
               <s-text-field
-                label="Add to cart button label"
+                label={i18n.atcLabelLabel}
                 name="addToCartLabel"
                 value={settings.addToCartLabel}
-                helpText="Label shown on the add to cart button. Only visible when enabled above."
               />
-
-              
-
             </s-stack>
           </s-section>
 
-          <s-section heading="Header wishlist link">
+          {/* Header Link */}
+          <s-section heading={i18n.headerSection}>
             <s-stack direction="block" gap="base">
-              <s-text>
-                Optionally add a Wishlist link to your storefront header without editing theme code.
-                The app embed must be enabled for this to appear.
-              </s-text>
               <s-text-field
-                label="Header CSS selector"
+                label={i18n.headerSelectorLabel}
                 name="headerSelector"
                 value={settings.headerSelector}
-                helpText="Enter a CSS selector for the header element to add the link to, for example .header__icons. The link is appended inside the first matching element. Leave blank to disable."
+                helpText={i18n.headerSelectorHelp}
               />
-              <s-text tone="subdued">
-                The selector must exist on the storefront. Theme markup differs, so test it with your theme.
-                Clearing this field removes the link on the next page load. Disabling the app embed also removes it.
-              </s-text>
             </s-stack>
           </s-section>
 
           {/* Toast */}
-          <s-section heading="Toast notification">
+          <s-section heading={i18n.toastSection}>
             <s-stack direction="block" gap="base">
-
-              <s-text>
-                Customize the notification shown when customers add
-                or remove products from their wishlist.
-              </s-text>
-
               <s-text-field
-                label="Background color"
+                label={i18n.toastBgLabel}
                 name="toastBg"
                 value={settings.toastBg}
-                helpText="Example: #1a1a1a"
               />
-
               <s-text-field
-                label="Text color"
+                label={i18n.toastColorLabel}
                 name="toastColor"
                 value={settings.toastColor}
-                helpText="Example: #ffffff"
               />
-
-              
-
             </s-stack>
           </s-section>
 
-          {/* Save feedback */}
           {actionData?.saved && (
-            <s-banner
-              tone="success"
-              heading="Settings saved"
-            >
-              Your wishlist settings have been updated successfully.
+            <s-banner tone="success" heading={i18n.savedToast}>
+              {i18n.savedToast}
             </s-banner>
           )}
 
-          {/* Actions */}
           <s-section>
             <s-button type="submit" variant="primary">
-              Save settings
+              {i18n.saveButton}
             </s-button>
           </s-section>
-
         </s-stack>
       </Form>
     </s-page>

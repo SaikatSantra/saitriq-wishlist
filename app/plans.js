@@ -13,6 +13,15 @@ export const PLANS = [
     trialDays: 0,
   },
   {
+    id: "starter",
+    name: "Starter",
+    price: 5,
+    limit: 5000,
+    description: "For growing stores with active shoppers.",
+    features: ["5,000 wishlist saves per month", "All storefront blocks", "Full analytics", "Priority support"],
+    trialDays: 5,
+  },
+  {
     id: "growth",
     name: "Growth",
     price: 10,

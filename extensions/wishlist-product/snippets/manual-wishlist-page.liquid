@@ -34,23 +34,26 @@ Renders the wishlist page container for the shared wishlist page script.
   data-setting-btn-label="{{ wishlist_button_label | escape }}"
   data-setting-show-atc="{{ wishlist_show_add_to_cart }}"
   data-setting-atc-label="{{ wishlist_add_to_cart_label | escape }}"
-  data-loc-sold-out="Sold out"
-  data-loc-atc-error="Could not add this item to the cart"
-  data-loc-added-cart="Added to cart"
-  data-loc-removed="Removed from wishlist"
-  data-loc-cleared="Wishlist cleared"
+  data-loc-sold-out="{{ 'wishlist.sold_out' | t | default: 'Sold out' | escape }}"
+  data-loc-atc-error="{{ 'wishlist.add_to_cart_error' | t | default: 'Could not add this item to the cart' | escape }}"
+  data-loc-added-cart="{{ 'wishlist.added_to_cart' | t | default: 'Added to cart' | escape }}"
+  data-loc-removed="{{ 'wishlist.removed_from_wishlist' | t | default: 'Removed from wishlist' | escape }}"
+  data-loc-cleared="{{ 'wishlist.wishlist_cleared' | t | default: 'Wishlist cleared' | escape }}"
+  data-loc-limit="{{ 'wishlist.limit_reached' | t | default: 'Monthly wishlist limit reached. Upgrade your plan.' | escape }}"
 >
   <div class="sai-wishlist-page__header">
     <h2 class="wislist-page-title h2">{{ wishlist_heading | escape }}</h2>
     <div class="sai-wishlist-page__actions">
       <button type="button" class="sai-wishlist-page__share button" data-sai-wishlist-share hidden>
-        Share wishlist
+        {{ 'wishlist.share_wishlist' | t | default: 'Share wishlist' }}
       </button>
       <button type="button" class="sai-wishlist-page__clear button" data-sai-wishlist-clear hidden>
-        Clear all
+        {{ 'wishlist.clear_all' | t | default: 'Clear all' }}
       </button>
     </div>
   </div>
+
   <p data-sai-wishlist-empty hidden>{{ wishlist_empty_message | escape }}</p>
+
   <div class="sai-wishlist-page__items" data-sai-wishlist-items></div>
 </section>

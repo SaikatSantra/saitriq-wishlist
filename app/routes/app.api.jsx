@@ -230,7 +230,7 @@ export const action = async ({ request }) => {
       const limit = effectiveLimit(entitlement.planLimit, addonSaves);
       if (Number.isFinite(limit) && used >= limit) {
         return json(
-          { error: "Monthly wishlist limit reached.", used, limit },
+          { error: "Monthly limit reached. Please upgrade your plan.", limitReached: true, used, limit },
           { status: 429 },
         );
       }

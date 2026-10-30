@@ -2,19 +2,39 @@ import { useEffect } from "react";
 import { useLoaderData, useRevalidator } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getAnalyticsHistory } from "../db.wishlist.server";
+import { detectLocale, createTranslator } from "../i18n.server";
 
 const monthKey = () => new Date().toISOString().slice(0, 7);
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const month = monthKey();
+  const locale = detectLocale({ request, session });
+  const t = createTranslator(locale);
+
   const history = await getAnalyticsHistory(session.shop, month);
   const maxAdds = Math.max(1, ...history.map((e) => e.adds));
-  return { month, history, maxAdds };
+
+  return {
+    month,
+    history,
+    maxAdds,
+    locale,
+    translations: {
+      title: t("activity.title"),
+      subtitle: t("activity.subtitle"),
+      dailySavesHeading: t("activity.dailySavesHeading", { month }),
+      noActivityHeading: t("activity.noActivityHeading"),
+      noActivityMessage: t("activity.noActivityMessage"),
+      liveUpdating: t("activity.liveUpdating"),
+      savesLabel: t("activity.savesBadge", { count: "{count}" }),
+      removalsLabel: t("activity.removalsBadge", { count: "{count}" }),
+    },
+  };
 };
 
 export default function WishlistOverview() {
-  const { month, history, maxAdds } = useLoaderData();
+  const { month, history, maxAdds, translations } = useLoaderData();
   const revalidator = useRevalidator();
 
   useEffect(() => {
@@ -22,13 +42,15 @@ export default function WishlistOverview() {
     return () => window.clearInterval(timer);
   }, [revalidator]);
 
-  return (
-    <s-page heading="Wishlist activity">
+  const renderSaves = (count) => translations.savesLabel.replace("{count}", String(count));
+  const renderRemovals = (count) => translations.removalsLabel.replace("{count}", String(count));
 
-      <s-section heading={`Daily saves · ${month}`}>
+  return (
+    <s-page heading={translations.title}>
+      <s-section heading={translations.dailySavesHeading}>
         {history.length === 0 ? (
-          <s-banner tone="info" heading="No activity yet">
-            Daily wishlist saves will appear here after shoppers save products.
+          <s-banner tone="info" heading={translations.noActivityHeading}>
+            {translations.noActivityMessage}
           </s-banner>
         ) : (
           <s-grid gap="small">
@@ -37,9 +59,9 @@ export default function WishlistOverview() {
                 <s-grid gap="small-200">
                   <s-stack direction="inline" gap="base" alignItems="center">
                     <s-text>{entry.day}</s-text>
-                    <s-badge tone="success">{entry.adds} saves</s-badge>
+                    <s-badge tone="success">{renderSaves(entry.adds)}</s-badge>
                     {entry.removes > 0 && (
-                      <s-badge tone="neutral">{entry.removes} removals</s-badge>
+                      <s-badge tone="neutral">{renderRemovals(entry.removes)}</s-badge>
                     )}
                   </s-stack>
                   {/* Bar chart */}
@@ -63,34 +85,6 @@ export default function WishlistOverview() {
           </s-grid>
         )}
       </s-section>
-
-      <s-section heading="Daily breakdown" padding="none">
-        <s-table variant="auto">
-          <s-table-header-row>
-            <s-table-header>Date</s-table-header>
-            <s-table-header format="numeric">Saves</s-table-header>
-            <s-table-header format="numeric">Removals</s-table-header>
-          </s-table-header-row>
-          <s-table-body>
-            {history.length === 0 ? (
-              <s-table-row>
-                <s-table-cell>No data for this month</s-table-cell>
-                <s-table-cell>—</s-table-cell>
-                <s-table-cell>—</s-table-cell>
-              </s-table-row>
-            ) : (
-              history.map((entry) => (
-                <s-table-row key={`table-${entry.day}`}>
-                  <s-table-cell>{entry.day}</s-table-cell>
-                  <s-table-cell>{entry.adds}</s-table-cell>
-                  <s-table-cell>{entry.removes}</s-table-cell>
-                </s-table-row>
-              ))
-            )}
-          </s-table-body>
-        </s-table>
-      </s-section>
-
     </s-page>
   );
 }

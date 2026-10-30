@@ -3,25 +3,39 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { detectLocale, createTranslator } from "../i18n.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  const { session } = await authenticate.admin(request);
+  const locale = detectLocale({ request, session });
+  const t = createTranslator(locale);
+
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    locale,
+    translations: {
+      dashboard: t("nav.dashboard"),
+      activity: t("nav.activity"),
+      design: t("nav.design"),
+      pricing: t("nav.pricing"),
+      setup: t("nav.setup"),
+      apiDocs: t("nav.apiDocs"),
+    },
+  };
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData();
+  const { apiKey, translations } = useLoaderData();
 
   return (
     <AppProvider embedded apiKey={apiKey}>
       <NavMenu>
-        <a href="/app">Dashboard</a>
-        <a href="/app/wishlist">Activity</a>
-        <a href="/app/settings">Design</a>
-        <a href="/app/pricing">Pricing</a>
-        <a href="/app/how-to-use">Setup</a>
-        <a href="/app/api-docs">Developer API</a>
+        <a href="/app">{translations?.dashboard || "Dashboard"}</a>
+        <a href="/app/wishlist">{translations?.activity || "Activity"}</a>
+        <a href="/app/settings">{translations?.design || "Design"}</a>
+        <a href="/app/pricing">{translations?.pricing || "Pricing"}</a>
+        <a href="/app/how-to-use">{translations?.setup || "Setup"}</a>
+        <a href="/app/api-docs">{translations?.apiDocs || "Developer API"}</a>
       </NavMenu>
       <Outlet />
     </AppProvider>

@@ -1,0 +1,31 @@
+{
+  "wishlist": {
+    "add_to_wishlist": "Ajouter à la liste d'envies",
+    "saved": "Enregistré",
+    "remove_from_wishlist": "Retirer de la liste d'envies",
+    "added_to_wishlist": "Ajouté à la liste d'envies",
+    "removed_from_wishlist": "Retiré de la liste d'envies",
+    "wishlist_cleared": "Liste d'envies effacée",
+    "limit_reached": "Limite mensuelle atteinte. Veuillez mettre à niveau votre forfait.",
+    "temporarily_unavailable": "La liste d'envies est temporairement indisponible. Veuillez réessayer.",
+    "sold_out": "Épuisé",
+    "added_to_cart": "Ajouté au panier",
+    "add_to_cart_error": "Impossible d'ajouter cet article au panier.",
+    "saved_items": "Articles enregistrés",
+    "nothing_saved_yet": "Aucun article enregistré pour le moment.",
+    "share_wishlist": "Partager la liste d'envies",
+    "clear_all": "Tout effacer",
+    "login_required": "Veuillez vous connecter pour enregistrer des articles.",
+    "view_wishlist": "Voir la liste d'envies",
+    "wishlist_title": "Liste d'envies"
+  },
+  "ratings": {
+    "stars": {
+      "label": "Évaluations"
+    },
+    "home": {
+      "recommendationText": "Produit recommandé !"
+    }
+  }
+}
+
