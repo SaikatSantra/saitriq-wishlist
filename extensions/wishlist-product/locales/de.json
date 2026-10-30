@@ -1,0 +1,31 @@
+{
+  "wishlist": {
+    "add_to_wishlist": "Auf den Wunschzettel",
+    "saved": "Gespeichert",
+    "remove_from_wishlist": "Vom Wunschzettel entfernen",
+    "added_to_wishlist": "Zum Wunschzettel hinzugefügt",
+    "removed_from_wishlist": "Vom Wunschzettel entfernt",
+    "wishlist_cleared": "Wunschzettel geleert",
+    "limit_reached": "Monatliches Limit erreicht. Bitte Tarif upgraden.",
+    "temporarily_unavailable": "Wunschzettel ist vorübergehend nicht verfügbar. Bitte erneut versuchen.",
+    "sold_out": "Ausverkauft",
+    "added_to_cart": "In den Warenkorb gelegt",
+    "add_to_cart_error": "Artikel konnte nicht in den Warenkorb gelegt werden.",
+    "saved_items": "Gespeicherte Artikel",
+    "nothing_saved_yet": "Noch keine Artikel gespeichert.",
+    "share_wishlist": "Wunschzettel teilen",
+    "clear_all": "Alle löschen",
+    "login_required": "Bitte melden Sie sich an, um Artikel zu speichern.",
+    "view_wishlist": "Wunschzettel ansehen",
+    "wishlist_title": "Wunschzettel"
+  },
+  "ratings": {
+    "stars": {
+      "label": "Bewertungen"
+    },
+    "home": {
+      "recommendationText": "Empfohlenes Produkt!"
+    }
+  }
+}
+

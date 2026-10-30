@@ -1,6 +1,33 @@
+import { useLoaderData } from "react-router";
+import { authenticate } from "../shopify.server";
+import { detectLocale, createTranslator } from "../i18n.server";
+export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const locale = detectLocale({ request, session });
+  const t = createTranslator(locale);
+
+  return {
+    locale,
+    i18n: {
+      title: t("apiDocs.title"),
+      subtitle: t("apiDocs.subtitle"),
+      overviewTitle: t("apiDocs.overviewTitle"),
+      overviewDesc: t("apiDocs.overviewDesc"),
+      statusCodesTitle: t("apiDocs.statusCodesTitle"),
+      code200: t("apiDocs.code200"),
+      code400: t("apiDocs.code400"),
+      code401: t("apiDocs.code401"),
+      code404: t("apiDocs.code404"),
+      code429: t("apiDocs.code429"),
+      code429Desc: t("apiDocs.code429Desc"),
+    },
+  };
+};
+
 export default function ApiDocsPage() {
+  const { i18n } = useLoaderData() || {};
   return (
-    <s-page heading="Developer API">
+    <s-page heading={i18n?.title || "Developer API"}>
       <style>{`
         .api-code-block > code {
           background-color: #1e1e1e;
@@ -18,7 +45,7 @@ export default function ApiDocsPage() {
           white-space: pre;
         }
       `}</style>
-      <s-section heading="Overview">
+      <s-section heading={i18n?.overviewTitle || "Overview"}>
         <s-paragraph>
           Saitriq Wishlist exposes a storefront app proxy and an authenticated
           embedded-app API. The app proxy is called from the shop storefront. The

@@ -68,13 +68,13 @@ button.sai-wishlist.button--tertiary {
 }
 
 .sai-wishlist--collection-top-left {
-    right: 0;
+    right: auto;
     left: 0.75rem;
 }
 
 .sai-wishlist--collection-top-right {
     right: 0.75rem;
-    left: 0;
+    left: auto;
 }
 
 .sai-wishlist--collection-bottom-left {

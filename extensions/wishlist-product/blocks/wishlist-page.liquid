@@ -38,15 +38,16 @@
   data-loc-added-cart="{{ 'wishlist.added_to_cart' | t | escape }}"
   data-loc-removed="{{ 'wishlist.removed_from_wishlist' | t | escape }}"
   data-loc-cleared="{{ 'wishlist.wishlist_cleared' | t | escape }}"
+  data-loc-limit="{{ 'wishlist.limit_reached' | t | escape }}"
 >
   <div class="sai-wishlist-page__header">
     <h2 class="wislist-page-title h2">{{ block.settings.heading }}</h2>
     <div class="sai-wishlist-page__actions">
       <button type="button" class="sai-wishlist-page__share button" data-sai-wishlist-share hidden>
-        Share wishlist
+        {{ 'wishlist.share_wishlist' | t | default: 'Share wishlist' }}
       </button>
       <button type="button" class="sai-wishlist-page__clear button" data-sai-wishlist-clear hidden>
-        Clear all
+        {{ 'wishlist.clear_all' | t | default: 'Clear all' }}
       </button>
     </div>
   </div>

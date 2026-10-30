@@ -130,6 +130,9 @@
           });
 
           const data = await res.json().catch(() => ({}));
+          if (res.status === 429 || data.limitReached) {
+            return { limitReached: true, error: data.error };
+          }
           if (res.ok && data.tracked) return data;
         } catch {}
 
@@ -138,7 +141,12 @@
 
       const sync = async (operation, item) => {
         if (!customerAuthenticated) {
-          await trackGuest(operation, item);
+          const guestResult = await trackGuest(operation, item);
+          if (operation === 'add' && guestResult?.limitReached) {
+            window.saitriqWishlistToast?.({ message: guestResult.error || locLimit });
+            refresh();
+            return getWishlist();
+          }
           return persistLocalFallback(operation, item);
         }
 
@@ -153,26 +161,20 @@
           })
         });
 
-        if (res.status === 429) {
-          const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({}));
 
+        if (res.status === 429 || data.limitReached) {
           if (operation === 'remove' || operation === 'clear') {
             window.saitriqWishlistToast?.({ message: locRemoved });
             return getWishlist();
           }
 
           window.saitriqWishlistToast?.({ message: data.error || locLimit });
+          refresh();
           return getWishlist();
         }
 
-        if (!res.ok) {
-          customerAuthenticated = false;
-          return persistLocalFallback(operation, item);
-        }
-
-        const data = await res.json();
-
-        if (!Array.isArray(data.items)) {
+        if (!res.ok || !Array.isArray(data.items)) {
           customerAuthenticated = false;
           return persistLocalFallback(operation, item);
         }
@@ -208,7 +210,7 @@
           const res = await fetch(syncEndpoint, { credentials: 'same-origin' });
           if (!res.ok) return;
 
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           customerAuthenticated = data.authenticated === true;
 
           if (!data.authenticated || !Array.isArray(data.items)) return;

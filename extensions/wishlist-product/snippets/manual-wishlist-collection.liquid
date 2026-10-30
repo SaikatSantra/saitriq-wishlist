@@ -4,17 +4,17 @@ Renders the collection-card wishlist button template for the shared app script.
 
 <template
   data-sai-collection-tpl
-  data-label-add="Add to wishlist"
-  data-label-remove="Remove from wishlist"
-  data-msg-added="Added to wishlist"
-  data-msg-removed="Removed from wishlist"
-  data-msg-limit="Wishlist limit reached"
+  data-label-add="{{ 'wishlist.add_to_wishlist' | t | default: 'Add to wishlist' | escape }}"
+  data-label-remove="{{ 'wishlist.remove_from_wishlist' | t | default: 'Remove from wishlist' | escape }}"
+  data-msg-added="{{ 'wishlist.added_to_wishlist' | t | default: 'Added to wishlist' | escape }}"
+  data-msg-removed="{{ 'wishlist.removed_from_wishlist' | t | default: 'Removed from wishlist' | escape }}"
+  data-msg-limit="{{ 'wishlist.limit_reached' | t | default: 'Monthly wishlist limit reached. Upgrade your plan.' | escape }}"
 >
   <button
     type="button"
     class="sai-wishlist sai-wishlist--collection sai-wishlist--collection-top-right"
     data-sai-collection-wishlist
-    aria-label="Add to wishlist"
+    aria-label="{{ 'wishlist.add_to_wishlist' | t | default: 'Add to wishlist' | escape }}"
   >
     <span class="sai-wishlist__icon sai-wishlist__icon--default" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em">

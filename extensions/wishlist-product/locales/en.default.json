@@ -12,7 +12,12 @@
     "added_to_cart": "Added to cart",
     "add_to_cart_error": "Could not add this item to the cart. Please try again.",
     "saved_items": "Saved items",
-    "nothing_saved_yet": "Nothing saved yet."
+    "nothing_saved_yet": "Nothing saved yet.",
+    "share_wishlist": "Share wishlist",
+    "clear_all": "Clear all",
+    "login_required": "Please log in to save items to your wishlist.",
+    "view_wishlist": "View wishlist",
+    "wishlist_title": "Wishlist"
   },
   "ratings": {
     "stars": {

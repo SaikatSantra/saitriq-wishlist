@@ -228,7 +228,8 @@ export const action = async ({ request }) => {
       const used = await currentUsage(shop, month);
       if (Number.isFinite(limit) && used >= limit) {
         return json({
-          error: "This store has reached its monthly wishlist limit.",
+          error: "Monthly limit reached. Please upgrade your plan.",
+          limitReached: true,
           usage: { used, limit, remaining: 0 },
         }, { status: 429 });
       }
