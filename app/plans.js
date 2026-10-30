@@ -19,7 +19,7 @@ export const PLANS = [
     limit: 5000,
     description: "For growing stores with active shoppers.",
     features: ["5,000 wishlist saves per month", "All storefront blocks", "Full analytics", "Priority support"],
-    trialDays: 5,
+    trialDays: 7,
   },
   {
     id: "growth",

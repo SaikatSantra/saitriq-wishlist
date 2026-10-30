@@ -6,7 +6,7 @@
     "added_to_wishlist": "Aggiunto alla lista desideri",
     "removed_from_wishlist": "Rimosso dalla lista desideri",
     "wishlist_cleared": "Lista desideri svuotata",
-    "limit_reached": "Limite mensile raggiunto. Effettua l'upgrade del piano.",
+    "limit_reached": "La lista dei desideri è temporaneamente non disponibile",
     "temporarily_unavailable": "La lista desideri è momentaneamente non disponibile. Riprova più tardi.",
     "sold_out": "Esaurito",
     "added_to_cart": "Aggiunto al carrello",
@@ -28,4 +28,3 @@
     }
   }
 }
-

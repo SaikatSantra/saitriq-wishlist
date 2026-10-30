@@ -30,7 +30,7 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <NavMenu>
-        <a href="/app">{translations?.dashboard || "Dashboard"}</a>
+        <a href="/app" rel="home">{translations?.dashboard || "Dashboard"}</a>
         <a href="/app/wishlist">{translations?.activity || "Activity"}</a>
         <a href="/app/settings">{translations?.design || "Design"}</a>
         <a href="/app/pricing">{translations?.pricing || "Pricing"}</a>

@@ -39,7 +39,7 @@ Renders the wishlist page container for the shared wishlist page script.
   data-loc-added-cart="{{ 'wishlist.added_to_cart' | t | default: 'Added to cart' | escape }}"
   data-loc-removed="{{ 'wishlist.removed_from_wishlist' | t | default: 'Removed from wishlist' | escape }}"
   data-loc-cleared="{{ 'wishlist.wishlist_cleared' | t | default: 'Wishlist cleared' | escape }}"
-  data-loc-limit="{{ 'wishlist.limit_reached' | t | default: 'Monthly wishlist limit reached. Upgrade your plan.' | escape }}"
+  data-loc-limit="{{ 'wishlist.limit_reached' | t | default: 'Wishlist is temporarily unavailable' | escape }}"
 >
   <div class="sai-wishlist-page__header">
     <h2 class="wislist-page-title h2">{{ wishlist_heading | escape }}</h2>

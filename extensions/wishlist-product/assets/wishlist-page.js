@@ -139,6 +139,12 @@
           return;
         }
         const data = await response.json();
+        if (data.limitReached || data.stopped) {
+          window.saitriqWishlistStopped = true;
+          localStorage.setItem(storageKey, '[]');
+          render();
+          return;
+        }
         customerAuthenticated = data.authenticated === true;
         applySettings(data);
         
@@ -349,6 +355,12 @@
           body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, variantId: item.variantId || '', productHandle: item.handle, productTitle: item.title, productImage: item.image })
         });
         
+        if (response.status === 429) {
+          window.saitriqWishlistStopped = true;
+          localStorage.setItem(storageKey, '[]');
+          render();
+          return;
+        }
         if (!response.ok) throw new Error('Wishlist remove request failed');
         const data = await response.json();
         if (!Array.isArray(data.items)) throw new Error('Wishlist remove response was invalid');
@@ -395,6 +407,7 @@
     };
 
     clearButton.addEventListener('click', async () => {
+      if (window.saitriqWishlistStopped) return;
       if (clearButton.disabled || getItems().length === 0) return;
       clearButton.disabled = true;
       localRevision += 1;
