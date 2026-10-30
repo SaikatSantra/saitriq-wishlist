@@ -42,18 +42,35 @@ Renders the wishlist page container for the shared wishlist page script.
   data-loc-limit="{{ 'wishlist.limit_reached' | t | default: 'Wishlist is temporarily unavailable' | escape }}"
 >
   <div class="sai-wishlist-page__header">
-    <h2 class="wislist-page-title h2">{{ wishlist_heading | escape }}</h2>
+    <div class="sai-wishlist-page__title-wrap">
+      <h1 class="wislist-page-title">{{ wishlist_heading | escape }}</h1>
+      <span class="sai-wishlist-page__count-badge" data-sai-wishlist-page-count></span>
+    </div>
     <div class="sai-wishlist-page__actions">
-      <button type="button" class="sai-wishlist-page__share button" data-sai-wishlist-share hidden>
-        {{ 'wishlist.share_wishlist' | t | default: 'Share wishlist' }}
+      <button type="button" class="sai-wishlist-page__share" data-sai-wishlist-share hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+        <span>{{ 'wishlist.share_wishlist' | t | default: 'Share' }}</span>
       </button>
-      <button type="button" class="sai-wishlist-page__clear button" data-sai-wishlist-clear hidden>
-        {{ 'wishlist.clear_all' | t | default: 'Clear all' }}
+      <button type="button" class="sai-wishlist-page__clear" data-sai-wishlist-clear hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        <span>{{ 'wishlist.clear_all' | t | default: 'Clear all' }}</span>
       </button>
     </div>
   </div>
 
-  <p data-sai-wishlist-empty hidden>{{ wishlist_empty_message | escape }}</p>
+  <div class="sai-wishlist-page__empty-container" data-sai-wishlist-empty hidden>
+    <div class="sai-wishlist-page__empty-icon">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#FE847F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+      </svg>
+    </div>
+    <h3 class="sai-wishlist-page__empty-title">{{ wishlist_empty_message | escape }}</h3>
+    <p class="sai-wishlist-page__empty-subtitle">Save your favorite products while you shop and find them all in one place.</p>
+    <a href="/collections/all" class="sai-wishlist-page__empty-btn">
+      <span>Explore Products</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+    </a>
+  </div>
 
   <div class="sai-wishlist-page__items" data-sai-wishlist-items></div>
 </section>

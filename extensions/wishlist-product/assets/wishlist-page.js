@@ -1,33 +1,39 @@
 (() => {
   const whenEmbedReady = (fn) => {
     if (window.saitriqEmbedEnabled) { fn(); return; }
-    document.addEventListener('saitriq:embed-ready', fn, { once: true });
+    let done = false;
+    const runOnce = () => {
+      if (done) return;
+      done = true;
+      fn();
+    };
+    document.addEventListener('saitriq:embed-ready', runOnce, { once: true });
+    setTimeout(runOnce, 800);
   };
 
   whenEmbedReady(() => {
     const page = document.querySelector('[data-sai-wishlist-page]');
     if (!page) return;
 
-    page.hidden = false; // Reveal page — embed is confirmed enabled
+    page.hidden = false; // Reveal page — embed confirmed enabled
 
     const storageKey = 'saitriq_wishlist';
     const visitorStorageKey = 'saitriq_wishlist_visitor';
     const syncEndpoint = '/apps/saitriq-wishlist';
     let localRevision = 0;
-    let customerAuthenticated = false;    
+    let customerAuthenticated = false;
 
     // Read settings & localized strings from HTML dataset
-    console.log('wishlist-page.js: reading settings from dataset', page.dataset);
     let settings = {
-      heading: page.dataset.settingHeading || '',
-      emptyMessage: page.dataset.settingEmptyMsg || '',
-      columns: Number(page.dataset.settingColumns) || 3,
-      showPrices: page.dataset.settingShowPrices === 'true',
-      showRemove: page.dataset.settingShowRemove === 'true',
+      heading: page.dataset.settingHeading || 'My Wishlist',
+      emptyMessage: page.dataset.settingEmptyMsg || 'Your wishlist is empty',
+      columns: Number(page.dataset.settingColumns) || 4,
+      showPrices: page.dataset.settingShowPrices !== 'false',
+      showRemove: page.dataset.settingShowRemove !== 'false',
       buttonLabel: page.dataset.settingBtnLabel || 'Remove',
       showAddToCart: page.dataset.settingShowAtc === 'true',
       addToCartLabel: page.dataset.settingAtcLabel || 'Add to cart',
-      cardClass: 'sai-wishlist-page__item',
+      cardClass: '',
       customCss: ''
     };
 
@@ -43,8 +49,8 @@
     const emptyMessage = page.querySelector('[data-sai-wishlist-empty]');
     const clearButton = page.querySelector('[data-sai-wishlist-clear]');
     const shareButton = page.querySelector('[data-sai-wishlist-share]');
-    
-    if (!itemsContainer || !emptyMessage || !clearButton) return;
+
+    if (!itemsContainer || !emptyMessage) return;
 
     const getItems = () => {
       try {
@@ -68,7 +74,7 @@
       const items = getItems();
       const itemId = String(item.productId || item.id || '');
       const index = items.findIndex((saved) => String(saved.id) === itemId);
-      
+
       if (operation === 'add' && itemId && index < 0) {
         items.push({
           id: itemId,
@@ -80,8 +86,9 @@
         });
       }
       if (operation === 'remove' && index >= 0) items.splice(index, 1);
-      
+
       localStorage.setItem(storageKey, JSON.stringify(items));
+      window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
       render();
       return items;
     };
@@ -96,10 +103,7 @@
         });
         const data = await response.json().catch(() => ({}));
         if (response.ok && data.tracked === true) return;
-        console.warn('Wishlist analytics tracking unavailable', response.status, data.error || '');
-      } catch (error) {
-        console.warn('Wishlist analytics tracking unavailable', error);
-      }
+      } catch (error) {}
     };
 
     const applySettings = (data) => {
@@ -133,12 +137,11 @@
       const syncRun = (async () => {
         const response = await fetch(syncEndpoint, { credentials: 'same-origin' });
         if (!response.ok) {
-          console.warn('Wishlist proxy unavailable during sync; using local storage fallback.', response.status);
           await loadAppSettings();
           render();
           return;
         }
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         if (data.limitReached || data.stopped) {
           window.saitriqWishlistStopped = true;
           localStorage.setItem(storageKey, '[]');
@@ -147,7 +150,7 @@
         }
         customerAuthenticated = data.authenticated === true;
         applySettings(data);
-        
+
         if (!data.authenticated || !Array.isArray(data.items)) {
           if (!data.settings) await loadAppSettings();
           render();
@@ -194,7 +197,7 @@
           variantAvailable: variant?.available === true,
         };
       };
-      
+
       if (_productDataCache.has(handle)) return resolveVariant(_productDataCache.get(handle));
       try {
         const res = await fetch(`/products/${encodeURIComponent(handle)}.js`);
@@ -203,38 +206,6 @@
         _productDataCache.set(handle, p);
         return resolveVariant(p);
       } catch { return null; }
-    };
-
-    const buildActions = (item, productData, existingRemoveButton = null) => {
-      const actions = document.createElement('div');
-      actions.className = 'sai-wishlist-page__card-actions';
-
-      if (settings.showAddToCart && productData?.variantId) {
-        const form = document.createElement('form');
-        form.className = 'sai-wishlist-page__atc-form';
-        form.action = '/cart/add';
-        form.method = 'post';
-        form.innerHTML = `<input type="hidden" name="id"><input type="hidden" name="quantity" value="1"><button type="submit" name="add" class="sai-wishlist-page__add-to-cart button">${esc(settings.addToCartLabel)}</button>`;
-        form.querySelector('[name="id"]').value = productData.variantId;
-        
-        const addButton = form.querySelector('button');
-        addButton.disabled = !productData.variantAvailable;
-        if (!productData.variantAvailable) addButton.textContent = locales.soldOut;
-        actions.append(form);
-      }
-
-      if (settings.showRemove) {
-        const removeButton = existingRemoveButton || document.createElement('button');
-        removeButton.type = 'button';
-        removeButton.classList.add('sai-wishlist-page__remove');
-        if (!removeButton.textContent.trim()) removeButton.textContent = settings.buttonLabel;
-        removeButton.addEventListener('click', () => handleRemove(item, removeButton));
-        actions.append(removeButton);
-      } else if (existingRemoveButton) {
-        existingRemoveButton.hidden = true;
-      }
-
-      return actions;
     };
 
     const refreshCartUi = (cartData) => {
@@ -296,24 +267,54 @@
 
     const buildCard = async (item) => {
       const productData = await fetchProductData(item.handle, item.variantId);
-      
+
       const card = document.createElement('div');
-      card.className = `sai-wishlist-page__item product-grid__item ${settings.cardClass || ''}`.trim();
+      card.className = `sai-wishlist-page__item ${settings.cardClass || ''}`.trim();
       card.innerHTML = `
-        <a href="/products/${encodeURIComponent(item.handle)}">
-          <img data-sai-wishlist-image alt="" loading="lazy">
-        </a>
+        <div class="sai-wishlist-page__media">
+          <a href="/products/${encodeURIComponent(item.handle)}" class="sai-wishlist-page__img-link">
+            <img data-sai-wishlist-image alt="${esc(item.title) || 'Product'}" loading="lazy">
+          </a>
+          <button type="button" class="sai-wishlist-page__card-remove" aria-label="Remove from wishlist" title="Remove">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
         <div class="sai-wishlist-page__info">
           <a class="sai-wishlist-page__title" href="/products/${encodeURIComponent(item.handle)}">${esc(item.title) || 'Product'}</a>
           ${productData?.variantTitle && productData.variantTitle !== 'Default Title' ? `<div class="sai-wishlist-page__variant">${esc(productData.variantTitle)}</div>` : ''}
           ${settings.showPrices && item.price ? `<div class="sai-wishlist-page__price">${esc(item.price)}</div>` : ''}
+          <div class="sai-wishlist-page__card-actions">
+            ${
+              settings.showAddToCart && productData?.variantId
+                ? `<form class="sai-wishlist-page__atc-form" action="/cart/add" method="post">
+                    <input type="hidden" name="id" value="${productData.variantId}">
+                    <input type="hidden" name="quantity" value="1">
+                    <button type="submit" name="add" class="sai-wishlist-page__add-to-cart" ${!productData.variantAvailable ? 'disabled' : ''}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                      <span>${!productData.variantAvailable ? esc(locales.soldOut) : esc(settings.addToCartLabel || 'Add to cart')}</span>
+                    </button>
+                  </form>`
+                : `<a href="/products/${encodeURIComponent(item.handle)}" class="sai-wishlist-page__view-btn">View Product</a>`
+            }
+          </div>
         </div>
       `;
-      
+
+      const removeBtn = card.querySelector('.sai-wishlist-page__card-remove');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleRemove(item, removeBtn);
+        });
+      }
+
       const image = card.querySelector('[data-sai-wishlist-image]');
-      image.alt = item.title || 'Product';
       image.src = item.image || `/products/${encodeURIComponent(item.handle)}.js`;
-      
+
       image.addEventListener('error', async () => {
         if (image.dataset.fallbackAttempted) return;
         image.dataset.fallbackAttempted = 'true';
@@ -323,12 +324,9 @@
           const product = await response.json();
           const fallback = product.featured_image || product.images?.[0];
           if (fallback) image.src = fallback;
-        } catch (error) {
-          console.error('Wishlist image fallback failed', error);
-        }
+        } catch (error) {}
       }, { once: true });
-      
-      card.querySelector('.sai-wishlist-page__info').append(buildActions(item, productData));
+
       return card;
     };
 
@@ -338,23 +336,35 @@
       try {
         if (!customerAuthenticated) {
           await trackGuest('remove', {
-            productId: item.id, productHandle: item.handle,
+            productId: item.id,
+            productHandle: item.handle,
             variantId: item.variantId || '',
-            productTitle: item.title, productImage: item.image
+            productTitle: item.title,
+            productImage: item.image
           });
-          localStorage.setItem(storageKey, JSON.stringify(getItems().filter((s) => !(String(s.id) === String(item.id) && String(s.variantId || '') === String(item.variantId || '')))));
+          const nextItems = getItems().filter((s) => !(String(s.id) === String(item.id) && String(s.variantId || '') === String(item.variantId || '')));
+          localStorage.setItem(storageKey, JSON.stringify(nextItems));
           window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
           window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: locales.removed } }));
+          render();
           return;
         }
-        
+
         const response = await fetch(syncEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ operation: 'remove', visitorId: getVisitorId(), productId: item.id, variantId: item.variantId || '', productHandle: item.handle, productTitle: item.title, productImage: item.image })
+          body: JSON.stringify({
+            operation: 'remove',
+            visitorId: getVisitorId(),
+            productId: item.id,
+            variantId: item.variantId || '',
+            productHandle: item.handle,
+            productTitle: item.title,
+            productImage: item.image
+          })
         });
-        
+
         if (response.status === 429) {
           window.saitriqWishlistStopped = true;
           localStorage.setItem(storageKey, '[]');
@@ -364,15 +374,24 @@
         if (!response.ok) throw new Error('Wishlist remove request failed');
         const data = await response.json();
         if (!Array.isArray(data.items)) throw new Error('Wishlist remove response was invalid');
-        
-        const serverItems = data.items.map((s) => ({ id: s.productId, variantId: s.variantId || '', variantTitle: s.variantTitle || '', handle: s.productHandle, title: s.productTitle, image: s.productImage || '', price: s.productPrice || '', addedAt: s.createdAt }));
+
+        const serverItems = data.items.map((s) => ({
+          id: s.productId,
+          variantId: s.variantId || '',
+          variantTitle: s.variantTitle || '',
+          handle: s.productHandle,
+          title: s.productTitle,
+          image: s.productImage || '',
+          price: s.productPrice || '',
+          addedAt: s.createdAt
+        }));
         localStorage.setItem(storageKey, JSON.stringify(serverItems));
-        
+
         window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
         window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', { detail: { message: locales.removed } }));
+        render();
       } catch (error) {
-        emptyMessage.textContent = error.message;
-        emptyMessage.hidden = false;
+        console.error('Wishlist remove failed', error);
       } finally {
         removeButton.disabled = false;
       }
@@ -386,13 +405,25 @@
       render._pending = true;
       try {
         const items = getItems();
-        page.querySelector('h2').textContent = settings.heading;
-        emptyMessage.textContent = settings.emptyMessage;
+        const titleEl = page.querySelector('.wislist-page-title');
+        if (titleEl) titleEl.textContent = settings.heading || 'My Wishlist';
+
+        const countBadge = page.querySelector('[data-sai-wishlist-page-count]');
+        if (countBadge) {
+          countBadge.textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
+          countBadge.hidden = items.length === 0;
+        }
+
+        const emptyTitle = emptyMessage.querySelector('.sai-wishlist-page__empty-title');
+        if (emptyTitle && settings.emptyMessage) {
+          emptyTitle.textContent = settings.emptyMessage;
+        }
+
         itemsContainer.style.setProperty('--sai-wishlist-columns', settings.columns);
         itemsContainer.replaceChildren();
-        
+
         emptyMessage.hidden = items.length > 0;
-        clearButton.hidden = items.length === 0;
+        if (clearButton) clearButton.hidden = items.length === 0;
         if (shareButton) shareButton.hidden = items.length === 0;
 
         const cards = await Promise.all(items.map((item) => buildCard(item)));
@@ -406,54 +437,46 @@
       }
     };
 
-    clearButton.addEventListener('click', async () => {
-      if (window.saitriqWishlistStopped) return;
-      if (clearButton.disabled || getItems().length === 0) return;
-      clearButton.disabled = true;
-      localRevision += 1;
-      try {
-        if (!customerAuthenticated) {
-          await trackGuest('clear');
-          localStorage.setItem(storageKey, '[]');
+    if (clearButton) {
+      clearButton.addEventListener('click', async () => {
+        if (window.saitriqWishlistStopped) return;
+        if (clearButton.disabled || getItems().length === 0) return;
+        clearButton.disabled = true;
+        localRevision += 1;
+        try {
+          if (!customerAuthenticated) {
+            await trackGuest('clear');
+            localStorage.setItem(storageKey, '[]');
+            window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+            window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+              detail: { message: locales.cleared }
+            }));
+            render();
+            return;
+          }
+
+          const response = await fetch(syncEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ operation: 'clear', visitorId: getVisitorId() })
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.authenticated || !Array.isArray(data.items)) {
+            throw new Error(data.error || 'Wishlist clear request failed');
+          }
+
+          localStorage.setItem(storageKey, JSON.stringify([]));
           window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
-            detail: { message: locales.cleared }
-          }));
-          return;
+          render();
+        } catch (error) {
+          console.error('Clear failed', error);
+        } finally {
+          clearButton.disabled = false;
         }
-        
-        const response = await fetch(syncEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ operation: 'clear', visitorId: getVisitorId() })
-        });
-        
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.authenticated || !Array.isArray(data.items)) {
-          console.error('Wishlist clear proxy request failed', { status: response.status, body: data });
-          throw new Error(data.error || 'Wishlist clear request failed');
-        }
-        
-        localStorage.setItem(storageKey, JSON.stringify(data.items.map((item) => ({
-          id: item.productId,
-          variantId: item.variantId || '',
-          variantTitle: item.variantTitle || '',
-          handle: item.productHandle,
-          title: item.productTitle,
-          image: item.productImage || '',
-          price: item.productPrice || '',
-          addedAt: item.createdAt
-        }))));
-        
-        window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
-      } catch (error) {
-        emptyMessage.textContent = error.message;
-        emptyMessage.hidden = false;
-      } finally {
-        clearButton.disabled = false;
-      }
-    });
+      });
+    }
 
     const buildShareUrl = () => {
       const items = getItems();
@@ -525,11 +548,10 @@
     render();
     loadAppSettings().catch(() => {}).then(render);
     if (!isSharedView) syncItems().catch(() => {});
-    
+
     window.addEventListener('saitriq:wishlist-updated', render);
     window.addEventListener('storage', (event) => {
       if (event.key === storageKey) render();
     });
-
-  }); 
+  });
 })();
