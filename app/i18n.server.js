@@ -1021,6 +1021,19 @@ export const TRANSLATIONS = {
   },
 };
 
+import { I18N_ADDITIONS } from "./i18n-additions.js";
+
+for (const [locale, sections] of Object.entries(I18N_ADDITIONS)) {
+  if (TRANSLATIONS[locale]) {
+    for (const [section, keys] of Object.entries(sections)) {
+      TRANSLATIONS[locale][section] = {
+        ...(TRANSLATIONS[locale][section] || {}),
+        ...keys,
+      };
+    }
+  }
+}
+
 // Aliases for Portuguese
 TRANSLATIONS.pt = TRANSLATIONS["pt-BR"];
 

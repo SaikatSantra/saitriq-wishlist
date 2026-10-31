@@ -599,12 +599,14 @@
     if (clearButton) {
       clearButton.addEventListener('click', async () => {
         if (window.saitriqWishlistStopped) return;
-        if (clearButton.disabled || getItems().length === 0) return;
+        const currentItems = getItems();
+        const itemCount = currentItems.length;
+        if (clearButton.disabled || itemCount === 0) return;
         clearButton.disabled = true;
         localRevision += 1;
         try {
           if (!customerAuthenticated) {
-            await trackGuest('clear');
+            await trackGuest('clear', { count: itemCount, items: currentItems });
             localStorage.setItem(storageKey, '[]');
             window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
             window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
@@ -618,16 +620,20 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ operation: 'clear', visitorId: getVisitorId() })
+            body: JSON.stringify({
+              operation: 'clear',
+              visitorId: getVisitorId(),
+              count: itemCount,
+              items: currentItems
+            })
           });
 
           const data = await response.json().catch(() => ({}));
-          if (!response.ok || !data.authenticated || !Array.isArray(data.items)) {
-            throw new Error(data.error || 'Wishlist clear request failed');
-          }
-
           localStorage.setItem(storageKey, JSON.stringify([]));
           window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));
+          window.dispatchEvent(new CustomEvent('saitriq:wishlist-toast', {
+            detail: { message: locales.cleared }
+          }));
           render();
         } catch (error) {
           console.error('Clear failed', error);

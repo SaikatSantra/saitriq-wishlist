@@ -156,13 +156,13 @@ export const loader = async ({ request }) => {
         ? new Date(Date.now() + sub.trialDays * 86400000).toISOString()
         : null,
       currentPeriodEnd: sub.currentPeriodEnd ?? null,
-      isDowngrade,
+      isDowngrade: false,
       previousPlanId: currentEntitlement.planId,
       purchaseType: requestedChangeType === "extra" ? "extra" : "base",
     });
     console.log("[BILLING] Plan activated:", planId, "for shop:", authenticatedShop);
 
-    return pricingRedirect({ [isDowngrade ? "scheduled" : "activated"]: "1" });
+    return pricingRedirect({ activated: "1" });
   } catch (err) {
     console.error("[BILLING] Error:", err.message);
     try {

@@ -206,6 +206,11 @@ export const recordMonthlyPlanPurchase = async (
   billingId,
   purchaseType = "base",
 ) => {
+  if (purchaseType === "base") {
+    await prisma.monthlyPlanPurchase.deleteMany({
+      where: { shop, month: monthKey(), purchaseType: "base" },
+    });
+  }
   await prisma.monthlyPlanPurchase.upsert({
     where: { billingId },
     create: {
@@ -215,7 +220,10 @@ export const recordMonthlyPlanPurchase = async (
       billingId,
       purchaseType,
     },
-    update: {},
+    update: {
+      planId,
+      purchaseType,
+    },
   });
 };
 
@@ -465,6 +473,9 @@ export const activateSubscription = async (
   });
 
   await prisma.scheduledPlanChange.deleteMany({ where: { shop } });
+  if (purchaseType === "base") {
+    await prisma.monthlyPlanPurchase.deleteMany({ where: { shop, month: monthKey(), purchaseType: "base" } });
+  }
   await recordMonthlyPlanPurchase(shop, planId, subscriptionId, purchaseType);
   await recordPlanPurchaseHistory({
     shop,
@@ -520,6 +531,224 @@ export const getActivePlan = async (shop, admin = null) => {
     return resolvePlanEntitlement({ activePlanId, month, scheduled, purchases });
   };
 
+/**
+ * Retrieve comprehensive plan purchase and billing details for a shop,
+ * including active subscription status, purchase date, renewal/end date,
+ * and a full month-wise breakdown of plan usage.
+ */
+export const getSubscriptionBillingDetails = async (shop, admin = null) => {
+  const currentMonth = monthKey();
+
+  // If active subscription record is missing in DB and admin is provided, try sync
+  let activeSub = await prisma.activeSubscription.findUnique({ where: { shop } });
+  if (!activeSub && admin) {
+    try {
+      await syncSubscriptionFromShopify(admin, shop);
+      activeSub = await prisma.activeSubscription.findUnique({ where: { shop } });
+    } catch (e) {
+      console.warn("Could not sync subscription from Shopify:", e?.message);
+    }
+  }
+
+  const [scheduledChange, historyRows, monthlyPurchases, addonPurchases] = await Promise.all([
+    prisma.scheduledPlanChange.findUnique({ where: { shop } }),
+    prisma.planPurchaseHistory.findMany({
+      where: { shop },
+      orderBy: { occurredAt: "desc" },
+      take: 50,
+    }),
+    prisma.monthlyPlanPurchase.findMany({
+      where: { shop },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.addonPurchase.findMany({
+      where: { shop },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  const entitlement = await getPlanEntitlement(shop, currentMonth, admin);
+  const planId = entitlement.planId || activeSub?.planId || "free";
+  const planMeta = getPlan(planId) || getPlan("free");
+  const activeHistory = activeSub?.subscriptionId
+    ? historyRows.find((h) => h.subscriptionId === activeSub.subscriptionId)
+    : historyRows.find((h) => h.planId === planId && h.purchaseType !== "cancellation");
+  const purchaseDate = planId === "free"
+    ? null
+    : (activeHistory?.occurredAt ? activeHistory.occurredAt.toISOString() : (activeSub?.updatedAt ? activeSub.updatedAt.toISOString() : null));
+  const currentPeriodEnd = activeSub?.currentPeriodEnd ? activeSub.currentPeriodEnd.toISOString() : null;
+  const trialEndsOn = activeSub?.trialEndsOn ? activeSub.trialEndsOn.toISOString() : null;
+  const subscriptionId = activeSub?.subscriptionId || null;
+  const shortSubscriptionId = subscriptionId
+    ? subscriptionId.replace("gid://shopify/AppSubscription/", "#")
+    : null;
+
+  const currentMonthAddons = addonPurchases.filter((a) => a.month === currentMonth && a.status === "active");
+  const addonSaves = currentMonthAddons.reduce((sum, a) => sum + a.saves, 0);
+
+  // If a paid subscription exists but historyRows has no record for this subscription, record it
+  if (
+    activeSub?.subscriptionId &&
+    planId !== "free" &&
+    !historyRows.some((h) => h.subscriptionId === activeSub.subscriptionId)
+  ) {
+    try {
+      await recordPlanPurchaseHistory({
+        shop,
+        planId,
+        purchaseType: "manual_purchase",
+        amount: planMeta.price,
+        eventKey: `subscription-start:${activeSub.subscriptionId}`,
+        subscriptionId: activeSub.subscriptionId,
+        billingPeriodEnd: activeSub.currentPeriodEnd,
+        occurredAt: activeSub.createdAt || new Date(),
+      });
+      const refreshedHistory = await prisma.planPurchaseHistory.findMany({
+        where: { shop },
+        orderBy: { occurredAt: "desc" },
+        take: 50,
+      });
+      historyRows.length = 0;
+      historyRows.push(...refreshedHistory);
+    } catch (err) {
+      console.warn("Could not backfill subscription history:", err?.message);
+    }
+  }
+
+  const currentSubscription = {
+    planId,
+    planName: planMeta.name,
+    price: planMeta.price,
+    currency: "USD",
+    status: activeSub?.status || "active",
+    purchaseDate,
+    currentPeriodEnd,
+    trialEndsOn,
+    isTrial: trialEndsOn ? new Date(trialEndsOn) > new Date() : false,
+    subscriptionId,
+    shortSubscriptionId,
+    interval: planMeta.price > 0 ? "Every 30 days" : "Free Forever",
+    savesLimit: entitlement.planLimit,
+    addonSaves,
+    effectiveLimit: Number.isFinite(entitlement.planLimit) ? entitlement.planLimit + addonSaves : Infinity,
+    scheduledChange: scheduledChange
+      ? {
+          planId: scheduledChange.planId,
+          planName: getPlan(scheduledChange.planId)?.name || scheduledChange.planId,
+          effectiveMonth: scheduledChange.effectiveMonth,
+          effectiveAt: scheduledChange.effectiveAt ? scheduledChange.effectiveAt.toISOString() : null,
+        }
+      : null,
+  };
+
+  // Collect distinct months
+  const monthSet = new Set();
+  monthSet.add(currentMonth);
+  if (purchaseDate) monthSet.add(purchaseDate.slice(0, 7));
+  for (const h of historyRows) {
+    if (h.occurredAt) monthSet.add(h.occurredAt.toISOString().slice(0, 7));
+  }
+  for (const m of monthlyPurchases) {
+    if (m.month) monthSet.add(m.month);
+  }
+  for (const a of addonPurchases) {
+    if (a.month) monthSet.add(a.month);
+  }
+
+  const sortedMonths = Array.from(monthSet).sort().reverse();
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+
+  const formatMonthLabel = (mKey) => {
+    const [year, monthNum] = mKey.split("-");
+    const monthIndex = parseInt(monthNum, 10) - 1;
+    return `${monthNames[monthIndex] || monthNum} ${year}`;
+  };
+
+  const monthlyBreakdown = sortedMonths.map((m) => {
+    const isCurrent = m === currentMonth;
+    const historyForMonth = historyRows.filter(
+      (h) => h.occurredAt && h.occurredAt.toISOString().slice(0, 7) === m,
+    );
+    const monthlyPurchase = monthlyPurchases.find((p) => p.month === m);
+    const addonsForMonth = addonPurchases.filter((a) => a.month === m);
+    const addonTotal = addonsForMonth.reduce((sum, a) => sum + (a.price || 0), 0);
+
+    let mPlanId = isCurrent ? planId : (monthlyPurchase?.planId || historyForMonth[0]?.planId || "free");
+    const mPlan = getPlan(mPlanId) || getPlan("free");
+
+    let mPurchaseDate = null;
+    let mEndDate = null;
+    let mSubId = null;
+    let mType = "manual_purchase";
+
+    if (isCurrent) {
+      mPurchaseDate = purchaseDate || (historyForMonth[0]?.occurredAt ? historyForMonth[0].occurredAt.toISOString() : null);
+      mEndDate = currentPeriodEnd || (historyForMonth[0]?.billingPeriodEnd ? historyForMonth[0].billingPeriodEnd.toISOString() : null);
+      mSubId = subscriptionId;
+      const cancellationEvent = historyForMonth.find((h) => h.purchaseType === "cancellation");
+      mType = mPlanId === "free" ? (cancellationEvent ? "cancellation" : "free") : (historyForMonth[0]?.purchaseType || "manual_purchase");
+    } else if (historyForMonth.length > 0) {
+      const primary = historyForMonth[0];
+      mPurchaseDate = primary.occurredAt ? primary.occurredAt.toISOString() : null;
+      mEndDate = primary.billingPeriodEnd ? primary.billingPeriodEnd.toISOString() : null;
+      mSubId = primary.subscriptionId;
+      mType = primary.purchaseType;
+    } else if (monthlyPurchase) {
+      mPurchaseDate = monthlyPurchase.createdAt ? monthlyPurchase.createdAt.toISOString() : null;
+      mSubId = monthlyPurchase.billingId;
+      mType = monthlyPurchase.purchaseType;
+    }
+
+    const baseAmount = mPlan.price || 0;
+    const totalAmount = baseAmount + addonTotal;
+
+    return {
+      month: m,
+      monthLabel: formatMonthLabel(m),
+      isCurrentMonth: isCurrent,
+      planId: mPlanId,
+      planName: mPlan.name,
+      basePrice: baseAmount,
+      totalAmount,
+      currency: "USD",
+      purchaseDate: mPurchaseDate,
+      endDate: mEndDate,
+      subscriptionId: mSubId,
+      shortSubscriptionId: mSubId ? mSubId.replace("gid://shopify/AppSubscription/", "#") : null,
+      purchaseType: mType,
+      status: isCurrent ? (mType === "cancellation" ? "cancelled" : (activeSub?.status || "active")) : "completed",
+      savesLimit: mPlan.limit,
+      addons: addonsForMonth.map((a) => ({
+        saves: a.saves,
+        price: a.price,
+        status: a.status,
+        createdAt: a.createdAt ? a.createdAt.toISOString() : null,
+      })),
+    };
+  });
+
+  return {
+    currentSubscription,
+    monthlyBreakdown,
+    historyRows: historyRows.map((h) => ({
+      id: h.id,
+      planId: h.planId,
+      planName: getPlan(h.planId)?.name || h.planId,
+      purchaseType: h.purchaseType,
+      amount: h.amount,
+      currencyCode: h.currencyCode,
+      subscriptionId: h.subscriptionId,
+      shortSubscriptionId: h.subscriptionId ? h.subscriptionId.replace("gid://shopify/AppSubscription/", "#") : null,
+      billingPeriodEnd: h.billingPeriodEnd ? h.billingPeriodEnd.toISOString() : null,
+      occurredAt: h.occurredAt ? h.occurredAt.toISOString() : null,
+    })),
+  };
+};
+
 /** Schedule a Free downgrade for next month while stopping future renewals. */
 export const scheduleFreeDowngrade = async (admin, shop, previousPlanId) => {
   const [record, subscriptions] = await Promise.all([
@@ -551,6 +780,72 @@ export const scheduleFreeDowngrade = async (admin, shop, previousPlanId) => {
     },
   });
   return { effectiveAt };
+};
+
+/**
+ * Cancel a paid subscription immediately, cancel recurring renewals on Shopify,
+ * and revert the store to the Free tier.
+ */
+export const cancelPaidPlan = async (admin, shop) => {
+  const [record, subscriptions] = await Promise.all([
+    prisma.activeSubscription.findUnique({ where: { shop } }),
+    admin ? fetchActiveSubscriptions(admin).catch(() => []) : [],
+  ]);
+
+  for (const subscription of subscriptions) {
+    if (subscription.status === "ACTIVE" && admin) {
+      try {
+        await cancelSubscription(admin, subscription.id);
+      } catch (e) {
+        console.warn(`Could not cancel subscription ${subscription.id} on Shopify:`, e?.message);
+      }
+    }
+  }
+
+  if (record?.subscriptionId && admin) {
+    try {
+      await cancelSubscription(admin, record.subscriptionId);
+    } catch (e) {
+      console.warn(`Could not cancel cached subscription ${record.subscriptionId} on Shopify:`, e?.message);
+    }
+  }
+
+  await prisma.activeSubscription.upsert({
+    where: { shop },
+    create: {
+      shop,
+      planId: "free",
+      status: "active",
+      subscriptionId: null,
+      currentPeriodEnd: null,
+      trialEndsOn: null,
+    },
+    update: {
+      planId: "free",
+      status: "active",
+      subscriptionId: null,
+      currentPeriodEnd: null,
+      trialEndsOn: null,
+    },
+  });
+
+  await prisma.scheduledPlanChange.deleteMany({ where: { shop } });
+  await prisma.monthlyPlanPurchase.deleteMany({ where: { shop, month: monthKey() } });
+
+  try {
+    await recordPlanPurchaseHistory({
+      shop,
+      planId: "free",
+      purchaseType: "cancellation",
+      amount: 0,
+      eventKey: `cancellation:${shop}:${Date.now()}`,
+      occurredAt: new Date(),
+    });
+  } catch (e) {
+    console.warn("Could not record cancellation history:", e?.message);
+  }
+
+  return { success: true };
 };
 
 // ─── Addon (one-time purchase) ────────────────────────────────────────────────

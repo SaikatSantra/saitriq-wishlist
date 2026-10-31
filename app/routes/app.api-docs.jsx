@@ -649,7 +649,7 @@ window.dispatchEvent(new CustomEvent('saitriq:wishlist-updated'));`,
     <s-page heading={i18n?.title || "Developer API Reference"}>
       {/* ── Top Hero Card ── */}
       <s-section>
-        <s-box border="base" borderRadius="base" padding="large" background="base">
+        <s-box border="base" borderRadius="base" padding="base" background="base">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>

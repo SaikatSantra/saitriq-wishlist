@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 import fs from "node:fs";
 import path from "node:path";
-import prisma from "./db.server";
+import prisma from "./db.server.js";
 
 const resendApiKey = process.env.RESEND_API_KEY;
 const resendFromEmail = process.env.RESEND_FROM_EMAIL || "Saitriq Wishlist <onboarding@resend.dev>";
@@ -51,13 +51,13 @@ export function recordAlertSent(shop, month, threshold = 80, recipient = "") {
  * Checks if the store's monthly wishlist saves have reached 80% of their plan limit.
  * If 80% is reached and an alert has not yet been sent this month, dispatches an email via Resend.
  */
-export async function checkAndSend80PercentQuotaEmail({ shop, month, used, limit, planName }) {
+export async function checkAndSend80PercentQuotaEmail({ shop, month, used, limit, planName, force = false }) {
   if (!Number.isFinite(limit) || limit <= 0) return { skipped: true, reason: "unlimited_or_zero" };
 
   const ratio = used / limit;
   if (ratio < 0.8) return { skipped: true, reason: "below_threshold" };
 
-  if (hasAlertBeenSent(shop, month, 80)) {
+  if (!force && hasAlertBeenSent(shop, month, 80)) {
     return { skipped: true, reason: "already_sent_this_month" };
   }
 
@@ -70,37 +70,40 @@ export async function checkAndSend80PercentQuotaEmail({ shop, month, used, limit
 
   let recipientEmail = session?.email || process.env.STORE_OWNER_NOTIFICATION_EMAIL;
 
-  // If not found in database session, query Shopify Admin GraphQL via unauthenticated.admin
+  // If not found in database session, query Shopify Admin GraphQL via offline session token
   if (!recipientEmail) {
     try {
-      const { unauthenticated } = await import("./shopify.server");
-      const { admin } = await unauthenticated.admin(shop);
-      const res = await admin.graphql(`
-        query GetShopContactEmail {
-          shop {
-            email
-            contactEmail
-          }
+      const offlineSession = await prisma.session.findFirst({
+        where: { shop, isOnline: false },
+        select: { id: true, accessToken: true },
+      });
+      if (offlineSession?.accessToken) {
+        const res = await fetch(`https://${shop}/admin/api/2026-07/graphql.json`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": offlineSession.accessToken,
+          },
+          body: JSON.stringify({
+            query: "{ shop { email contactEmail } }",
+          }),
+        });
+        const body = await res.json().catch(() => null);
+        recipientEmail = body?.data?.shop?.contactEmail || body?.data?.shop?.email;
+        if (recipientEmail) {
+          await prisma.session.update({
+            where: { id: offlineSession.id },
+            data: { email: recipientEmail },
+          }).catch(() => {});
         }
-      `);
-      const body = await res.json();
-      recipientEmail = body?.data?.shop?.contactEmail || body?.data?.shop?.email;
-      if (recipientEmail) {
-        // Cache back to offline session for future lookups
-        await prisma.session.updateMany({
-          where: { shop, isOnline: false },
-          data: { email: recipientEmail },
-        }).catch(() => {});
       }
     } catch (err) {
-      // GraphQL query failed or offline session not ready
+      console.warn(`[EmailAlert] Failed to query shop email for ${shop}:`, err?.message || err);
     }
   }
 
   if (!recipientEmail) {
     console.warn(`[EmailAlert] 80% quota reached for ${shop}, but no merchant email found in session or admin API.`);
-    // Record alert to prevent repetitive console warning on every single wish save
-    recordAlertSent(shop, month, 80, "unresolved");
     return { skipped: true, reason: "no_recipient_email" };
   }
 
@@ -132,26 +135,26 @@ export async function checkAndSend80PercentQuotaEmail({ shop, month, used, limit
 </head>
 <body>
   <div class="card">
-    <span class="badge">Capacity Alert · 80% Reached</span>
+    <span class="badge">Capacity Alert · ${pct}% Reached</span>
     <h1>Your store is approaching its monthly wishlist limit</h1>
     <p>Hello,</p>
     <p>Your store <strong>${shop}</strong> has used <strong>${pct}%</strong> of its monthly wishlist saves for <strong>${month}</strong>.</p>
     
     <div class="stats-box">
       <div class="stat-row">
-        <span class="stat-label">Active Plan</span>
+        <span class="stat-label">Active Plan: </span>
         <span class="stat-value">${planName || "Free"}</span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">Saves Used This Month</span>
+        <span class="stat-label">Saves Used This Month: </span>
         <span class="stat-value">${used.toLocaleString()} saves</span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">Monthly Plan Limit</span>
+        <span class="stat-label">Monthly Plan Limit: </span>
         <span class="stat-value">${limit.toLocaleString()} saves</span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">Remaining Saves</span>
+        <span class="stat-label">Remaining Saves: </span>
         <span class="stat-value">${Math.max(0, limit - used).toLocaleString()} saves</span>
       </div>
     </div>
@@ -183,6 +186,11 @@ export async function checkAndSend80PercentQuotaEmail({ shop, month, used, limit
       subject,
       html,
     });
+
+    if (response?.error) {
+      console.error(`[EmailAlert] Resend API error sending to ${recipientEmail}:`, response.error);
+      return { sent: false, error: response.error };
+    }
 
     recordAlertSent(shop, month, 80, recipientEmail);
     console.log(`[EmailAlert] 80% quota warning successfully sent to ${recipientEmail} for ${shop}:`, response);
