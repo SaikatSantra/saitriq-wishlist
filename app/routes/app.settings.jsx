@@ -141,17 +141,17 @@ export default function WishlistSettingsPage() {
   return (
     <s-page heading={i18n.title}>
       {actionData?.saved && (
-        <div style={{ marginBottom: "16px" }}>
+        <div style={{ marginBottom: "10px" }}>
           <s-banner tone="success" heading={i18n.savedToast}>
             {i18n.savedToast}
           </s-banner>
         </div>
       )}
 
-      <s-grid gridTemplateColumns="repeat(auto-fit, minmax(320px, 1fr))" gap="large">
+      <s-grid gridTemplateColumns="repeat(auto-fit, minmax(320px, 1fr))" gap="base">
         {/* Left Column: Form Controls */}
         <Form method="post">
-          <s-stack direction="block" gap="large">
+          <s-stack direction="block" gap="base">
             <s-section heading={i18n.pageSection}>
               <s-stack direction="block" gap="base">
                 <s-text-field

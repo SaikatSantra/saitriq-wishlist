@@ -72,6 +72,20 @@ export const loader = async ({ request }) => {
       checklistTitle: t("dashboard.checklistTitle"),
       checklistSubtitle: t("dashboard.checklistSubtitle"),
       faqTitle: t("dashboard.faqTitle"),
+      setupGuideBtn: t("dashboard.setupGuideBtn"),
+      viewAnalyticsBtn: t("dashboard.viewAnalyticsBtn"),
+      upgradePlanBtn: t("dashboard.upgradePlanBtn"),
+      starterAvailable: t("dashboard.starterAvailable"),
+      starterCallout: t("dashboard.starterCallout"),
+      viewStarterBtn: t("dashboard.viewStarterBtn"),
+      capacityActivityHeading: t("dashboard.capacityActivityHeading"),
+      monthlyCapacityLabel: t("dashboard.monthlyCapacityLabel"),
+      consumedBadge: (pct) => t("dashboard.consumedBadge", { pct }),
+      mtdSavesHeading: t("dashboard.mtdSavesHeading"),
+      mtdSavesSubtitle: t("dashboard.mtdSavesSubtitle"),
+      appEmbedHeading: t("dashboard.appEmbedHeading"),
+      storefrontThemeStatus: t("dashboard.storefrontThemeStatus"),
+      manageSubscription: t("pricing.activePlanRate") || "Manage Subscription",
     },
   };
 };
@@ -80,7 +94,7 @@ export const headers = () => ({ "Cache-Control": "no-store, max-age=0" });
 export const shouldRevalidate = () => true;
 
 export default function WishlistDashboard() {
-  const { shop, blocks, stats, embed, history, faqs, i18n } = useLoaderData();
+  const { shop, blocks, stats, embed, history, faqs, locale, i18n } = useLoaderData();
   const [liveStats, setLiveStats] = useState(stats);
   const [openFaq, setOpenFaq] = useState(null);
 
@@ -131,27 +145,27 @@ export default function WishlistDashboard() {
     <s-page heading={i18n.title}>
       {/* ── Hero Callout & Quick Launch ── */}
       <s-section>
-        <s-box border="base" borderRadius="base" padding="large" background="base">
+        <s-box border="base" borderRadius="base" padding="base" background="base">
           <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
-            <s-grid gap="small-300">
+            <s-grid gap="small-200">
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "20px" }}>✨</span>
                 <s-heading>{i18n.title}</s-heading>
               </div>
               <s-paragraph>{i18n.subtitle}</s-paragraph>
               <s-stack direction="inline" gap="small-200">
-                <s-button href="/app/how-to-use" variant="primary">Setup Guide</s-button>
-                <s-button href="/app/wishlist" variant="secondary">View Analytics</s-button>
-                <s-button href="/app/pricing" variant="tertiary">Upgrade Plan</s-button>
+                <s-button href="/app/how-to-use" variant="primary">{i18n.setupGuideBtn || "Setup Guide"}</s-button>
+                <s-button href="/app/wishlist" variant="secondary">{i18n.viewAnalyticsBtn || "View Analytics"}</s-button>
+                <s-button href="/app/pricing" variant="tertiary">{i18n.upgradePlanBtn || "Upgrade Plan"}</s-button>
               </s-stack>
             </s-grid>
             {liveStats.planId === "free" && (
-              <div style={{ background: "#f6fef9", border: "1px solid #cce8db", borderRadius: "10px", padding: "16px 20px", textAlign: "center" }}>
-                <s-badge tone="success">Starter Plan Available</s-badge>
-                <div style={{ margin: "8px 0 12px 0", fontSize: "13px", color: "#202223" }}>
-                  5,000 saves/month for only $5.
+              <div style={{ background: "#f6fef9", border: "1px solid #cce8db", borderRadius: "8px", padding: "12px 16px", textAlign: "center" }}>
+                <s-badge tone="success">{i18n.starterAvailable || "Starter Plan Available"}</s-badge>
+                <div style={{ margin: "6px 0 10px 0", fontSize: "13px", color: "#202223" }}>
+                  {i18n.starterCallout || "5,000 saves/month for only $5."}
                 </div>
-                <s-button href="/app/pricing" variant="primary">View Starter</s-button>
+                <s-button href="/app/pricing" variant="primary">{i18n.viewStarterBtn || "View Starter"}</s-button>
               </div>
             )}
           </s-grid>
@@ -159,19 +173,19 @@ export default function WishlistDashboard() {
       </s-section>
 
       {/* ── Visual Quota Gauge & Key Metrics ── */}
-      <s-section heading="Capacity & Activity">
+      <s-section heading={i18n.capacityActivityHeading || "Capacity & Activity"}>
         <s-grid gridTemplateColumns="repeat(auto-fit, minmax(260px, 1fr))" gap="base">
           {/* Radial Gauge Card */}
-          <s-box border="base" borderRadius="base" padding="large" background="base">
+          <s-box border="base" borderRadius="base" padding="base" background="base">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <s-text color="subdued">Monthly Capacity</s-text>
+                <s-text color="subdued">{i18n.monthlyCapacityLabel || "Monthly Capacity"}</s-text>
                 <div style={{ fontSize: "24px", fontWeight: "700", marginTop: "4px" }}>
-                  {liveStats.used} <span style={{ fontSize: "14px", fontWeight: "normal", color: "#6d7175" }}>/ {Number.isFinite(liveStats.limit) ? liveStats.limit.toLocaleString() : "∞"}</span>
+                  {liveStats.used.toLocaleString(locale)} <span style={{ fontSize: "14px", fontWeight: "normal", color: "#6d7175" }}>/ {Number.isFinite(liveStats.limit) ? liveStats.limit.toLocaleString(locale) : "∞"}</span>
                 </div>
                 <div style={{ marginTop: "6px" }}>
                   <s-badge tone={usedPct >= 90 ? "critical" : usedPct >= 75 ? "warning" : "success"}>
-                    {usedPct}% Consumed
+                    {i18n.consumedBadge ? i18n.consumedBadge(usedPct) : `${usedPct}% Consumed`}
                   </s-badge>
                 </div>
               </div>
@@ -218,19 +232,19 @@ export default function WishlistDashboard() {
           </s-box>
 
           {/* Activity Trend Sparkline Card */}
-          <s-box border="base" borderRadius="base" padding="large" background="base">
+          <s-box border="base" borderRadius="base" padding="base" background="base">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <s-text color="subdued">14-Day Save Trend</s-text>
                 <div style={{ fontSize: "24px", fontWeight: "700", marginTop: "4px" }}>
-                  {history.reduce((acc, curr) => acc + curr.adds, 0)} <span style={{ fontSize: "14px", fontWeight: "normal", color: "#6d7175" }}>saves</span>
+                  {history.reduce((acc, curr) => acc + curr.adds, 0).toLocaleString(locale)} <span style={{ fontSize: "14px", fontWeight: "normal", color: "#6d7175" }}>saves</span>
                 </div>
               </div>
               <s-badge tone="info">Real-time</s-badge>
             </div>
 
             {/* Sparkline Curve */}
-            <div style={{ marginTop: "12px", width: "100%" }}>
+            <div style={{ marginTop: "10px", width: "100%" }}>
               <svg viewBox="0 0 140 40" style={{ width: "100%", height: "45px", overflow: "visible" }}>
                 <polyline
                   fill="none"
@@ -245,7 +259,7 @@ export default function WishlistDashboard() {
           </s-box>
 
           {/* Active Plan Card */}
-          <s-box border="base" borderRadius="base" padding="large" background="base">
+          <s-box border="base" borderRadius="base" padding="base" background="base">
             <s-grid gap="small-200">
               <s-text color="subdued">{i18n.activePlan}</s-text>
               <s-stack direction="inline" gap="small-200" alignItems="center">
@@ -257,17 +271,17 @@ export default function WishlistDashboard() {
               <s-text tone="subdued">
                 {liveStats.remaining === null
                   ? i18n.unlimited
-                  : `${liveStats.remaining.toLocaleString()} saves remaining`}
+                  : `${liveStats.remaining.toLocaleString(locale)} saves remaining`}
               </s-text>
               <div style={{ marginTop: "6px" }}>
-                <s-button href="/app/pricing" variant="secondary">Manage Subscription</s-button>
+                <s-button href="/app/pricing" variant="secondary">{i18n.manageSubscription || "Manage Subscription"}</s-button>
               </div>
             </s-grid>
           </s-box>
         </s-grid>
 
         {Number.isFinite(liveStats.limit) && liveStats.remaining === 0 && (
-          <div style={{ marginTop: "16px" }}>
+          <div style={{ marginTop: "12px" }}>
             <s-banner tone="critical" heading="Monthly limit reached">
               Shoppers cannot add new wishlist items until next month.{" "}
               <s-link href="/app/pricing">Upgrade your plan</s-link> to restore capacity immediately.
@@ -294,10 +308,10 @@ export default function WishlistDashboard() {
           </s-banner>
         )}
 
-        <s-box border="base" borderRadius="base" padding="large" background="base">
+        <s-box border="base" borderRadius="base" padding="base" background="base">
           <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
             <s-grid gap="small-200">
-              <s-heading>Theme App Embed</s-heading>
+              <s-heading>{i18n.appEmbedHeading || "Theme App Embed"}</s-heading>
               <s-paragraph>
                 The app embed loads your wishlist buttons and styles globally on all templates with zero theme code edits.
               </s-paragraph>

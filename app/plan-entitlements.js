@@ -21,8 +21,8 @@ export const resolvePlanEntitlement = ({
     ? now >= scheduledEffectiveAt
     : month >= scheduled.effectiveMonth);
   const basePlanId = scheduled
-    ? scheduleStarted ? scheduled.planId : scheduled.previousPlanId
-    : activePlanId;
+    ? (scheduleStarted ? scheduled.planId : (activePlanId && activePlanId !== "free" ? activePlanId : scheduled.previousPlanId || activePlanId || "free"))
+    : (activePlanId || "free");
 
   const purchasedPlanId = purchases.reduce(
     (highest, purchase) => higherPlan(highest, purchase.planId),
@@ -30,7 +30,7 @@ export const resolvePlanEntitlement = ({
   );
   const planId = scheduleStarted
     ? scheduled.planId
-    : higherPlan(basePlanId, purchasedPlanId);
+    : (activePlanId === "free" && !scheduled ? "free" : higherPlan(basePlanId, purchasedPlanId));
   const basePurchaseCount = purchases.filter(
     (purchase) => purchase.planId === planId && purchase.purchaseType === "base",
   ).length;

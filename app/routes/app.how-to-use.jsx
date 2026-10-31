@@ -179,7 +179,7 @@ export default function HowToUsePage() {
     <s-page heading={i18n?.title || "Storefront Integration Guide"}>
       {/* ── Top Header ── */}
       <s-section>
-        <s-box border="base" borderRadius="base" padding="large" background="base">
+        <s-box border="base" borderRadius="base" padding="base" background="base">
           <div style={{
             display: "flex",
             justifyContent: "space-between",
@@ -235,7 +235,7 @@ export default function HowToUsePage() {
 
       {/* ── PART 1: ONLINE STORE 2.0 (APP BLOCKS) ── */}
       <s-section>
-        <s-box border="base" borderRadius="base" padding="large" background="base">
+        <s-box border="base" borderRadius="base" padding="base" background="base">
           <div style={{
             display: "flex",
             alignItems: "center",
@@ -342,7 +342,7 @@ export default function HowToUsePage() {
 
       {/* ── PART 2: MANUAL LIQUID INTEGRATION (VINTAGE THEMES) ── */}
       <s-section>
-        <s-box border="base" borderRadius="base" padding="large" background="base">
+        <s-box border="base" borderRadius="base" padding="base" background="base">
           <div style={{
             display: "flex",
             justifyContent: "space-between",

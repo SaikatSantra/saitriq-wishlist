@@ -212,7 +212,9 @@ export const action = async ({ request }) => {
   try {
     // ── clear ──────────────────────────────────────────────────────────────
     if (operation === "clear") {
-      const count = await clearCustomerWishlist(shop, customerId);
+      let count = await clearCustomerWishlist(shop, customerId);
+      const payloadCount = Math.max(0, parseInt(payload?.count ?? payload?.itemCount, 10) || 0);
+      if (payloadCount > count) count = payloadCount;
       if (count > 0) await recordAnalytics(shop, { removes: count }).catch(() => {});
       const items = await listCustomerWishlistItems(shop, customerId);
       return json({ operation: "clear", removed: count, items });

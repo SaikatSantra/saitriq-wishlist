@@ -210,32 +210,30 @@ export const action = async ({ request }) => {
     ]);
     const limit = effectiveLimit(entitlement.planLimit, addonSaves);
 
-    // Hard Stop when limit reached: stops all wishlist operations (add, remove, clear)
-    if (Number.isFinite(limit) && used >= limit) {
-      return json({
-        authenticated: false,
-        limitReached: true,
-        stopped: true,
-        error: "Wishlist is temporarily unavailable.",
-        items: [],
-        usage: { used, limit, remaining: 0 },
-      }, { status: 429 });
-    }
-
     // ── clear ─────────────────────────────────────────────────────────────────
     if (operation === "clear") {
       let removedCount = 0;
-      if (customerId) removedCount = await clearCustomerWishlist(shop, customerId);
+      if (customerId) {
+        removedCount = await clearCustomerWishlist(shop, customerId);
+      }
+
+      const payloadCount = Math.max(0, parseInt(payload?.count ?? payload?.itemCount, 10) || 0);
+      if (payloadCount > removedCount) {
+        removedCount = payloadCount;
+      } else if (removedCount === 0 && !customerId) {
+        removedCount = 1;
+      }
+
       if (removedCount > 0) {
         await recordAnalytics(shop, { removes: removedCount }).catch((e) =>
           console.error("Analytics update failed on clear", e));
       }
-      const used = await currentUsage(shop, month);
+      const currentUsed = await currentUsage(shop, month);
       return json({
         authenticated: Boolean(customerId),
         tracked: true,
         items: customerId ? await listCustomerWishlistItems(shop, customerId) : [],
-        usage: usageFor(used, limit),
+        usage: usageFor(currentUsed, limit),
       });
     }
 
@@ -248,6 +246,18 @@ export const action = async ({ request }) => {
 
     if (!productId || !productHandle || !productTitle || !["add", "remove"].includes(operation)) {
       return json({ error: "A valid wishlist operation and product details are required." }, { status: 400 });
+    }
+
+    // Hard Stop when limit reached: only blocks 'add' saves (removals are always permitted)
+    if (operation === "add" && Number.isFinite(limit) && used >= limit) {
+      return json({
+        authenticated: Boolean(customerId),
+        limitReached: true,
+        stopped: true,
+        error: "Wishlist is temporarily unavailable.",
+        items: customerId ? await listCustomerWishlistItems(shop, customerId) : [],
+        usage: { used, limit, remaining: 0 },
+      }, { status: 429 });
     }
 
     if (operation === "add") {
@@ -281,7 +291,7 @@ export const action = async ({ request }) => {
     const currentUsed = await currentUsage(shop, month);
 
     if (operation === "add" && Number.isFinite(limit) && currentUsed / limit >= 0.8) {
-      import("../email.server").then(({ checkAndSend80PercentQuotaEmail }) => {
+      import("../email.server.js").then(({ checkAndSend80PercentQuotaEmail }) => {
         checkAndSend80PercentQuotaEmail({
           shop,
           month,

@@ -56,6 +56,15 @@ export const listCustomerWishlistItems = async (shop, customerId) => {
   return rows.map(toItem);
 };
 
+export const listRecentWishlistItems = async (shop, take = 50) => {
+  const rows = await prisma.wishlistItem.findMany({
+    where: { shop },
+    orderBy: { createdAt: "desc" },
+    take,
+  });
+  return rows.map(toItem);
+};
+
 export const countWishlistSavesForMonth = async (shop, month) => {
   // month = "YYYY-MM"
   const from = new Date(`${month}-01T00:00:00.000Z`);
